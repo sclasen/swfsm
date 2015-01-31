@@ -7,9 +7,9 @@ import (
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
-// ActivityCorrelator is a serialization-friendly struct that can be used as a field in your main StateData struct in an FSM.
-// You can use it to track the type of a given activity, so you know how to react when an event that signals the
-// end or an activity hits your Decider.  This is missing from the SWF api.
+// EventCorrelator is a serialization-friendly struct that is automatically managed by the FSM machinery
+// It tracks signal and activity correlation info, so you know how to react when an event that signals the
+// end of an activity or signal  hits your Decider.  This is missing from the SWF api.
 // Activities and Signals are string instead of int64 beacuse json.
 type EventCorrelator struct {
 	Activities       map[string]*ActivityInfo //schedueledEventId -> info
@@ -24,7 +24,7 @@ type ActivityInfo struct {
 	*swf.ActivityType
 }
 
-// ActivityInfo holds the ActivityID and ActivityType for an activity
+// SignalInfo holds the SignalName and Input for an activity
 type SignalInfo struct {
 	SignalName string
 	Input      string
