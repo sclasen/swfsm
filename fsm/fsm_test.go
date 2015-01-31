@@ -106,7 +106,7 @@ func TestFSM(t *testing.T) {
 	secondEvents := DecisionsToEvents(decisions)
 	secondEvents = append(secondEvents, events...)
 
-	if state, _ := fsm.findSerializedState(secondEvents); state.ReplicationData.StateName != "working" {
+	if state, _ := fsm.findSerializedState(secondEvents); state.StateName != "working" {
 		t.Fatal("current state is not 'working'", secondEvents)
 	}
 
@@ -393,13 +393,11 @@ func TestContinuedWorkflows(t *testing.T) {
 
 	stateData := fsm.Serialize(TestData{States: []string{"continuing"}})
 	state := SerializedState{
-		ReplicationData: ReplicationData{
-			StateVersion: 23,
-			StateName:    "ok",
-			StateData:    stateData,
-		},
-		EventCorrelator: EventCorrelator{},
+		StateVersion: 23,
+		StateName:    "ok",
+		StateData:    stateData,
 	}
+
 	serializedState := fsm.Serialize(state)
 	resp := testDecisionTask(4, []swf.HistoryEvent{swf.HistoryEvent{
 		EventType: S(swf.EventTypeWorkflowExecutionStarted),
@@ -413,8 +411,8 @@ func TestContinuedWorkflows(t *testing.T) {
 
 	log.Println(updatedState)
 
-	if updatedState.ReplicationData.StateVersion != 24 {
-		t.Fatal("StateVersion !=24 ", updatedState.ReplicationData.StateVersion)
+	if updatedState.StateVersion != 24 {
+		t.Fatal("StateVersion !=24 ", updatedState.StateVersion)
 	}
 
 	if len(decisions) != 1 && *decisions[0].RecordMarkerDecisionAttributes.MarkerName != StateMarker {
@@ -621,7 +619,7 @@ func TestTrackPendingActivities(t *testing.T) {
 		},
 	}
 	secondEvents = append(secondEvents, events...)
-	if state, _ := fsm.findSerializedState(secondEvents); state.ReplicationData.StateName != "working" {
+	if state, _ := fsm.findSerializedState(secondEvents); state.StateName != "working" {
 		t.Fatal("current state is not 'working'", secondEvents)
 	}
 	second := testDecisionTask(3, secondEvents)
@@ -662,7 +660,7 @@ func TestTrackPendingActivities(t *testing.T) {
 		},
 	}
 	thirdEvents = append(thirdEvents, secondEvents...)
-	if state, _ := fsm.findSerializedState(thirdEvents); state.ReplicationData.StateName != "working" {
+	if state, _ := fsm.findSerializedState(thirdEvents); state.StateName != "working" {
 		t.Fatal("current state is not 'working'", thirdEvents)
 	}
 	third := testDecisionTask(7, thirdEvents)
@@ -691,7 +689,7 @@ func TestTrackPendingActivities(t *testing.T) {
 		},
 	}
 	fourthEvents = append(fourthEvents, thirdEvents...)
-	if state, _ := fsm.findSerializedState(fourthEvents); state.ReplicationData.StateName != "done" {
+	if state, _ := fsm.findSerializedState(fourthEvents); state.StateName != "done" {
 		t.Fatal("current state is not 'done'", fourthEvents)
 	}
 	fourth := testDecisionTask(11, fourthEvents)
@@ -801,8 +799,8 @@ func TestContinueWorkflowDecision(t *testing.T) {
 	testData := new(TestData)
 	serState := new(SerializedState)
 	ctx.Deserialize(*cont.ContinueAsNewWorkflowExecutionDecisionAttributes.Input, serState)
-	ctx.Deserialize(serState.ReplicationData.StateData, testData)
-	if len(testData.States) != 1 || testData.States[0] != "continuing" || serState.ReplicationData.StateVersion != 7 || serState.ReplicationData.StateName != "InitialState" {
+	ctx.Deserialize(serState.StateData, testData)
+	if len(testData.States) != 1 || testData.States[0] != "continuing" || serState.StateVersion != 7 || serState.StateName != "InitialState" {
 		t.Fatal(testData, cont)
 	}
 

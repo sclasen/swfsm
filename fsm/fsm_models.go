@@ -15,6 +15,7 @@ import (
 // constants used as marker names or signal names
 const (
 	StateMarker       = "FSM.State"
+	CorrelatorMarker  = "FSM.Correlator"
 	ErrorSignal       = "FSM.Error"
 	SystemErrorSignal = "FSM.SystemError"
 	ContinueTimer     = "FSM.ContinueWorkflow"
@@ -352,12 +353,9 @@ func (f *FSMContext) ContinueWorkflowDecision(continuedState string) swf.Decisio
 		DecisionType: aws.String(swf.DecisionTypeContinueAsNewWorkflowExecution),
 		ContinueAsNewWorkflowExecutionDecisionAttributes: &swf.ContinueAsNewWorkflowExecutionDecisionAttributes{
 			Input: aws.String(f.Serialize(SerializedState{
-				ReplicationData: ReplicationData{
-					StateName:    continuedState,
-					StateData:    f.Serialize(f.stateData),
-					StateVersion: f.stateVersion,
-				},
-				EventCorrelator: EventCorrelator{},
+				StateName:    continuedState,
+				StateData:    f.Serialize(f.stateData),
+				StateVersion: f.stateVersion,
 			},
 			)),
 		},
@@ -380,6 +378,7 @@ func (f *FSMContext) CompletionDecision(data interface{}) swf.Decision {
 // been continued, and the StartedId of the DecisionTask that generated this state.  The epoch + the id provide a total ordering
 // of state over the lifetime of different runs of a workflow.
 type SerializedState struct {
-	ReplicationData ReplicationData
-	EventCorrelator EventCorrelator
+	StateVersion uint64 `json:"stateVersion"`
+	StateName    string `json:"stateName"`
+	StateData    string `json:"stateData"`
 }

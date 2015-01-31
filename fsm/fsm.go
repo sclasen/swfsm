@@ -163,7 +163,7 @@ func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
 	}
 	//currently we arent returning state when in in an error state so only set context in non-error state.
 	if state != nil {
-		complete.ExecutionContext = aws.String(state.ReplicationData.StateName)
+		complete.ExecutionContext = aws.String(state.StateName)
 	}
 
 	if err := f.SWF.RespondDecisionTaskCompleted(&complete); err != nil {
@@ -174,7 +174,7 @@ func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
 	if state == nil || f.KinesisStream == "" {
 		return // nothing to replicate
 	}
-	stateToReplicate, err := f.Serializer.Serialize(state.ReplicationData)
+	stateToReplicate, err := f.Serializer.Serialize(state)
 	if err != nil {
 		f.log("action=tick at=serialize-state-failed error=%q", err.Error())
 		return
@@ -244,8 +244,15 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 		}
 		return append(outcome.decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
 	}
-	f.log("action=tick at=find-serialized-state state=%s", serializedState.ReplicationData.StateName)
-	eventCorrelator := &serializedState.EventCorrelator
+	eventCorrelator, err := f.findSerializedEventCorrelator(decisionTask.Events)
+	if err != nil {
+		f.log("action=tick at=error=find-serialized-event-correlator-failed err=%q", err)
+		if f.allowPanics {
+			panic(err)
+		}
+		return append(outcome.decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
+	}
+	f.log("action=tick at=find-serialized-state state=%s", serializedState.StateName)
 	context := NewFSMContext(f,
 		*decisionTask.WorkflowType,
 		*decisionTask.WorkflowExecution,
@@ -258,7 +265,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 	//if there was no error processing, we recover the state + data from the marker
 	if outcome.data == nil && outcome.state == "" {
 		data := reflect.New(reflect.TypeOf(f.DataType)).Interface()
-		if err = f.Serializer.Deserialize(serializedState.ReplicationData.StateData, data); err != nil {
+		if err = f.Serializer.Deserialize(serializedState.StateData, data); err != nil {
 			f.log("action=tick at=error=deserialize-state-failed err=&s", err)
 			if f.allowPanics {
 				panic(err)
@@ -268,9 +275,9 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 		f.log("action=tick at=find-current-data data=%v", data)
 
 		outcome.data = data
-		outcome.state = serializedState.ReplicationData.StateName
-		outcome.stateVersion = serializedState.ReplicationData.StateVersion
-		context.stateVersion = serializedState.ReplicationData.StateVersion
+		outcome.state = serializedState.StateName
+		outcome.stateVersion = serializedState.StateVersion
+		context.stateVersion = serializedState.StateVersion
 	}
 
 	//iterate through events oldest to newest, calling the decider for the current state.
@@ -440,14 +447,25 @@ func (f *FSM) findSerializedState(events []swf.HistoryEvent) (*SerializedState, 
 			state := &SerializedState{}
 			err := f.Serializer.Deserialize(*event.WorkflowExecutionStartedEventAttributes.Input, state)
 			if err == nil {
-				if state.ReplicationData.StateName == "" {
-					state.ReplicationData.StateName = f.initialState.Name
+				if state.StateName == "" {
+					state.StateName = f.initialState.Name
 				}
 			}
 			return state, err
 		}
 	}
 	return nil, errors.New("Cant Find Current Data")
+}
+
+func (f *FSM) findSerializedEventCorrelator(events []swf.HistoryEvent) (*EventCorrelator, error) {
+	for _, event := range events {
+		if f.isCorrelatorMarker(event) {
+			correlator := &EventCorrelator{}
+			err := f.Serializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, correlator)
+			return correlator, err
+		}
+	}
+	return &EventCorrelator{}, nil
 }
 
 func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) []swf.HistoryEvent {
@@ -478,21 +496,26 @@ func (f *FSM) recordStateMarker(outcome *intermediateOutcome, eventCorrelator *E
 	serializedData, err := f.Serializer.Serialize(outcome.data)
 
 	state := &SerializedState{
-		ReplicationData: ReplicationData{
-			StateVersion: outcome.stateVersion + 1, //increment the version here only.
-			StateName:    outcome.state,
-			StateData:    serializedData,
-		},
-		EventCorrelator: *eventCorrelator,
+		StateVersion: outcome.stateVersion + 1, //increment the version here only.
+		StateName:    outcome.state,
+		StateData:    serializedData,
 	}
-
 	serializedMarker, err := f.systemSerializer.Serialize(state)
+
 	if err != nil {
 		return nil, state, err
 	}
+
+	serializedCorrelator, err := f.systemSerializer.Serialize(eventCorrelator)
+
+	if err != nil {
+		return nil, state, err
+	}
+
 	d := f.recordStringMarker(StateMarker, serializedMarker)
+	c := f.recordStringMarker(CorrelatorMarker, serializedCorrelator)
 	decisions := f.EmptyDecisions()
-	decisions = append(decisions, d)
+	decisions = append(decisions, d, c)
 	decisions = append(decisions, outcome.decisions...)
 	return decisions, state, nil
 }
@@ -525,6 +548,10 @@ func (f *FSM) isStateMarker(e swf.HistoryEvent) bool {
 	return *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == StateMarker
 }
 
+func (f *FSM) isCorrelatorMarker(e swf.HistoryEvent) bool {
+	return *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == CorrelatorMarker
+}
+
 func (f *FSM) isErrorSignal(e swf.HistoryEvent) bool {
 	if *e.EventType == swf.EventTypeWorkflowExecutionSignaled {
 		switch *e.WorkflowExecutionSignaledEventAttributes.SignalName {
@@ -552,7 +579,7 @@ func StartFSMWorkflowInput(serializer StateSerializer, data interface{}) string 
 		panic(err)
 	}
 
-	ss.ReplicationData.StateData = stateData
+	ss.StateData = stateData
 	serialized, err := serializer.Serialize(ss)
 	if err != nil {
 		panic(err)
@@ -565,9 +592,9 @@ func ContinueFSMWorkflowInput(ctx *FSMContext, data interface{}) string {
 	ss := new(SerializedState)
 	stateData := ctx.Serialize(data)
 
-	ss.ReplicationData.StateData = stateData
-	ss.ReplicationData.StateName = ctx.serialization.InitialState()
-	ss.ReplicationData.StateVersion = ctx.stateVersion
+	ss.StateData = stateData
+	ss.StateName = ctx.serialization.InitialState()
+	ss.StateVersion = ctx.stateVersion
 
 	return ctx.Serialize(ss)
 }
