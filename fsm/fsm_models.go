@@ -213,7 +213,7 @@ func (p ProtobufStateSerializer) Deserialize(serialized string, state interface{
 	return err
 }
 
-// FSMSerializer is the contract for de/serializing state inside an FSM, typically implemented by the FSM itself
+// Serialization is the contract for de/serializing state inside an FSM, typically implemented by the FSM itself
 // but serves to break the circular dep between FSMContext and FSM.
 type Serialization interface {
 	EventData(h swf.HistoryEvent, data interface{})
