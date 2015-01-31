@@ -840,6 +840,7 @@ func testFSM() *FSM {
 		DataType:          TestData{},
 		KinesisStream:     "test-stream",
 		Serializer:        JSONStateSerializer{},
+		systemSerializer:  JSONStateSerializer{},
 		KinesisReplicator: defaultKinesisReplicator(),
 		allowPanics:       true,
 	}

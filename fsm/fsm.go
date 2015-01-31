@@ -486,10 +486,11 @@ func (f *FSM) recordStateMarker(outcome *intermediateOutcome, eventCorrelator *E
 		EventCorrelator: *eventCorrelator,
 	}
 
-	d, err := f.recordMarker(StateMarker, state)
+	serializedMarker, err := f.systemSerializer.Serialize(state)
 	if err != nil {
 		return nil, state, err
 	}
+	d := f.recordStringMarker(StateMarker, serializedMarker)
 	decisions := f.EmptyDecisions()
 	decisions = append(decisions, d)
 	decisions = append(decisions, outcome.decisions...)
