@@ -1,5 +1,4 @@
 swf-go
-
 ======
 
 go library that provides a Finite State Machine abstraction and other niceities on top of swf apis.
@@ -8,7 +7,11 @@ go library that provides a Finite State Machine abstraction and other niceities 
 
 [![Build Status](https://travis-ci.org/sclasen/swf-go.svg?branch=master)](https://travis-ci.org/sclasen/swf-go)
 
-* godoc here: http://godoc.org/github.com/sclasen/swf-go
+* fsm godoc here: http://godoc.org/github.com/sclasen/swf-go/fsm
+* poller godoc here: http://godoc.org/github.com/sclasen/swf-go/poller
+* migrator godoc here: http://godoc.org/github.com/sclasen/swf-go/migrator
+* sugar godoc here: http://godoc.org/github.com/sclasen/swf-go/sugar
+
 
 features
 --------
