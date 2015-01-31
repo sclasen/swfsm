@@ -295,7 +295,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 				if f.allowPanics {
 					panic(err)
 				}
-				return append(outcome.decisions, f.captureDecisionError(execution, i, lastEvents, outcome.state, outcome.data, err)...), nil
+				return append(outcome.decisions, f.captureDecisionError(execution, e, err)...), nil
 			}
 			eventCorrelator.Track(e)
 			curr := outcome.state
@@ -354,13 +354,10 @@ func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event swf.Hi
 	return
 }
 
-func (f *FSM) captureDecisionError(execution *swf.WorkflowExecution, event int, lastEvents []swf.HistoryEvent, stateName string, stateData interface{}, err error) []swf.Decision {
+func (f *FSM) captureDecisionError(execution *swf.WorkflowExecution, event swf.HistoryEvent, err error) []swf.Decision {
 	return f.captureError(ErrorSignal, execution, &SerializedDecisionError{
-		ErrorEventID:        *lastEvents[event].EventID,
-		UnprocessedEventIDs: f.eventIDs(lastEvents[event+1:]),
-		StateName:           stateName,
-		StateData:           stateData,
-		Error:               err,
+		ErrorEvent:       event,
+		Error:              err,
 	})
 }
 
