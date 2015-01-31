@@ -331,7 +331,7 @@ func Transition(toState string) Decider {
 func Complete() Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		log.Printf("at=complete-workflow workflowID=%s", ctx.WorkflowID)
-		return ctx.Complete(data)
+		return ctx.CompleteWorkflow(data)
 	}
 }
 
@@ -357,7 +357,7 @@ func ManagedContinuations(historySize int, timerRetrySeconds int) Decider {
 	handleContinuationTimer := func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		if *h.EventType == swf.EventTypeTimerFired && *h.TimerFiredEventAttributes.TimerID == ContinueTimer {
 			if len(ctx.ActivitiesInfo()) == 0 {
-				decisions := append(ctx.EmptyDecisions(), ctx.ContinueWorkflowDecision(ctx.State))
+				decisions := append(ctx.EmptyDecisions(), ctx.ContinueWorkflowDecision(ctx.State, data))
 				return ctx.Stay(data, decisions)
 			}
 			d := swf.Decision{
@@ -378,7 +378,7 @@ func ManagedContinuations(historySize int, timerRetrySeconds int) Decider {
 		if *h.EventType == swf.EventTypeWorkflowExecutionSignaled && *h.WorkflowExecutionSignaledEventAttributes.SignalName == ContinueSignal {
 
 			if len(ctx.ActivitiesInfo()) == 0 {
-				decisions := append(ctx.EmptyDecisions(), ctx.ContinueWorkflowDecision(ctx.State))
+				decisions := append(ctx.EmptyDecisions(), ctx.ContinueWorkflowDecision(ctx.State, data))
 				return ctx.Stay(data, decisions)
 			}
 

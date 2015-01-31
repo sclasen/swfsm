@@ -104,7 +104,7 @@ func (f *FSM) DefaultCompleteState() *FSMState {
 		Name: CompleteState,
 		Decider: func(fsm *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 			f.log("state=complete at=attempt-completion event=%s", h)
-			return fsm.Complete(data)
+			return fsm.CompleteWorkflow(data)
 		},
 	}
 }

@@ -795,7 +795,7 @@ func TestContinueWorkflowDecision(t *testing.T) {
 	},
 	)
 
-	cont := ctx.ContinueWorkflowDecision("InitialState")
+	cont := ctx.ContinueWorkflowDecision("InitialState", ctx.stateData)
 	testData := new(TestData)
 	serState := new(SerializedState)
 	ctx.Deserialize(*cont.ContinueAsNewWorkflowExecutionDecisionAttributes.Input, serState)

@@ -278,11 +278,24 @@ func (f *FSMContext) Goto(state string, data interface{}, decisions []swf.Decisi
 }
 
 // Complete is a helper func to easily create a CompleteOutcome.
-func (f *FSMContext) Complete(data interface{}, decisions ...swf.Decision) Outcome {
-	final := append(decisions, f.CompleteWorkflowDecision(data))
+func (f *FSMContext) CompleteWorkflow(data interface{}, decisions ...swf.Decision) Outcome {
+	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != swf.DecisionTypeCompleteWorkflowExecution {
+		decisions = append(decisions, f.CompleteWorkflowDecision(data))
+	}
 	return CompleteOutcome{
 		data:      data,
-		decisions: final,
+		decisions: decisions,
+	}
+}
+
+// Complete is a helper func to easily create a CompleteOutcome.
+func (f *FSMContext) ContinueWorkflow(data interface{}, decisions ...swf.Decision) Outcome {
+	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != swf.DecisionTypeContinueAsNewWorkflowExecution {
+		decisions = append(decisions, f.ContinueWorkflowDecision(f.State, data))
+	}
+	return CompleteOutcome{
+		data:      data,
+		decisions: decisions,
 	}
 }
 
@@ -345,13 +358,13 @@ func (f *FSMContext) EmptyDecisions() []swf.Decision {
 // This decision should be used when it is appropriate to Continue your workflow.
 // You are unable to ContinueAsNew a workflow that has running activites, so you should assure there are none running before using this.
 // As such there is no need to copy over the ActivityCorrelator.
-func (f *FSMContext) ContinueWorkflowDecision(continuedState string) swf.Decision {
+func (f *FSMContext) ContinueWorkflowDecision(continuedState string, data interface{}) swf.Decision {
 	return swf.Decision{
 		DecisionType: aws.String(swf.DecisionTypeContinueAsNewWorkflowExecution),
 		ContinueAsNewWorkflowExecutionDecisionAttributes: &swf.ContinueAsNewWorkflowExecutionDecisionAttributes{
 			Input: aws.String(f.Serialize(SerializedState{
 				StateName:    continuedState,
-				StateData:    f.Serialize(f.stateData),
+				StateData:    f.Serialize(data),
 				StateVersion: f.stateVersion,
 			},
 			)),
