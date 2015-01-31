@@ -17,8 +17,8 @@ test-aws: install forego
 tidy:
 	go get github.com/golang/lint/golint
 	go get code.google.com/p/go.tools/cmd/goimports
-	test -z "$$(goimports -l -d . | tee /dev/stderr)"
-	test -z "$$(golint . | tee /dev/stderr)"
+	test -z "$$(goimports -l -d ./... | tee /dev/stderr)"
+	test -z "$$(golint ./... | tee /dev/stderr)"
 
 imports:
 	goimports -w .

@@ -19,17 +19,13 @@ import (
 //Todo add tests of error handling mechanism
 //assert that the decisions have the mark and the signal external...hmm need workflow id for signal external.
 
-var testActivityInfo = ActivityInfo{ActivityID: "activityId", ActivityType: swf.ActivityType{Name: S("activity"), Version: S("activityVersion")}}
+var testActivityInfo = ActivityInfo{ActivityID: "activityId", ActivityType: &swf.ActivityType{Name: S("activity"), Version: S("activityVersion")}}
 
 var typedFuncs = Typed(new(TestData))
 
 func TestFSM(t *testing.T) {
 
-	fsm := FSM{
-		Name:       "test-fsm",
-		DataType:   TestData{},
-		Serializer: JSONStateSerializer{},
-	}
+	fsm := testFSM()
 
 	fsm.AddInitialState(&FSMState{
 		Name: "start",
@@ -41,7 +37,7 @@ func TestFSM(t *testing.T) {
 				DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 				ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 					ActivityID:   S(testActivityInfo.ActivityID),
-					ActivityType: &testActivityInfo.ActivityType,
+					ActivityType: testActivityInfo.ActivityType,
 					TaskList:     &swf.TaskList{Name: S("taskList")},
 					Input:        S(serialized),
 				},
@@ -71,7 +67,7 @@ func TestFSM(t *testing.T) {
 					DecisionType: aws.String(swf.DecisionTypeScheduleActivityTask),
 					ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 						ActivityID:   S(testActivityInfo.ActivityID),
-						ActivityType: &testActivityInfo.ActivityType,
+						ActivityType: testActivityInfo.ActivityType,
 						TaskList:     &swf.TaskList{Name: S("taskList")},
 						Input:        S(serialized),
 					},
@@ -174,7 +170,7 @@ func DecisionsToEvents(decisions []swf.Decision) []swf.HistoryEvent {
 				EventID:   I(6),
 				ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
 					ActivityID:   S(testActivityInfo.ActivityID),
-					ActivityType: &testActivityInfo.ActivityType,
+					ActivityType: testActivityInfo.ActivityType,
 				},
 			}
 			events = append(events, event)
@@ -230,87 +226,6 @@ func TestPanicRecovery(t *testing.T) {
 		t.Fatal("fatallz")
 	} else {
 		log.Println(err)
-	}
-}
-
-func TestErrorHandling(t *testing.T) {
-	fsm := FSM{
-		Name:        "test-fsm",
-		DataType:    TestData{},
-		Serializer:  JSONStateSerializer{},
-		allowPanics: true,
-	}
-
-	fsm.AddInitialState(&FSMState{
-		Name: "ok",
-		Decider: func(f *FSMContext, h swf.HistoryEvent, d interface{}) Outcome {
-			if *h.EventType == swf.EventTypeWorkflowExecutionStarted {
-				return f.Stay(d, nil)
-			}
-			if *h.EventType == swf.EventTypeWorkflowExecutionSignaled && d.(*TestData).States[0] == "recovered" {
-				log.Println("recovered")
-				return f.Stay(d, nil)
-			}
-			t.Fatalf("ok state did not get recovered %s", h)
-			return nil
-
-		},
-	})
-
-	fsm.AddErrorState(&FSMState{
-		Name: "error",
-		Decider: func(f *FSMContext, h swf.HistoryEvent, d interface{}) Outcome {
-			if *h.EventType == swf.EventTypeWorkflowExecutionSignaled && *h.WorkflowExecutionSignaledEventAttributes.SignalName == ErrorSignal {
-				log.Println("in error recovery")
-				return f.Goto("ok", &TestData{States: []string{"recovered"}}, nil)
-			}
-			t.Fatalf("error handler got unexpected event")
-			return nil
-
-		},
-	})
-
-	events := []swf.HistoryEvent{
-		swf.HistoryEvent{
-			EventID:   I(3),
-			EventType: S(swf.EventTypeWorkflowExecutionSignaled),
-			WorkflowExecutionSignaledEventAttributes: &swf.WorkflowExecutionSignaledEventAttributes{
-				SignalName: S("NOT AN ERROR"),
-				Input:      S("Hi"),
-			},
-		},
-		swf.HistoryEvent{
-			EventID:   I(2),
-			EventType: S(swf.EventTypeWorkflowExecutionSignaled),
-			WorkflowExecutionSignaledEventAttributes: &swf.WorkflowExecutionSignaledEventAttributes{
-				SignalName: S(ErrorSignal),
-				Input:      S("{\"workflowEpoch\":2})"),
-			},
-		},
-		swf.HistoryEvent{
-			EventID:   I(1),
-			EventType: S(swf.EventTypeWorkflowExecutionStarted),
-			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: S(StartFSMWorkflowInput(fsm.Serializer, "")),
-			},
-		},
-	}
-
-	resp := testDecisionTask(1, events)
-
-	decisions, _ := fsm.Tick(resp)
-	if len(decisions) != 1 && *decisions[0].DecisionType != swf.DecisionTypeRecordMarker {
-		t.Fatalf("no state marker!")
-	}
-	//Try with TypedDecider
-	id := fsm.initialState.Decider
-	fsm.initialState.Decider = typedFuncs.Decider(func(f *FSMContext, h swf.HistoryEvent, d *TestData) Outcome { return id(f, h, d) })
-	ie := fsm.errorState.Decider
-	fsm.errorState.Decider = typedFuncs.Decider(func(f *FSMContext, h swf.HistoryEvent, d *TestData) Outcome { return ie(f, h, d) })
-
-	decisions2, _ := fsm.Tick(resp)
-	if len(decisions2) != 1 && *decisions2[0].DecisionType != swf.DecisionTypeRecordMarker {
-		t.Fatalf("no state marker for typed decider!")
 	}
 }
 
@@ -439,7 +354,7 @@ func ExampleFSM() {
 	//wire it up in an fsm
 	fsm := &FSM{
 		Name:       "example-fsm",
-		Client:     client,
+		SWF:        client,
 		DataType:   StateData{},
 		Domain:     "exaple-swf-domain",
 		TaskList:   "example-decision-task-list-to-poll",
@@ -464,12 +379,7 @@ func ExampleFSM() {
 }
 
 func TestContinuedWorkflows(t *testing.T) {
-	fsm := FSM{
-		Name:        "test-fsm",
-		DataType:    TestData{},
-		Serializer:  JSONStateSerializer{},
-		allowPanics: true,
-	}
+	fsm := testFSM()
 
 	fsm.AddInitialState(&FSMState{
 		Name: "ok",
@@ -488,7 +398,7 @@ func TestContinuedWorkflows(t *testing.T) {
 			StateName:    "ok",
 			StateData:    stateData,
 		},
-		PendingActivities: ActivityCorrelator{},
+		EventCorrelator: EventCorrelator{},
 	}
 	serializedState := fsm.Serialize(state)
 	resp := testDecisionTask(4, []swf.HistoryEvent{swf.HistoryEvent{
@@ -512,42 +422,11 @@ func TestContinuedWorkflows(t *testing.T) {
 	}
 }
 
-type MockKinesisClient struct {
-	*kinesis.Kinesis
-	*swf.SWF
-	putRecords []kinesis.PutRecordInput
-	seqNumber  int
-}
-
-func (c *MockKinesisClient) PutRecord(req *kinesis.PutRecordInput) (*kinesis.PutRecordOutput, error) {
-	if c.putRecords == nil {
-		c.seqNumber = rand.Int()
-		c.putRecords = make([]kinesis.PutRecordInput, 0)
-	}
-	c.putRecords = append(c.putRecords, *req)
-	c.seqNumber++
-	return &kinesis.PutRecordOutput{
-		SequenceNumber: S(strconv.Itoa(c.seqNumber)),
-		ShardID:        req.PartitionKey,
-	}, nil
-}
-
-func (c *MockKinesisClient) RespondDecisionTaskCompleted(req *swf.RespondDecisionTaskCompletedInput) (err error) {
-	return nil
-}
-
 func TestKinesisReplication(t *testing.T) {
-	client := &MockKinesisClient{}
-	fsm := FSM{
-		KinesisClient:     client,
-		Client:            client,
-		Name:              "test-fsm",
-		DataType:          TestData{},
-		KinesisStream:     "test-stream",
-		Serializer:        JSONStateSerializer{},
-		KinesisReplicator: defaultKinesisReplicator(),
-		allowPanics:       true,
-	}
+	client := &MockClient{}
+	fsm := testFSM()
+	fsm.SWF = client
+	fsm.Kinesis = client
 	fsm.AddInitialState(&FSMState{
 		Name: "initial",
 		Decider: func(f *FSMContext, h swf.HistoryEvent, d interface{}) Outcome {
@@ -600,12 +479,7 @@ func TestKinesisReplication(t *testing.T) {
 }
 
 func TestTrackPendingActivities(t *testing.T) {
-	fsm := &FSM{
-		Name:        "test-fsm",
-		DataType:    TestData{},
-		Serializer:  JSONStateSerializer{},
-		allowPanics: true,
-	}
+	fsm := testFSM()
 
 	fsm.AddInitialState(&FSMState{
 		Name: "start",
@@ -617,7 +491,7 @@ func TestTrackPendingActivities(t *testing.T) {
 				DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 				ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 					ActivityID:   S(testActivityInfo.ActivityID),
-					ActivityType: &testActivityInfo.ActivityType,
+					ActivityType: testActivityInfo.ActivityType,
 					TaskList:     &swf.TaskList{Name: S("taskList")},
 					Input:        S(serialized),
 				},
@@ -635,6 +509,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			var decisions = f.EmptyDecisions()
 			if *lastEvent.EventType == swf.EventTypeActivityTaskCompleted {
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
+				log.Printf("----->>>>> %+v %+v", trackedActivityInfo, testActivityInfo)
 				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
 					t.Fatalf("pending activity not being tracked\nExpected:\n%+v\nGot:\n%+v",
 						testActivityInfo, trackedActivityInfo,
@@ -651,6 +526,7 @@ func TestTrackPendingActivities(t *testing.T) {
 				return f.Goto("done", testData, []swf.Decision{decision})
 			} else if *lastEvent.EventType == swf.EventTypeActivityTaskFailed {
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
+				log.Printf("----->>>>> %+v %+v %+v", trackedActivityInfo, testActivityInfo, f.ActivitiesInfo())
 				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
 					t.Fatalf("pending activity not being tracked\nExpected:\n%+v\nGot:\n%+v",
 						testActivityInfo, trackedActivityInfo,
@@ -660,7 +536,7 @@ func TestTrackPendingActivities(t *testing.T) {
 					DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 					ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 						ActivityID:   S(testActivityInfo.ActivityID),
-						ActivityType: &testActivityInfo.ActivityType,
+						ActivityType: testActivityInfo.ActivityType,
 						TaskList:     &swf.TaskList{Name: S("taskList")},
 						Input:        S(serialized),
 					},
@@ -732,7 +608,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			EventID:   I(6),
 			ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
 				ActivityID:   S(testActivityInfo.ActivityID),
-				ActivityType: &testActivityInfo.ActivityType,
+				ActivityType: testActivityInfo.ActivityType,
 			},
 		},
 		{
@@ -773,7 +649,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			EventID:   I(10),
 			ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
 				ActivityID:   S(testActivityInfo.ActivityID),
-				ActivityType: &testActivityInfo.ActivityType,
+				ActivityType: testActivityInfo.ActivityType,
 			},
 		},
 		{
@@ -830,17 +706,7 @@ func TestTrackPendingActivities(t *testing.T) {
 }
 
 func TestFSMContextActivityTracking(t *testing.T) {
-	ctx := NewFSMContext(
-		&FSM{
-			Name:       "test-fsm",
-			DataType:   TestData{},
-			Serializer: JSONStateSerializer{},
-		},
-		swf.WorkflowType{Name: S("test-workflow"), Version: S("1")},
-		swf.WorkflowExecution{WorkflowID: S("test-workflow-1"), RunID: S("123123")},
-		&ActivityCorrelator{},
-		"InitialState", &TestData{}, 0,
-	)
+	ctx := testContext(testFSM())
 	scheduledEventID := rand.Int()
 	activityID := fmt.Sprintf("test-activity-%d", scheduledEventID)
 	taskScheduled := swf.HistoryEvent{
@@ -918,21 +784,11 @@ func TestFSMContextActivityTracking(t *testing.T) {
 
 func TestContinueWorkflowDecision(t *testing.T) {
 
-	fsm := &FSM{
-		Name:       "test-fsm",
-		DataType:   TestData{},
-		Serializer: JSONStateSerializer{},
-	}
-
-	ctx := NewFSMContext(
-		fsm,
-		swf.WorkflowType{Name: S("test-workflow"), Version: S("1")},
-		swf.WorkflowExecution{WorkflowID: S("test-workflow-1"), RunID: S("123123")},
-		&ActivityCorrelator{},
-		"InitialState", &TestData{}, uint64(7),
-	)
-
+	fsm := testFSM()
+	ctx := testContext(fsm)
+	ctx.stateVersion = uint64(7)
 	ctx.stateData = &TestData{States: []string{"continuing"}}
+
 	fsm.AddInitialState(&FSMState{
 		Name: "InitialState",
 		Decider: func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
@@ -953,19 +809,9 @@ func TestContinueWorkflowDecision(t *testing.T) {
 }
 
 func TestCompleteState(t *testing.T) {
-	fsm := &FSM{
-		Name:       "test-fsm",
-		DataType:   TestData{},
-		Serializer: JSONStateSerializer{},
-	}
+	fsm := testFSM()
 
-	ctx := NewFSMContext(
-		fsm,
-		swf.WorkflowType{Name: S("test-workflow"), Version: S("1")},
-		swf.WorkflowExecution{WorkflowID: S("test-workflow-1"), RunID: S("123123")},
-		&ActivityCorrelator{},
-		"InitialState", &TestData{}, 0,
-	)
+	ctx := testContext(fsm)
 
 	event := swf.HistoryEvent{
 		EventID:   I(1),
@@ -988,14 +834,36 @@ func TestCompleteState(t *testing.T) {
 	}
 }
 
+func testFSM() *FSM {
+	fsm := &FSM{
+		Name:              "test-fsm",
+		DataType:          TestData{},
+		KinesisStream:     "test-stream",
+		Serializer:        JSONStateSerializer{},
+		KinesisReplicator: defaultKinesisReplicator(),
+		allowPanics:       true,
+	}
+	return fsm
+}
+
+func testContext(fsm *FSM) *FSMContext {
+	return NewFSMContext(
+		fsm,
+		swf.WorkflowType{Name: S("test-workflow"), Version: S("1")},
+		swf.WorkflowExecution{WorkflowID: S("test-workflow-1"), RunID: S("123123")},
+		&EventCorrelator{},
+		"InitialState", &TestData{}, 0,
+	)
+}
+
 func testDecisionTask(prevStarted int, events []swf.HistoryEvent) *swf.DecisionTask {
 
 	d := &swf.DecisionTask{
 		Events:                 events,
 		PreviousStartedEventID: I(prevStarted),
 		StartedEventID:         I(prevStarted + len(events)),
-		WorkflowExecution:      &swf.WorkflowExecution{WorkflowID: S("workflow-id"), RunID: S("run-id")},
-		WorkflowType:           &swf.WorkflowType{Name: S("workflow-name"), Version: S("workflow-version")},
+		WorkflowExecution:      testWorkflowExecution,
+		WorkflowType:           testWorkflowType,
 	}
 	for i, e := range d.Events {
 		if e.EventID == nil {
@@ -1005,4 +873,31 @@ func testDecisionTask(prevStarted int, events []swf.HistoryEvent) *swf.DecisionT
 		d.Events[i] = e
 	}
 	return d
+}
+
+var testWorkflowExecution = &swf.WorkflowExecution{WorkflowID: S("workflow-id"), RunID: S("run-id")}
+var testWorkflowType = &swf.WorkflowType{Name: S("workflow-name"), Version: S("workflow-version")}
+
+type MockClient struct {
+	*kinesis.Kinesis
+	*swf.SWF
+	putRecords []kinesis.PutRecordInput
+	seqNumber  int
+}
+
+func (c *MockClient) PutRecord(req *kinesis.PutRecordInput) (*kinesis.PutRecordOutput, error) {
+	if c.putRecords == nil {
+		c.seqNumber = rand.Int()
+		c.putRecords = make([]kinesis.PutRecordInput, 0)
+	}
+	c.putRecords = append(c.putRecords, *req)
+	c.seqNumber++
+	return &kinesis.PutRecordOutput{
+		SequenceNumber: S(strconv.Itoa(c.seqNumber)),
+		ShardID:        req.PartitionKey,
+	}, nil
+}
+
+func (c *MockClient) RespondDecisionTaskCompleted(req *swf.RespondDecisionTaskCompletedInput) (err error) {
+	return nil
 }

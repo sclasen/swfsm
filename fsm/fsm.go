@@ -13,12 +13,6 @@ import (
 	. "github.com/sclasen/swf-go/sugar"
 )
 
-func defaultKinesisReplicator() KinesisReplicator {
-	return func(fsm, workflowID string, put func() (*kinesis.PutRecordOutput, error)) (*kinesis.PutRecordOutput, error) {
-		return put()
-	}
-}
-
 type SWFOps interface {
 	PollForDecisionTask(*swf.PollForDecisionTaskInput) (*swf.DecisionTask, error)
 	PollForActivityTask(*swf.PollForActivityTaskInput) (*swf.ActivityTask, error)
@@ -27,6 +21,12 @@ type SWFOps interface {
 
 type KinesisOps interface {
 	PutRecord(*kinesis.PutRecordInput) (*kinesis.PutRecordOutput, error)
+}
+
+func defaultKinesisReplicator() KinesisReplicator {
+	return func(fsm, workflowID string, put func() (*kinesis.PutRecordOutput, error)) (*kinesis.PutRecordOutput, error) {
+		return put()
+	}
 }
 
 // FSM models the decision handling logic a workflow in SWF
@@ -40,23 +40,25 @@ type FSM struct {
 	// Identity used in PollForDecisionTaskRequests, can be empty.
 	Identity string
 	// Client used to make SWF api requests.
-	Client SWFOps
+	SWF SWFOps
 	// KinesisClient used to make Kinesis api requests.
-	KinesisClient KinesisOps
-	// DataType of the data struct associated with this FSM.
-	// The data is automatically peristed to and loaded from workflow history by the FSM.
-	DataType interface{}
-	// Serializer used to serialize/deserialise state from workflow history.
-	Serializer StateSerializer
+	Kinesis KinesisOps
 	// Kinesis stream in the same region to replicate state to.
 	KinesisStream string
 	// Strategy for replication of state to Kinesis.
 	KinesisReplicator KinesisReplicator
+	// DataType of the data struct associated with this FSM.
+	// The data is automatically peristed to and loaded from workflow history by the FSM.
+	// it should be a pointer to a struct i.e. new(MyStruct). reflection is used to create new instances of this type.
+	DataType interface{}
+	// Serializer used to serialize/deserialise fsm state data to/from workflow history.
+	Serializer StateSerializer
+	// Serializer used to serialize/deserialise in json the fsm managed marker recorded events to/from workflow history.
+	systemSerializer StateSerializer
 	//PollerShutdownManager is used when the FSM is managing the polling
 	PollerShutdownManager *poller.PollerShutdownManager
 	states                map[string]*FSMState
 	initialState          *FSMState
-	errorState            *FSMState
 	completeState         *FSMState
 	stop                  chan bool
 	stopAck               chan bool
@@ -87,51 +89,6 @@ func (f *FSM) AddState(state *FSMState) {
 	f.states[state.Name] = state
 }
 
-//ErrorStates should return an outcome with nil Data and "" as NextState if they wish for the normal state recovery mechanism
-//to load current state and data.
-
-// AddErrorState adds an error handling state to your FSM. This is a special FSMState that should at a minimum handle
-// WorkflowSignaled events where the signal name is FSM.Error and the event data is a SerializedDecisionError, or the
-// signal name is FSM.SystemError and the event data is a SerializedSystemError. The error state should take care of transitioning
-// the workflow back into a working state, by making decisions, updating data and/or choosing a new state.
-func (f *FSM) AddErrorState(state *FSMState) {
-	f.AddState(state)
-	f.errorState = state
-}
-
-// DefaultErrorState is the error state used in an FSM if one has not been set. It simply emits logs admonishing you to add
-// a proper error state to your FSM.
-func (f *FSM) DefaultErrorState() *FSMState {
-	return &FSMState{
-		Name: ErrorState,
-		Decider: func(fsm *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
-			switch *h.EventType {
-			case swf.EventTypeWorkflowExecutionSignaled:
-				{
-					switch *h.WorkflowExecutionSignaledEventAttributes.SignalName {
-					case ErrorSignal:
-						err := &SerializedDecisionError{}
-						f.Deserialize(*h.WorkflowExecutionSignaledEventAttributes.Input, err)
-						f.log("action=default-handle-error at=handle-decision-error error=%+v", err)
-						f.log("YOU SHOULD CREATE AN ERROR STATE FOR YOUR FSM, Workflow %s is Hung", h.WorkflowExecutionSignaledEventAttributes.ExternalWorkflowExecution.WorkflowID)
-					case SystemErrorSignal:
-						err := &SerializedSystemError{}
-						f.Deserialize(*h.WorkflowExecutionSignaledEventAttributes.Input, err)
-						f.log("action=default-handle-error at=handle-system-error error=%+v", err)
-						f.log("YOU SHOULD CREATE AN ERROR STATE FOR YOUR FSM, Workflow %s is Hung", h.WorkflowExecutionSignaledEventAttributes.ExternalWorkflowExecution.WorkflowID)
-					default:
-						f.log("action=default-handle-error at=process-signal-event event=%+v", h)
-					}
-
-				}
-			default:
-				f.log("action=default-handle-error at=process-event event=%+v", h)
-			}
-			return fsm.Error(data, []swf.Decision{})
-		},
-	}
-}
-
 // AddCompleteState adds a state to the FSM and uses it as the final state of a workflow.
 // it will only receive events if you returned FSMContext.Complete(...) and the workflow was unable to complete.
 func (f *FSM) AddCompleteState(state *FSMState) {
@@ -159,10 +116,6 @@ func (f *FSM) Init() {
 		panic("No Initial State Defined For FSM")
 	}
 
-	if f.errorState == nil {
-		f.AddErrorState(f.DefaultErrorState())
-	}
-
 	if f.completeState == nil {
 		f.AddCompleteState(f.DefaultCompleteState())
 	}
@@ -180,6 +133,11 @@ func (f *FSM) Init() {
 		f.Serializer = &JSONStateSerializer{}
 	}
 
+	if f.systemSerializer == nil {
+		f.log("action=start at=no-system-serializer defaulting-to=JSONSerializer")
+		f.systemSerializer = &JSONStateSerializer{}
+	}
+
 	if f.PollerShutdownManager == nil {
 		f.PollerShutdownManager = poller.NewPollerShutdownManager()
 	}
@@ -193,7 +151,7 @@ func (f *FSM) Init() {
 // If you wish to manage polling and calling Tick() yourself, you dont need to start the FSM, just call Init().
 func (f *FSM) Start() {
 	f.Init()
-	poller := poller.NewDecisionTaskPoller(f.Client, f.Domain, f.Identity, f.TaskList)
+	poller := poller.NewDecisionTaskPoller(f.SWF, f.Domain, f.Identity, f.TaskList)
 	go poller.PollUntilShutdownBy(f.PollerShutdownManager, fmt.Sprintf("%s-poller", f.Name), f.handleDecisionTask)
 }
 
@@ -208,7 +166,7 @@ func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
 		complete.ExecutionContext = aws.String(state.ReplicationData.StateName)
 	}
 
-	if err := f.Client.RespondDecisionTaskCompleted(&complete); err != nil {
+	if err := f.SWF.RespondDecisionTaskCompleted(&complete); err != nil {
 		f.log("action=tick at=decide-request-failed error=%q", err.Error())
 		return
 	}
@@ -223,7 +181,7 @@ func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
 	}
 
 	put := func() (*kinesis.PutRecordOutput, error) {
-		return f.KinesisClient.PutRecord(&kinesis.PutRecordInput{
+		return f.Kinesis.PutRecord(&kinesis.PutRecordInput{
 			StreamName: aws.String(f.KinesisStream),
 			//partition by workflow
 			PartitionKey: decisionTask.WorkflowExecution.WorkflowID,
@@ -275,7 +233,7 @@ func (f *FSM) Deserialize(serialized string, data interface{}) {
 // On errors, a nil *SerializedState is returned, and an error Outcome is included in the Decision list.
 // It is exported to facilitate testing.
 func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedState) {
-	lastEvents, errorEvents := f.findLastEvents(*decisionTask.PreviousStartedEventID, decisionTask.Events)
+	lastEvents := f.findLastEvents(*decisionTask.PreviousStartedEventID, decisionTask.Events)
 	execution := decisionTask.WorkflowExecution
 	outcome := new(intermediateOutcome)
 	serializedState, err := f.findSerializedState(decisionTask.Events)
@@ -287,33 +245,16 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 		return append(outcome.decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
 	}
 	f.log("action=tick at=find-serialized-state state=%s", serializedState.ReplicationData.StateName)
-	pendingActivities := &serializedState.PendingActivities
+	eventCorrelator := &serializedState.EventCorrelator
 	context := NewFSMContext(f,
 		*decisionTask.WorkflowType,
 		*decisionTask.WorkflowExecution,
-		pendingActivities,
+		eventCorrelator,
 		"", nil, uint64(0),
 	)
 
-	//if there are error events, we dont do normal recovery of state + data, we expect the error state to provide this.
-	if len(errorEvents) > 0 {
-		//todo how can errors mess up versioning
-		outcome.data = reflect.New(reflect.TypeOf(f.DataType)).Interface()
-		outcome.state = f.errorState.Name
-		context.State = f.errorState.Name
-		context.stateData = outcome.data
-		for i := len(errorEvents) - 1; i >= 0; i-- {
-			e := errorEvents[i]
-			anOutcome, err := f.panicSafeDecide(f.errorState, context, e, outcome.data)
-			if err != nil {
-				f.log("at=error error=error-handling-decision-execution-error err=%q state=%s next-state=%s", err, f.errorState.Name, outcome.state)
-				//we wont get here if panics are allowed
-				return append(outcome.decisions, f.captureDecisionError(execution, i, errorEvents, outcome.state, outcome.data, err)...), nil //TODO: is nil the thing to do?
-			}
-			f.mergeOutcomes(outcome, anOutcome)
-		}
-	}
-
+	//todo now on any error on processing an event simply sends an error signal to the workflow
+	//decider stack should all handle errors
 	//if there was no error processing, we recover the state + data from the marker
 	if outcome.data == nil && outcome.state == "" {
 		data := reflect.New(reflect.TypeOf(f.DataType)).Interface()
@@ -349,7 +290,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 				}
 				return append(outcome.decisions, f.captureDecisionError(execution, i, lastEvents, outcome.state, outcome.data, err)...), nil
 			}
-			pendingActivities.Track(e)
+			eventCorrelator.Track(e)
 			curr := outcome.state
 			f.mergeOutcomes(outcome, anOutcome)
 			f.log("action=tick at=decided-event state=%s next-state=%s decisions=%d", curr, outcome.state, len(anOutcome.Decisions()))
@@ -365,7 +306,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 		f.log("action=tick at=decide next-state=%s decision=%s", outcome.state, d.DecisionType)
 	}
 
-	final, serializedState, err := f.recordStateMarker(outcome, pendingActivities)
+	final, serializedState, err := f.recordStateMarker(outcome, eventCorrelator)
 	if err != nil {
 		f.log("action=tick at=error error=state-serialization-error err=%q error-type=system", err)
 		if f.allowPanics {
@@ -509,13 +450,12 @@ func (f *FSM) findSerializedState(events []swf.HistoryEvent) (*SerializedState, 
 	return nil, errors.New("Cant Find Current Data")
 }
 
-func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) ([]swf.HistoryEvent, []swf.HistoryEvent) {
+func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) []swf.HistoryEvent {
 	var lastEvents []swf.HistoryEvent
-	var errorEvents []swf.HistoryEvent
 
 	for _, event := range events {
 		if *event.EventID == prevStarted {
-			return lastEvents, errorEvents
+			return lastEvents
 		}
 		switch *event.EventType {
 		case swf.EventTypeDecisionTaskCompleted, swf.EventTypeDecisionTaskScheduled,
@@ -525,22 +465,16 @@ func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) ([]sw
 			if !f.isStateMarker(event) {
 				lastEvents = append(lastEvents, event)
 			}
-		case swf.EventTypeWorkflowExecutionSignaled:
-			if f.isErrorSignal(event) {
-				errorEvents = append(errorEvents, event)
-			} else {
-				lastEvents = append(lastEvents, event)
-			}
 		default:
 			lastEvents = append(lastEvents, event)
 		}
 
 	}
 
-	return lastEvents, errorEvents
+	return lastEvents
 }
 
-func (f *FSM) recordStateMarker(outcome *intermediateOutcome, pending *ActivityCorrelator) ([]swf.Decision, *SerializedState, error) {
+func (f *FSM) recordStateMarker(outcome *intermediateOutcome, eventCorrelator *EventCorrelator) ([]swf.Decision, *SerializedState, error) {
 	serializedData, err := f.Serializer.Serialize(outcome.data)
 
 	state := &SerializedState{
@@ -549,7 +483,7 @@ func (f *FSM) recordStateMarker(outcome *intermediateOutcome, pending *ActivityC
 			StateName:    outcome.state,
 			StateData:    serializedData,
 		},
-		PendingActivities: *pending,
+		EventCorrelator: *eventCorrelator,
 	}
 
 	d, err := f.recordMarker(StateMarker, state)

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"strconv"
 	"strings"
 
 	"code.google.com/p/goprotobuf/proto"
@@ -218,7 +217,7 @@ func (p ProtobufStateSerializer) Deserialize(serialized string, state interface{
 
 // FSMSerializer is the contract for de/serializing state inside an FSM, typically implemented by the FSM itself
 // but serves to break the circular dep between FSMContext and FSM.
-type FSMSerializer interface {
+type Serialization interface {
 	EventData(h swf.HistoryEvent, data interface{})
 	Serialize(data interface{}) string
 	StateSerializer() StateSerializer
@@ -228,27 +227,27 @@ type FSMSerializer interface {
 
 // FSMContext is populated by the FSM machinery and passed to Deciders.
 type FSMContext struct {
-	serialization FSMSerializer
+	serialization Serialization
 	swf.WorkflowType
 	swf.WorkflowExecution
-	pendingActivities *ActivityCorrelator
-	State             string
-	stateData         interface{}
-	stateVersion      uint64
+	eventCorrelator *EventCorrelator
+	State           string
+	stateData       interface{}
+	stateVersion    uint64
 }
 
 // NewFSMContext constructs an FSMContext.
 func NewFSMContext(
-	serialization FSMSerializer,
+	serialization Serialization,
 	wfType swf.WorkflowType, wfExec swf.WorkflowExecution,
-	pending *ActivityCorrelator,
+	eventCorrelator *EventCorrelator,
 	state string, stateData interface{}, stateVersion uint64,
 ) *FSMContext {
 	return &FSMContext{
 		serialization:     serialization,
 		WorkflowType:      wfType,
 		WorkflowExecution: wfExec,
-		pendingActivities: pending,
+		eventCorrelator:   eventCorrelator,
 		State:             state,
 		stateData:         stateData,
 		stateVersion:      stateVersion,
@@ -301,7 +300,7 @@ func (f *FSMContext) Error(data interface{}, decisions []swf.Decision) Outcome {
 // Decide executes a decider making sure that Activity tasks are being tracked.
 func (f *FSMContext) Decide(h swf.HistoryEvent, data interface{}, decider Decider) Outcome {
 	outcome := decider(f, h, data)
-	f.pendingActivities.Track(h)
+	f.eventCorrelator.Track(h)
 	return outcome
 }
 
@@ -314,12 +313,12 @@ func (f *FSMContext) EventData(h swf.HistoryEvent, data interface{}) {
 // ActivityTasks are automatically tracked after a EventTypeActivityTaskScheduled event.
 // When there is no pending activity related to the event, nil is returned.
 func (f *FSMContext) ActivityInfo(h swf.HistoryEvent) *ActivityInfo {
-	return f.pendingActivities.ActivityType(h)
+	return f.eventCorrelator.ActivityType(h)
 }
 
 // ActivitiesInfo will return a map of activityId -> ActivityInfo for all in-flight activities in the workflow.
 func (f *FSMContext) ActivitiesInfo() map[string]*ActivityInfo {
-	return f.pendingActivities.Activities
+	return f.eventCorrelator.Activities
 }
 
 // Serialize will use the current fsm's Serializer to serialize the given struct. It will panic on errors, which is ok in the context of a Decider.
@@ -358,7 +357,7 @@ func (f *FSMContext) ContinueWorkflowDecision(continuedState string) swf.Decisio
 					StateData:    f.Serialize(f.stateData),
 					StateVersion: f.stateVersion,
 				},
-				PendingActivities: ActivityCorrelator{},
+				EventCorrelator: EventCorrelator{},
 			},
 			)),
 		},
@@ -381,74 +380,6 @@ func (f *FSMContext) CompletionDecision(data interface{}) swf.Decision {
 // been continued, and the StartedId of the DecisionTask that generated this state.  The epoch + the id provide a total ordering
 // of state over the lifetime of different runs of a workflow.
 type SerializedState struct {
-	ReplicationData   ReplicationData
-	PendingActivities ActivityCorrelator
-}
-
-// ActivityCorrelator is a serialization-friendly struct that can be used as a field in your main StateData struct in an FSM.
-// You can use it to track the type of a given activity, so you know how to react when an event that signals the
-// end or an activity hits your Decider.  This is missing from the SWF api.
-type ActivityCorrelator struct {
-	Activities map[string]*ActivityInfo
-}
-
-// ActivityInfo holds the ActivityID and ActivityType for an activity
-type ActivityInfo struct {
-	ActivityID string
-	swf.ActivityType
-}
-
-// Track will add or remove entries based on the EventType.
-// A new entry is added when there is a new ActivityTask, or an entry is removed when the ActivityTask is terminating.
-func (a *ActivityCorrelator) Track(h swf.HistoryEvent) {
-	a.RemoveCorrelation(h)
-	a.Correlate(h)
-}
-
-// Correlate establishes a mapping of eventId to ActivityType. The HistoryEvent is expected to be of type EventTypeActivityTaskScheduled.
-func (a *ActivityCorrelator) Correlate(h swf.HistoryEvent) {
-	if a.Activities == nil {
-		a.Activities = make(map[string]*ActivityInfo)
-	}
-	if *h.EventType == swf.EventTypeActivityTaskScheduled {
-		a.Activities[strconv.FormatInt(*h.EventID, 10)] = &ActivityInfo{
-			ActivityID:   *h.ActivityTaskScheduledEventAttributes.ActivityID,
-			ActivityType: *h.ActivityTaskScheduledEventAttributes.ActivityType,
-		}
-	}
-}
-
-// RemoveCorrelation gcs a mapping of eventId to ActivityType. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
-func (a *ActivityCorrelator) RemoveCorrelation(h swf.HistoryEvent) {
-	if a.Activities == nil {
-		a.Activities = make(map[string]*ActivityInfo)
-	}
-	switch *h.EventType {
-	case swf.EventTypeActivityTaskCompleted:
-		delete(a.Activities, strconv.FormatInt(*h.ActivityTaskCompletedEventAttributes.ScheduledEventID, 10))
-	case swf.EventTypeActivityTaskFailed:
-		delete(a.Activities, strconv.FormatInt(*h.ActivityTaskFailedEventAttributes.ScheduledEventID, 10))
-	case swf.EventTypeActivityTaskTimedOut:
-		delete(a.Activities, strconv.FormatInt(*h.ActivityTaskTimedOutEventAttributes.ScheduledEventID, 10))
-	case swf.EventTypeActivityTaskCanceled:
-		delete(a.Activities, strconv.FormatInt(*h.ActivityTaskCanceledEventAttributes.ScheduledEventID, 10))
-	}
-}
-
-// ActivityType returns the ActivityType that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
-func (a *ActivityCorrelator) ActivityType(h swf.HistoryEvent) *ActivityInfo {
-	if a.Activities == nil {
-		a.Activities = make(map[string]*ActivityInfo)
-	}
-	switch *h.EventType {
-	case swf.EventTypeActivityTaskCompleted:
-		return a.Activities[strconv.FormatInt(*h.ActivityTaskCompletedEventAttributes.ScheduledEventID, 10)]
-	case swf.EventTypeActivityTaskFailed:
-		return a.Activities[strconv.FormatInt(*h.ActivityTaskFailedEventAttributes.ScheduledEventID, 10)]
-	case swf.EventTypeActivityTaskTimedOut:
-		return a.Activities[strconv.FormatInt(*h.ActivityTaskTimedOutEventAttributes.ScheduledEventID, 10)]
-	case swf.EventTypeActivityTaskCanceled:
-		return a.Activities[strconv.FormatInt(*h.ActivityTaskCanceledEventAttributes.ScheduledEventID, 10)]
-	}
-	return nil
+	ReplicationData ReplicationData
+	EventCorrelator EventCorrelator
 }
