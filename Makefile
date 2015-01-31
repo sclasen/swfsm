@@ -3,13 +3,13 @@ all: build
 travis: dependencies tidy test
 
 install:
-	 go install
+	 go install ./...
 
 forego:
 	go get github.com/ddollar/forego
 
 test: install
-	go test
+	go test ./...
 
 test-aws: install forego
 	forego run go test
