@@ -3,6 +3,7 @@ package sugar
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )

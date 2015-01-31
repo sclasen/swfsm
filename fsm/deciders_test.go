@@ -1,9 +1,10 @@
 package fsm
 
 import (
+	"testing"
+
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
-	"testing"
 )
 
 func TestTypedFuncs(t *testing.T) {

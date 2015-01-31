@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"code.google.com/p/goprotobuf/proto"
-    . "github.com/sclasen/swf-go/sugar"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/kinesis"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
+	. "github.com/sclasen/swf-go/sugar"
 )
 
 //Todo add tests of error handling mechanism
@@ -94,7 +94,6 @@ func TestFSM(t *testing.T) {
 			},
 		},
 	}
-
 
 	first := testDecisionTask(0, events)
 
@@ -297,7 +296,7 @@ func TestErrorHandling(t *testing.T) {
 		},
 	}
 
-	resp := testDecisionTask(1,events)
+	resp := testDecisionTask(1, events)
 
 	decisions, _ := fsm.Tick(resp)
 	if len(decisions) != 1 && *decisions[0].DecisionType != swf.DecisionTypeRecordMarker {
@@ -466,9 +465,9 @@ func ExampleFSM() {
 
 func TestContinuedWorkflows(t *testing.T) {
 	fsm := FSM{
-		Name:       "test-fsm",
-		DataType:   TestData{},
-		Serializer: JSONStateSerializer{},
+		Name:        "test-fsm",
+		DataType:    TestData{},
+		Serializer:  JSONStateSerializer{},
 		allowPanics: true,
 	}
 
@@ -492,12 +491,12 @@ func TestContinuedWorkflows(t *testing.T) {
 		PendingActivities: ActivityCorrelator{},
 	}
 	serializedState := fsm.Serialize(state)
-	resp := testDecisionTask(4,[]swf.HistoryEvent{swf.HistoryEvent{
-			EventType: S(swf.EventTypeWorkflowExecutionStarted),
-			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: S(serializedState),
-			},
-		}})
+	resp := testDecisionTask(4, []swf.HistoryEvent{swf.HistoryEvent{
+		EventType: S(swf.EventTypeWorkflowExecutionStarted),
+		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
+			Input: S(serializedState),
+		},
+	}})
 
 	log.Printf("%+v", resp)
 	decisions, updatedState := fsm.Tick(resp)
@@ -602,9 +601,9 @@ func TestKinesisReplication(t *testing.T) {
 
 func TestTrackPendingActivities(t *testing.T) {
 	fsm := &FSM{
-		Name:       "test-fsm",
-		DataType:   TestData{},
-		Serializer: JSONStateSerializer{},
+		Name:        "test-fsm",
+		DataType:    TestData{},
+		Serializer:  JSONStateSerializer{},
 		allowPanics: true,
 	}
 
@@ -790,7 +789,7 @@ func TestTrackPendingActivities(t *testing.T) {
 	if state, _ := fsm.findSerializedState(thirdEvents); state.ReplicationData.StateName != "working" {
 		t.Fatal("current state is not 'working'", thirdEvents)
 	}
-	third := testDecisionTask(7,thirdEvents)
+	third := testDecisionTask(7, thirdEvents)
 	thirdDecisions, _ := fsm.Tick(third)
 	recordMarker = FindDecision(thirdDecisions, stateMarkerPredicate)
 	if recordMarker == nil {
@@ -819,7 +818,7 @@ func TestTrackPendingActivities(t *testing.T) {
 	if state, _ := fsm.findSerializedState(fourthEvents); state.ReplicationData.StateName != "done" {
 		t.Fatal("current state is not 'done'", fourthEvents)
 	}
-	fourth := testDecisionTask(11,fourthEvents)
+	fourth := testDecisionTask(11, fourthEvents)
 	fourthDecisions, _ := fsm.Tick(fourth)
 	recordMarker = FindDecision(fourthDecisions, stateMarkerPredicate)
 	if recordMarker == nil {
@@ -992,17 +991,17 @@ func TestCompleteState(t *testing.T) {
 func testDecisionTask(prevStarted int, events []swf.HistoryEvent) *swf.DecisionTask {
 
 	d := &swf.DecisionTask{
-		Events: events,
+		Events:                 events,
 		PreviousStartedEventID: I(prevStarted),
-		StartedEventID: I(prevStarted + len(events)),
-		WorkflowExecution: &swf.WorkflowExecution{WorkflowID:S("workflow-id"),RunID:S("run-id")},
-		WorkflowType: &swf.WorkflowType{Name:S("workflow-name"),Version:S("workflow-version")},
+		StartedEventID:         I(prevStarted + len(events)),
+		WorkflowExecution:      &swf.WorkflowExecution{WorkflowID: S("workflow-id"), RunID: S("run-id")},
+		WorkflowType:           &swf.WorkflowType{Name: S("workflow-name"), Version: S("workflow-version")},
 	}
 	for i, e := range d.Events {
 		if e.EventID == nil {
 			e.EventID = L(*d.StartedEventID - int64(i))
 		}
-		e.EventTimestamp = &aws.UnixTimestamp{time.Unix(0,0)}
+		e.EventTimestamp = &aws.UnixTimestamp{time.Unix(0, 0)}
 		d.Events[i] = e
 	}
 	return d

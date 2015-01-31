@@ -21,5 +21,3 @@ once any in-flight polls have completed, and block until this happens. The shutd
 due to the length of SWF long polls before an empty response is returned.
 */
 package poller
-
-

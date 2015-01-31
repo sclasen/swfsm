@@ -1,11 +1,12 @@
 package migrator
 
 import (
+	"log"
+
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/kinesis"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	. "github.com/sclasen/swf-go/sugar"
-	"log"
 	//"github.com/awslabs/aws-sdk-go/gen/dynamodb"
 )
 

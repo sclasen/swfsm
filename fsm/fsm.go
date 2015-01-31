@@ -3,13 +3,14 @@ package fsm
 import (
 	"errors"
 	"fmt"
+	"log"
+	"reflect"
+
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/kinesis"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"github.com/sclasen/swf-go/poller"
 	. "github.com/sclasen/swf-go/sugar"
-	"log"
-	"reflect"
 )
 
 func defaultKinesisReplicator() KinesisReplicator {
@@ -24,7 +25,7 @@ type SWFOps interface {
 	RespondDecisionTaskCompleted(*swf.RespondDecisionTaskCompletedInput) error
 }
 
-type KinesisOps interface{
+type KinesisOps interface {
 	PutRecord(*kinesis.PutRecordInput) (*kinesis.PutRecordOutput, error)
 }
 
@@ -273,7 +274,7 @@ func (f *FSM) Deserialize(serialized string, data interface{}) {
 // Tick is called when the DecisionTaskPoller receives a PollForDecisionTaskResponse in its polling loop.
 // On errors, a nil *SerializedState is returned, and an error Outcome is included in the Decision list.
 // It is exported to facilitate testing.
-func (f *FSM)  Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedState) {
+func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedState) {
 	lastEvents, errorEvents := f.findLastEvents(*decisionTask.PreviousStartedEventID, decisionTask.Events)
 	execution := decisionTask.WorkflowExecution
 	outcome := new(intermediateOutcome)

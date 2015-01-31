@@ -2,11 +2,12 @@ package fsm
 
 import (
 	"fmt"
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"log"
 	"reflect"
 	"strconv"
+
+	"github.com/awslabs/aws-sdk-go/aws"
+	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
 //ComposedDecider can be used to build a decider out of a number of sub Deciders

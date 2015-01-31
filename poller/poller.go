@@ -1,13 +1,14 @@
 package poller
 
 import (
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"log"
 	"time"
+
+	"github.com/awslabs/aws-sdk-go/aws"
+	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
-type SWFOps interface{
+type SWFOps interface {
 	PollForDecisionTask(req *swf.PollForDecisionTaskInput) (resp *swf.DecisionTask, err error)
 	PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error)
 }

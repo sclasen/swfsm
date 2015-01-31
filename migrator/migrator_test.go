@@ -2,13 +2,14 @@ package migrator
 
 import (
 	"fmt"
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/kinesis"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/awslabs/aws-sdk-go/aws"
+	"github.com/awslabs/aws-sdk-go/gen/kinesis"
+	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
 func TestMigrateDomains(t *testing.T) {
