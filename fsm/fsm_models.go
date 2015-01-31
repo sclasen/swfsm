@@ -279,7 +279,7 @@ func (f *FSMContext) Goto(state string, data interface{}, decisions []swf.Decisi
 
 // Complete is a helper func to easily create a CompleteOutcome.
 func (f *FSMContext) Complete(data interface{}, decisions ...swf.Decision) Outcome {
-	final := append(decisions, f.CompletionDecision(data))
+	final := append(decisions, f.CompleteWorkflowDecision(data))
 	return CompleteOutcome{
 		data:      data,
 		decisions: final,
@@ -361,7 +361,7 @@ func (f *FSMContext) ContinueWorkflowDecision(continuedState string) swf.Decisio
 
 // CompletionDecision will build a CompleteWorkflowExecutionDecision decision that has the expected SerializedState marshalled to json as its result.
 // This decision should be used when it is appropriate to Complete your workflow.
-func (f *FSMContext) CompletionDecision(data interface{}) swf.Decision {
+func (f *FSMContext) CompleteWorkflowDecision(data interface{}) swf.Decision {
 	return swf.Decision{
 		DecisionType: aws.String(swf.DecisionTypeCompleteWorkflowExecution),
 		CompleteWorkflowExecutionDecisionAttributes: &swf.CompleteWorkflowExecutionDecisionAttributes{
