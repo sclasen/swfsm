@@ -86,7 +86,7 @@ func TestFSM(t *testing.T) {
 			EventID:   I(1),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: S(StartFSMWorkflowInput(fsm.Serializer, new(TestData))),
+				Input: StartFSMWorkflowInput(fsm.Serializer, new(TestData)),
 			},
 		},
 	}
@@ -374,7 +374,7 @@ func ExampleFSM() {
 		//you will have previously regiestered a WorkflowType that this FSM will work.
 		WorkflowType: &swf.WorkflowType{Name: S("the-name"), Version: S("the-version")},
 		// It is *very* important to use StartFSMWorkflowInput so the state management works properly
-		Input: S(StartFSMWorkflowInput(fsm.Serializer, &StateData{Count: 0, Message: "starting message"})),
+		Input: StartFSMWorkflowInput(fsm.Serializer, &StateData{Count: 0, Message: "starting message"}),
 	})
 }
 
@@ -449,7 +449,7 @@ func TestKinesisReplication(t *testing.T) {
 			EventID:   I(1),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: S(StartFSMWorkflowInput(fsm.Serializer, new(TestData))),
+				Input: StartFSMWorkflowInput(fsm.Serializer, new(TestData)),
 			},
 		},
 	}
@@ -577,7 +577,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			EventID:   I(1),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: S(StartFSMWorkflowInput(fsm.Serializer, new(TestData))),
+				Input: StartFSMWorkflowInput(fsm.Serializer, new(TestData)),
 			},
 		},
 	}
@@ -815,7 +815,7 @@ func TestCompleteState(t *testing.T) {
 		EventID:   I(1),
 		EventType: S("WorkflowExecutionStarted"),
 		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-			Input: S(StartFSMWorkflowInput(ctx.Serializer(), new(TestData))),
+			Input: StartFSMWorkflowInput(ctx.Serializer(), new(TestData)),
 		},
 	}
 

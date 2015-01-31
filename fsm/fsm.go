@@ -295,6 +295,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 				if f.allowPanics {
 					panic(err)
 				}
+				//todo make a synthetic error signal event and make the decider handle
 				return append(outcome.decisions, f.captureDecisionError(execution, e, err)...), nil
 			}
 			eventCorrelator.Track(e)
@@ -313,7 +314,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 		f.log("action=tick at=decide next-state=%s decision=%s", outcome.state, d.DecisionType)
 	}
 
-	final, serializedState, err := f.recordStateMarker(outcome, eventCorrelator)
+	final, serializedState, err := f.recordStateMarkers(outcome, eventCorrelator)
 	if err != nil {
 		f.log("action=tick at=error error=state-serialization-error err=%q error-type=system", err)
 		if f.allowPanics {
@@ -356,8 +357,8 @@ func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event swf.Hi
 
 func (f *FSM) captureDecisionError(execution *swf.WorkflowExecution, event swf.HistoryEvent, err error) []swf.Decision {
 	return f.captureError(ErrorSignal, execution, &SerializedDecisionError{
-		ErrorEvent:       event,
-		Error:              err,
+		ErrorEvent: event,
+		Error:      err,
 	})
 }
 
@@ -489,7 +490,7 @@ func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) []swf
 	return lastEvents
 }
 
-func (f *FSM) recordStateMarker(outcome *intermediateOutcome, eventCorrelator *EventCorrelator) ([]swf.Decision, *SerializedState, error) {
+func (f *FSM) recordStateMarkers(outcome *intermediateOutcome, eventCorrelator *EventCorrelator) ([]swf.Decision, *SerializedState, error) {
 	serializedData, err := f.Serializer.Serialize(outcome.data)
 
 	state := &SerializedState{
@@ -569,7 +570,7 @@ func (f *FSM) EmptyDecisions() []swf.Decision {
 
 // StartFSMWorkflowInput should be used to construct the input for any StartWorkflowExecutionRequests.
 // This panics on errors cause really this should never err.
-func StartFSMWorkflowInput(serializer StateSerializer, data interface{}) string {
+func StartFSMWorkflowInput(serializer StateSerializer, data interface{}) aws.StringValue {
 	ss := new(SerializedState)
 	stateData, err := serializer.Serialize(data)
 	if err != nil {
@@ -581,11 +582,11 @@ func StartFSMWorkflowInput(serializer StateSerializer, data interface{}) string 
 	if err != nil {
 		panic(err)
 	}
-	return serialized
+	return aws.String(serialized)
 }
 
 //ContinueFSMWorkflowInput should be used to construct the input for any ContinueAsNewWorkflowExecution decisions.
-func ContinueFSMWorkflowInput(ctx *FSMContext, data interface{}) string {
+func ContinueFSMWorkflowInput(ctx *FSMContext, data interface{}) aws.StringValue {
 	ss := new(SerializedState)
 	stateData := ctx.Serialize(data)
 
@@ -593,5 +594,5 @@ func ContinueFSMWorkflowInput(ctx *FSMContext, data interface{}) string {
 	ss.StateName = ctx.serialization.InitialState()
 	ss.StateVersion = ctx.stateVersion
 
-	return ctx.Serialize(ss)
+	return aws.String(ctx.Serialize(ss))
 }

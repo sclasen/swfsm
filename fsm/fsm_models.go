@@ -153,8 +153,8 @@ type ReplicationData struct {
 // SerializedDecisionError is a wrapper struct that allows serializing the context in which an error in a Decider occurred
 // into a WorkflowSignaledEvent in the workflow history.
 type SerializedDecisionError struct {
-	ErrorEvent          swf.HistoryEvent `json:"errorEvent"`
-	Error               interface{} `json:"error"`
+	ErrorEvent swf.HistoryEvent `json:"errorEvent"`
+	Error      interface{}      `json:"error"`
 }
 
 // SerializedSystemError is a wrapper struct that allows serializing the context in which an error internal to FSM processing has occurred
