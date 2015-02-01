@@ -252,8 +252,8 @@ func NewFSMContext(
 	}
 }
 
-// ContinueDecision is a helper func to easily create a ContinueOutcome.
-func (f *FSMContext) ContinueDecision(data interface{}, decisions []swf.Decision) Outcome {
+// ContinueDecider is a helper func to easily create a ContinueOutcome.
+func (f *FSMContext) ContinueDecider(data interface{}, decisions []swf.Decision) Outcome {
 	return ContinueOutcome{
 		data:      data,
 		decisions: decisions,

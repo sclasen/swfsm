@@ -299,7 +299,7 @@ func AddDecision(decisionFn DecisionFunc) Decider {
 		d := decisionFn(ctx, h, data)
 		logf(ctx, "at=decide")
 		decisions = append(decisions, d)
-		return ctx.ContinueDecision(data, decisions)
+		return ctx.ContinueDecider(data, decisions)
 	}
 }
 
@@ -309,7 +309,7 @@ func AddDecisions(signalFn MultiDecisionFunc) Decider {
 		ds := signalFn(ctx, h, data)
 		logf(ctx, "at=decide-many")
 		decisions = append(decisions, ds...)
-		return ctx.ContinueDecision(data, decisions)
+		return ctx.ContinueDecider(data, decisions)
 	}
 }
 
@@ -317,7 +317,7 @@ func UpdateState(updateFunc StateFunc) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		logf(ctx, "at=update-state")
 		updateFunc(ctx, h, data)
-		return ctx.ContinueDecision(data, ctx.EmptyDecisions())
+		return ctx.ContinueDecider(data, ctx.EmptyDecisions())
 	}
 }
 
