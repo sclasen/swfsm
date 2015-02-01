@@ -49,7 +49,6 @@ type FSM struct {
 	KinesisReplicator KinesisReplicator
 	// DataType of the data struct associated with this FSM.
 	// The data is automatically peristed to and loaded from workflow history by the FSM.
-	// it should be a pointer to a struct i.e. new(MyStruct). reflection is used to create new instances of this type.
 	DataType interface{}
 	// Serializer used to serialize/deserialise fsm state data to/from workflow history.
 	Serializer StateSerializer
@@ -57,12 +56,14 @@ type FSM struct {
 	systemSerializer StateSerializer
 	//PollerShutdownManager is used when the FSM is managing the polling
 	PollerShutdownManager *poller.PollerShutdownManager
-	states                map[string]*FSMState
-	initialState          *FSMState
-	completeState         *FSMState
-	stop                  chan bool
-	stopAck               chan bool
-	allowPanics           bool //makes testing easier
+	//DecisionTaskDispatcher determines the concurrency strategy for processing tasks in your fsm
+	DecisionTaskDispatcher DecisionTaskDispatcher
+	states                 map[string]*FSMState
+	initialState           *FSMState
+	completeState          *FSMState
+	stop                   chan bool
+	stopAck                chan bool
+	allowPanics            bool //makes testing easier
 }
 
 // StateSerializer is the implementation of FSMSerializer.StateSerializer()
@@ -142,6 +143,10 @@ func (f *FSM) Init() {
 		f.PollerShutdownManager = poller.NewPollerShutdownManager()
 	}
 
+	if f.DecisionTaskDispatcher == nil {
+		f.DecisionTaskDispatcher = &CallingGoroutineDispatcher{}
+	}
+
 	if f.KinesisReplicator == nil {
 		f.KinesisReplicator = defaultKinesisReplicator()
 	}
@@ -152,7 +157,11 @@ func (f *FSM) Init() {
 func (f *FSM) Start() {
 	f.Init()
 	poller := poller.NewDecisionTaskPoller(f.SWF, f.Domain, f.Identity, f.TaskList)
-	go poller.PollUntilShutdownBy(f.PollerShutdownManager, fmt.Sprintf("%s-poller", f.Name), f.handleDecisionTask)
+	go poller.PollUntilShutdownBy(f.PollerShutdownManager, fmt.Sprintf("%s-poller", f.Name), f.dispatchTask)
+}
+
+func (f *FSM) dispatchTask(decisionTask *swf.DecisionTask) {
+	f.DecisionTaskDispatcher.DispatchTask(decisionTask, f.handleDecisionTask)
 }
 
 func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
