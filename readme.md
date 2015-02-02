@@ -7,12 +7,12 @@ go library that provides a Finite State Machine abstraction and other niceities 
 
  Built using the [aws-sdk-go](https://github.com/awslabs/aws-sdk-go)
 
-[![Build Status](https://travis-ci.org/sclasen/swf-go.svg?branch=master)](https://travis-ci.org/sclasen/swf-go)
+[![Build Status](https://travis-ci.org/sclasen/swfsm.svg?branch=master)](https://travis-ci.org/sclasen/swfsm)
 
-* fsm godoc here: http://godoc.org/github.com/sclasen/swf-go/fsm
-* poller godoc here: http://godoc.org/github.com/sclasen/swf-go/poller
-* migrator godoc here: http://godoc.org/github.com/sclasen/swf-go/migrator
-* sugar godoc here: http://godoc.org/github.com/sclasen/swf-go/sugar
+* fsm godoc here: http://godoc.org/github.com/sclasen/swfsm/fsm
+* poller godoc here: http://godoc.org/github.com/sclasen/swfsm/poller
+* migrator godoc here: http://godoc.org/github.com/sclasen/swfsm/migrator
+* sugar godoc here: http://godoc.org/github.com/sclasen/swfsm/ugar
 
 
 features
