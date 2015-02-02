@@ -293,7 +293,6 @@ func S(s string) aws.StringValue {
 	return aws.String(s)
 }
 
-
 //LS is a helper so you dont have to do nil checks before logging aws.StringValue values
 func LS(s aws.StringValue) string {
 	if s == nil {
