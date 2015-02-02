@@ -327,9 +327,21 @@ func (f *FSMContext) ActivityInfo(h swf.HistoryEvent) *ActivityInfo {
 	return f.eventCorrelator.ActivityInfo(h)
 }
 
-// ActivitiesInfo will return a map of activityId -> ActivityInfo for all in-flight activities in the workflow.
+// ActivitiesInfo will return a map of scheduledID -> ActivityInfo for all in-flight activities in the workflow.
 func (f *FSMContext) ActivitiesInfo() map[string]*ActivityInfo {
 	return f.eventCorrelator.Activities
+}
+
+// SignalInfo will find information for ActivityTasks being tracked. It can only be used when handling events related to ActivityTasks.
+// ActivityTasks are automatically tracked after a EventTypeActivityTaskScheduled event.
+// When there is no pending activity related to the event, nil is returned.
+func (f *FSMContext) SignalInfo(h swf.HistoryEvent) *SignalInfo {
+	return f.eventCorrelator.SignalInfo(h)
+}
+
+// SignalsInfo will return a map of scheduledId -> ActivityInfo for all in-flight activities in the workflow.
+func (f *FSMContext) SignalsInfo() map[string]*SignalInfo {
+	return f.eventCorrelator.Signals
 }
 
 // Serialize will use the current fsm's Serializer to serialize the given struct. It will panic on errors, which is ok in the context of a Decider.

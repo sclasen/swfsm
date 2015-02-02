@@ -1,4 +1,7 @@
 /*
+Package poller contains TaskPollers and PollerShutdownManager to help workaround the 'phantom' task assignment in SWF,
+by alowing your pollers to wait until any in-flight polls are done to shut down.
+
 TaskPollers
 
 DecisionTaskPoller and ActivityTaskPoller facilitate proper usage of the PollForDecisionTask and PollForActivityTask endpoints in the SWF API. These endpoints are used by

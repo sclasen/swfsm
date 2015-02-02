@@ -8,7 +8,7 @@ import (
 
 func TestPollerManager(t *testing.T) {
 
-	mgr := NewPollerShutdownManager()
+	mgr := NewShutdownManager()
 
 	for i := 1; i < 10; i++ {
 		p := TestPoller{strconv.FormatInt(int64(i), 10), make(chan bool, 1), make(chan bool, 1)}

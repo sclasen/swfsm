@@ -55,7 +55,7 @@ type FSM struct {
 	// Serializer used to serialize/deserialise in json the fsm managed marker recorded events to/from workflow history.
 	systemSerializer StateSerializer
 	//PollerShutdownManager is used when the FSM is managing the polling
-	PollerShutdownManager *poller.PollerShutdownManager
+	ShutdownManager *poller.ShutdownManager
 	//DecisionTaskDispatcher determines the concurrency strategy for processing tasks in your fsm
 	DecisionTaskDispatcher DecisionTaskDispatcher
 	states                 map[string]*FSMState
@@ -139,8 +139,8 @@ func (f *FSM) Init() {
 		f.systemSerializer = &JSONStateSerializer{}
 	}
 
-	if f.PollerShutdownManager == nil {
-		f.PollerShutdownManager = poller.NewPollerShutdownManager()
+	if f.ShutdownManager == nil {
+		f.ShutdownManager = poller.NewShutdownManager()
 	}
 
 	if f.DecisionTaskDispatcher == nil {
@@ -157,7 +157,7 @@ func (f *FSM) Init() {
 func (f *FSM) Start() {
 	f.Init()
 	poller := poller.NewDecisionTaskPoller(f.SWF, f.Domain, f.Identity, f.TaskList)
-	go poller.PollUntilShutdownBy(f.PollerShutdownManager, fmt.Sprintf("%s-poller", f.Name), f.dispatchTask)
+	go poller.PollUntilShutdownBy(f.ShutdownManager, fmt.Sprintf("%s-poller", f.Name), f.dispatchTask)
 }
 
 func (f *FSM) dispatchTask(decisionTask *swf.DecisionTask) {

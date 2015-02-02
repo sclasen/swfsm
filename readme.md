@@ -12,7 +12,7 @@ go library that provides a Finite State Machine abstraction and other niceities 
 * fsm godoc here: http://godoc.org/github.com/sclasen/swfsm/fsm
 * poller godoc here: http://godoc.org/github.com/sclasen/swfsm/poller
 * migrator godoc here: http://godoc.org/github.com/sclasen/swfsm/migrator
-* sugar godoc here: http://godoc.org/github.com/sclasen/swfsm/ugar
+* sugar godoc here: http://godoc.org/github.com/sclasen/swfsm/sugar
 
 
 features

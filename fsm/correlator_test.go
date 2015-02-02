@@ -361,7 +361,7 @@ func TestCountActivityAttemtps(t *testing.T) {
 
 }
 
-func TestSignalTracking(t *testing.T)  {
+func TestSignalTracking(t *testing.T) {
 	//track signal'->'workflowID => attempts
 	event := func(eventId int, payload interface{}) swf.HistoryEvent {
 		return EventFromPayload(eventId, payload)
@@ -376,7 +376,6 @@ func TestSignalTracking(t *testing.T)  {
 	fail := EventFromPayload(2, &swf.SignalExternalWorkflowExecutionFailedEventAttributes{
 		InitiatedEventID: I(1),
 	})
-
 
 	ok := EventFromPayload(4, &swf.ExternalWorkflowExecutionSignaledEventAttributes{
 		InitiatedEventID: I(3),
@@ -397,6 +396,6 @@ func TestSignalTracking(t *testing.T)  {
 	c.Track(ok)
 
 	if c.AttemptsForSignal(info) != 0 {
-		t.Fatal("expected zero attempts",c)
+		t.Fatal("expected zero attempts", c)
 	}
 }

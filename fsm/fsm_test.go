@@ -432,7 +432,7 @@ func TestKinesisReplication(t *testing.T) {
 	fsm.AddState(&FSMState{
 		Name: "done",
 		Decider: func(f *FSMContext, h swf.HistoryEvent, d interface{}) Outcome {
-			go fsm.PollerShutdownManager.StopPollers()
+			go fsm.ShutdownManager.StopPollers()
 			return f.Stay(d, f.EmptyDecisions())
 		},
 	})

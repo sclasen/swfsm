@@ -1,3 +1,6 @@
+GO_PACKAGES := $(shell go list ./... | sed 's_github.com/sclasen/swfsm_._')
+
+
 all: build
 
 travis: dependencies tidy test
@@ -15,12 +18,15 @@ test-aws: install forego
 	forego run go test
 
 tidy:
-	go get github.com/golang/lint/golint
 	go get code.google.com/p/go.tools/cmd/goimports
-	test -z "$$(goimports -l -d ./... | tee /dev/stderr)"
+	test -z "$$(goimports -l -d $(GO_PACKAGES) | tee /dev/stderr)"
+
+lint:
+	go vet ./...
 	test -z "$$(golint ./... | tee /dev/stderr)"
 
 imports:
+	go get github.com/golang/lint/golint
 	goimports -w .
 
 fmt:

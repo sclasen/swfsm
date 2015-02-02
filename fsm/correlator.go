@@ -85,27 +85,27 @@ func (a *EventCorrelator) RemoveCorrelation(h swf.HistoryEvent) {
 	}
 }
 
-// ActivityType returns the ActivityType that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
+// ActivityInfo returns the ActivityInfo that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
 func (a *EventCorrelator) ActivityInfo(h swf.HistoryEvent) *ActivityInfo {
 	a.checkInit()
 	return a.Activities[a.getID(h)]
 }
 
-// ActivityType returns the ActivityType that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
+// SignalInfo returns the SignalInfo that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeSignalExternalWorkflowExecutionFailed,EventTypeExternalWorkflowExecutionSignaled.
 func (a *EventCorrelator) SignalInfo(h swf.HistoryEvent) *SignalInfo {
 	a.checkInit()
 	return a.Signals[a.getID(h)]
 }
 
-//AttemptsForID returns the number of times a given activityID has been attempted.
+//AttemptsForActivity returns the number of times a given activity has been attempted.
 //It will return 0 if the activity has never failed, has been canceled, or has been completed successfully
 func (a *EventCorrelator) AttemptsForActivity(info *ActivityInfo) int {
 	a.checkInit()
 	return a.ActivityAttempts[info.ActivityID]
 }
 
-//AttemptsForID returns the number of times a given activityID has been attempted.
-//It will return 0 if the activity has never failed, has been canceled, or has been completed successfully
+//AttemptsForSignal returns the number of times a given signal has been attempted.
+//It will return 0 if the signal has never failed, or has been completed successfully
 func (a *EventCorrelator) AttemptsForSignal(signalInfo *SignalInfo) int {
 	a.checkInit()
 	return a.SignalAttempts[a.signalIDFromInfo(signalInfo)]
@@ -160,7 +160,7 @@ func (a *EventCorrelator) safeSignalID(h swf.HistoryEvent) string {
 	return ""
 }
 
-func (a *EventCorrelator)signalIDFromInfo(info *SignalInfo) string {
+func (a *EventCorrelator) signalIDFromInfo(info *SignalInfo) string {
 	return fmt.Sprintf("%s->%s", info.SignalName, info.WorkflowID)
 }
 
@@ -178,6 +178,6 @@ func (a *EventCorrelator) incrementSignalAttempts(h swf.HistoryEvent) {
 	}
 }
 
-func (a *EventCorrelator) key(eventId aws.LongValue) string {
-	return strconv.FormatInt(*eventId, 10)
+func (a *EventCorrelator) key(eventID aws.LongValue) string {
+	return strconv.FormatInt(*eventID, 10)
 }

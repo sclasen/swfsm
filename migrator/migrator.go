@@ -49,18 +49,18 @@ type DomainMigrator struct {
 func (d *DomainMigrator) Migrate() {
 	for _, dd := range d.DeprecatedDomains {
 		if d.isDeprecated(dd.Name) {
-			log.Printf("action=migrate at=deprecate-domain domain=%s status=previously-deprecated", dd.Name)
+			log.Printf("action=migrate at=deprecate-domain domain=%s status=previously-deprecated", LS(dd.Name))
 		} else {
 			d.deprecate(dd)
-			log.Printf("action=migrate at=deprecate-domain domain=%s status=deprecated", dd.Name)
+			log.Printf("action=migrate at=deprecate-domain domain=%s status=deprecated", LS(dd.Name))
 		}
 	}
 	for _, r := range d.RegisteredDomains {
 		if d.isRegisteredNotDeprecated(r) {
-			log.Printf("action=migrate at=register-domain domain=%s status=previously-registered", r.Name)
+			log.Printf("action=migrate at=register-domain domain=%s status=previously-registered", LS(r.Name))
 		} else {
 			d.register(r)
-			log.Printf("action=migrate at=register-domain domain=%s status=registered", r.Name)
+			log.Printf("action=migrate at=register-domain domain=%s status=registered", LS(r.Name))
 		}
 	}
 }
@@ -89,7 +89,7 @@ func (d *DomainMigrator) register(rd swf.RegisterDomainInput) {
 func (d *DomainMigrator) isDeprecated(domain aws.StringValue) bool {
 	desc, err := d.describe(domain)
 	if err != nil {
-		log.Printf("action=migrate at=is-dep domain=%s error=%s", domain, err.Error())
+		log.Printf("action=migrate at=is-dep domain=%s error=%s", LS(domain), err.Error())
 		return false
 	}
 
@@ -122,18 +122,18 @@ type WorkflowTypeMigrator struct {
 func (w *WorkflowTypeMigrator) Migrate() {
 	for _, dd := range w.DeprecatedWorkflowTypes {
 		if w.isDeprecated(dd.Domain, dd.WorkflowType.Name, dd.WorkflowType.Version) {
-			log.Printf("action=migrate at=deprecate-workflow domain=%s workflow=%s version=%s status=previously-deprecated", dd.Domain, dd.WorkflowType.Name, dd.WorkflowType.Version)
+			log.Printf("action=migrate at=deprecate-workflow domain=%s workflow=%s version=%s status=previously-deprecated", LS(dd.Domain), LS(dd.WorkflowType.Name), LS(dd.WorkflowType.Version))
 		} else {
 			w.deprecate(dd)
-			log.Printf("action=migrate at=deprecate-workflow domain=%s  workflow=%s version=%s status=deprecate", dd.Domain, dd.WorkflowType.Name, dd.WorkflowType.Version)
+			log.Printf("action=migrate at=deprecate-workflow domain=%s  workflow=%s version=%s status=deprecate", LS(dd.Domain), LS(dd.WorkflowType.Name), LS(dd.WorkflowType.Version))
 		}
 	}
 	for _, r := range w.RegisteredWorkflowTypes {
 		if w.isRegisteredNotDeprecated(r) {
-			log.Printf("action=migrate at=register-workflow domain=%s workflow=%s version=%s status=previously-registered", r.Domain, r.Name, r.Version)
+			log.Printf("action=migrate at=register-workflow domain=%s workflow=%s version=%s status=previously-registered", LS(r.Domain), LS(r.Name), LS(r.Version))
 		} else {
 			w.register(r)
-			log.Printf("action=migrate at=register-workflow domain=%s  workflow=%s version=%s status=registered", r.Domain, r.Name, r.Version)
+			log.Printf("action=migrate at=register-workflow domain=%s  workflow=%s version=%s status=registered", LS(r.Domain), LS(r.Name), LS(r.Version))
 		}
 	}
 }
@@ -162,7 +162,7 @@ func (w *WorkflowTypeMigrator) register(rd swf.RegisterWorkflowTypeInput) {
 func (w *WorkflowTypeMigrator) isDeprecated(domain aws.StringValue, name aws.StringValue, version aws.StringValue) bool {
 	desc, err := w.describe(domain, name, version)
 	if err != nil {
-		log.Printf("action=migrate at=is-dep domain=%s workflow=%s version=%s error=%s", domain, name, version, err.Error())
+		log.Printf("action=migrate at=is-dep domain=%s workflow=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
 		return false
 	}
 
@@ -195,18 +195,18 @@ type ActivityTypeMigrator struct {
 func (a *ActivityTypeMigrator) Migrate() {
 	for _, d := range a.DeprecatedActivityTypes {
 		if a.isDeprecated(d.Domain, d.ActivityType.Name, d.ActivityType.Version) {
-			log.Printf("action=migrate at=deprecate-activity domain=%s activity=%s version=%s status=previously-deprecated", d.Domain, d.ActivityType.Name, d.ActivityType.Version)
+			log.Printf("action=migrate at=deprecate-activity domain=%s activity=%s version=%s status=previously-deprecated", LS(d.Domain), LS(d.ActivityType.Name), LS(d.ActivityType.Version))
 		} else {
 			a.deprecate(d)
-			log.Printf("action=migrate at=depreacate-activity domain=%s activity=%s version=%s status=deprecated", d.Domain, d.ActivityType.Name, d.ActivityType.Version)
+			log.Printf("action=migrate at=depreacate-activity domain=%s activity=%s version=%s status=deprecated", LS(d.Domain), LS(d.ActivityType.Name), LS(d.ActivityType.Version))
 		}
 	}
 	for _, r := range a.RegisteredActivityTypes {
 		if a.isRegisteredNotDeprecated(r) {
-			log.Printf("action=migrate at=register-activity domain=%s activity=%s version=%s status=previously-registered", r.Domain, r.Name, r.Version)
+			log.Printf("action=migrate at=register-activity domain=%s activity=%s version=%s status=previously-registered", LS(r.Domain), LS(r.Name), LS(r.Version))
 		} else {
 			a.register(r)
-			log.Printf("action=migrate at=register-activity domain=%s activity=%s version=%s status=registered", r.Domain, r.Name, r.Version)
+			log.Printf("action=migrate at=register-activity domain=%s activity=%s version=%s status=registered", LS(r.Domain), LS(r.Name), LS(r.Version))
 		}
 	}
 }
@@ -235,7 +235,7 @@ func (a *ActivityTypeMigrator) register(rd swf.RegisterActivityTypeInput) {
 func (a *ActivityTypeMigrator) isDeprecated(domain aws.StringValue, name aws.StringValue, version aws.StringValue) bool {
 	desc, err := a.describe(domain, name, version)
 	if err != nil {
-		log.Printf("action=migrate at=is-dep domain=%s activity=%s version=%s error=%s", domain, name, version, err.Error())
+		log.Printf("action=migrate at=is-dep domain=%s activity=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
 		return false
 	}
 
@@ -267,10 +267,10 @@ type StreamMigrator struct {
 func (s *StreamMigrator) Migrate() {
 	for _, st := range s.Streams {
 		if s.isCreated(st) {
-			log.Printf("action=migrate at=create-stream stream=%s status=previously-created", st.StreamName)
+			log.Printf("action=migrate at=create-stream stream=%s status=previously-created", LS(st.StreamName))
 		} else {
 			s.create(st)
-			log.Printf("action=migrate at=create-stream stream=%s status=created", st.StreamName)
+			log.Printf("action=migrate at=create-stream stream=%s status=created", LS(st.StreamName))
 		}
 	}
 }

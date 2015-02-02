@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"strconv"
+
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
@@ -286,4 +288,18 @@ func I(i int) aws.LongValue {
 
 func S(s string) aws.StringValue {
 	return aws.String(s)
+}
+
+func LS(s aws.StringValue) string {
+	if s == nil {
+		return "nil"
+	}
+	return *s
+}
+
+func LL(l aws.LongValue) string {
+	if l == nil {
+		return "nil"
+	}
+	return strconv.FormatInt(*l, 10)
 }

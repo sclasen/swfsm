@@ -8,6 +8,7 @@ import (
 
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
+	. "github.com/sclasen/swfsm/sugar"
 )
 
 //ComposedDecider can be used to build a decider out of a number of sub Deciders
@@ -58,7 +59,7 @@ func (c *ComposedDecider) Decide(ctx *FSMContext, h swf.HistoryEvent, data inter
 }
 
 func logf(ctx *FSMContext, format string, data ...interface{}) {
-	format = fmt.Sprintf("workflow=%s workflow-id state=%s ", *ctx.WorkflowType.Name, ctx.WorkflowID, ctx.State) + format
+	format = fmt.Sprintf("workflow=%s workflow-id=%s state=%s ", LS(ctx.WorkflowType.Name), LS(ctx.WorkflowID), ctx.State) + format
 	log.Printf(format, data)
 }
 
@@ -66,7 +67,7 @@ func logf(ctx *FSMContext, format string, data ...interface{}) {
 //You should place this or one like it as the last decider in your top level ComposableDecider.
 func DefaultDecider() Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
-		log.Printf("at=unhandled-event event=%s state=%s default=stay decisions=0", h.EventType, ctx.State)
+		log.Printf("at=unhandled-event event=%s state=%s default=stay decisions=0", LS(h.EventType), ctx.State)
 		return ctx.Stay(data, ctx.EmptyDecisions())
 	}
 }
@@ -197,6 +198,7 @@ func typeCheck(typedFunc interface{}, in []string, out []string) {
 	}
 }
 
+// OnStarted builds a composed decider that fires on swf.EventTypeWorkflowExecutionStarted.
 func OnStarted(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
@@ -208,6 +210,7 @@ func OnStarted(deciders ...Decider) Decider {
 	}
 }
 
+// OnChildStarted builds a composed decider that fires on swf.EventTypeChildWorkflowExecutionStarted.
 func OnChildStarted(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
@@ -219,6 +222,7 @@ func OnChildStarted(deciders ...Decider) Decider {
 	}
 }
 
+// OnData builds a composed decider that fires on when the PredicateFunc is satisfied.
 func OnData(predicate PredicateFunc, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		if predicate(data) {
@@ -229,6 +233,7 @@ func OnData(predicate PredicateFunc, deciders ...Decider) Decider {
 	}
 }
 
+// OnSignalReceived builds a composed decider that fires on when a matching signal is recieved.
 func OnSignalReceived(signalName string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
@@ -242,6 +247,7 @@ func OnSignalReceived(signalName string, deciders ...Decider) Decider {
 	}
 }
 
+// OnSignalSent builds a composed decider that fires on when a matching signal is recieved.
 func OnSignalSent(signalName string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
@@ -254,6 +260,7 @@ func OnSignalSent(signalName string, deciders ...Decider) Decider {
 	}
 }
 
+// OnSignalFailed builds a composed decider that fires on when a matching signal fails.
 func OnSignalFailed(signalName string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
@@ -266,6 +273,7 @@ func OnSignalFailed(signalName string, deciders ...Decider) Decider {
 	}
 }
 
+// OnActivityCompleted builds a composed decider that fires on when a matching activity completes.
 func OnActivityCompleted(activityName string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
@@ -279,6 +287,7 @@ func OnActivityCompleted(activityName string, deciders ...Decider) Decider {
 	}
 }
 
+// OnActivityFailed builds a composed decider that fires on when a matching activity fails.
 func OnActivityFailed(activityName string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
@@ -292,6 +301,7 @@ func OnActivityFailed(activityName string, deciders ...Decider) Decider {
 	}
 }
 
+// AddDecision adds a single decision to a ContinueDecider outcome
 func AddDecision(decisionFn DecisionFunc) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		decisions := ctx.EmptyDecisions()
@@ -302,6 +312,7 @@ func AddDecision(decisionFn DecisionFunc) Decider {
 	}
 }
 
+// AddDecisions adds decisions to a ContinueDecider outcome
 func AddDecisions(signalFn MultiDecisionFunc) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		decisions := ctx.EmptyDecisions()
@@ -312,6 +323,7 @@ func AddDecisions(signalFn MultiDecisionFunc) Decider {
 	}
 }
 
+// UpdateState allows you to modicy the state data without generating decisions.
 func UpdateState(updateFunc StateFunc) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		logf(ctx, "at=update-state")
@@ -320,6 +332,7 @@ func UpdateState(updateFunc StateFunc) Decider {
 	}
 }
 
+// Transition transitions the FSM to a new state, and terminates the decdier.
 func Transition(toState string) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		logf(ctx, "at=transition")
@@ -327,13 +340,15 @@ func Transition(toState string) Decider {
 	}
 }
 
-func Complete() Decider {
+// CompleteWorkflow completes the workflow
+func CompleteWorkflow() Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
-		log.Printf("at=complete-workflow workflowID=%s", ctx.WorkflowID)
+		log.Printf("at=complete-workflow workflowID=%s", LS(ctx.WorkflowID))
 		return ctx.CompleteWorkflow(data)
 	}
 }
 
+// Stay keeps the fsm in the same state, and terminates the decider.
 func Stay() Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		logf(ctx, "at=stay")
