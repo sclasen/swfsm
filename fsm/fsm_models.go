@@ -324,7 +324,7 @@ func (f *FSMContext) EventData(h swf.HistoryEvent, data interface{}) {
 // ActivityTasks are automatically tracked after a EventTypeActivityTaskScheduled event.
 // When there is no pending activity related to the event, nil is returned.
 func (f *FSMContext) ActivityInfo(h swf.HistoryEvent) *ActivityInfo {
-	return f.eventCorrelator.ActivityType(h)
+	return f.eventCorrelator.ActivityInfo(h)
 }
 
 // ActivitiesInfo will return a map of activityId -> ActivityInfo for all in-flight activities in the workflow.

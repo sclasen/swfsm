@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/awslabs/aws-sdk-go/aws"
@@ -27,7 +28,7 @@ type ActivityInfo struct {
 // SignalInfo holds the SignalName and Input for an activity
 type SignalInfo struct {
 	SignalName string
-	Input      string
+	WorkflowID string
 }
 
 // Track will add or remove entries based on the EventType.
@@ -51,8 +52,9 @@ func (a *EventCorrelator) Correlate(h swf.HistoryEvent) {
 	if *h.EventType == swf.EventTypeSignalExternalWorkflowExecutionInitiated {
 		a.Signals[a.key(h.EventID)] = &SignalInfo{
 			SignalName: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
-			Input:      *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input,
+			WorkflowID: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 		}
+		fmt.Printf("added signal @ %s\n %+v\n", a.key(h.EventID), a.Signals)
 	}
 }
 
@@ -74,40 +76,39 @@ func (a *EventCorrelator) RemoveCorrelation(h swf.HistoryEvent) {
 		delete(a.ActivityAttempts, a.safeActivityID(h))
 		delete(a.Activities, a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID))
 	case swf.EventTypeExternalWorkflowExecutionSignaled:
-		a.incrementActivityAttempts(h)
+		info := a.Signals[a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)]
+		delete(a.SignalAttempts, a.signalIDFromInfo(info))
 		delete(a.Signals, a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID))
 	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
-		delete(a.SignalAttempts, a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))
+		a.incrementSignalAttempts(h)
+		delete(a.Signals, a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))
 	}
 }
 
 // ActivityType returns the ActivityType that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
-func (a *EventCorrelator) ActivityType(h swf.HistoryEvent) *ActivityInfo {
+func (a *EventCorrelator) ActivityInfo(h swf.HistoryEvent) *ActivityInfo {
 	a.checkInit()
 	return a.Activities[a.getID(h)]
 }
 
+// ActivityType returns the ActivityType that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
+func (a *EventCorrelator) SignalInfo(h swf.HistoryEvent) *SignalInfo {
+	a.checkInit()
+	return a.Signals[a.getID(h)]
+}
+
 //AttemptsForID returns the number of times a given activityID has been attempted.
 //It will return 0 if the activity has never failed, has been canceled, or has been completed successfully
-func (a *EventCorrelator) AttemptsForActivity(activityID string) int {
+func (a *EventCorrelator) AttemptsForActivity(info *ActivityInfo) int {
 	a.checkInit()
-	return a.ActivityAttempts[activityID]
+	return a.ActivityAttempts[info.ActivityID]
 }
 
-func (a *EventCorrelator) safeActivityID(h swf.HistoryEvent) string {
-	info := a.Activities[a.key(h.EventID)]
-	if info != nil {
-		return info.ActivityID
-	}
-	return ""
-}
-
-func (a *EventCorrelator) safeSignalID(h swf.HistoryEvent) string {
-	info := a.Signals[a.key(h.EventID)]
-	if info != nil {
-		return info.SignalName
-	}
-	return ""
+//AttemptsForID returns the number of times a given activityID has been attempted.
+//It will return 0 if the activity has never failed, has been canceled, or has been completed successfully
+func (a *EventCorrelator) AttemptsForSignal(signalInfo *SignalInfo) int {
+	a.checkInit()
+	return a.SignalAttempts[a.signalIDFromInfo(signalInfo)]
 }
 
 func (a *EventCorrelator) checkInit() {
@@ -135,8 +136,32 @@ func (a *EventCorrelator) getID(h swf.HistoryEvent) (id string) {
 		id = a.key(h.ActivityTaskTimedOutEventAttributes.ScheduledEventID)
 	case swf.EventTypeActivityTaskCanceled:
 		id = a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID)
+	case swf.EventTypeExternalWorkflowExecutionSignaled:
+		id = a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)
+	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
+		id = a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID)
 	}
 	return
+}
+
+func (a *EventCorrelator) safeActivityID(h swf.HistoryEvent) string {
+	info := a.Activities[a.getID(h)]
+	if info != nil {
+		return info.ActivityID
+	}
+	return ""
+}
+
+func (a *EventCorrelator) safeSignalID(h swf.HistoryEvent) string {
+	info := a.Signals[a.getID(h)]
+	if info != nil {
+		return a.signalIDFromInfo(info)
+	}
+	return ""
+}
+
+func (a *EventCorrelator)signalIDFromInfo(info *SignalInfo) string {
+	return fmt.Sprintf("%s->%s", info.SignalName, info.WorkflowID)
 }
 
 func (a *EventCorrelator) incrementActivityAttempts(h swf.HistoryEvent) {
@@ -147,9 +172,9 @@ func (a *EventCorrelator) incrementActivityAttempts(h swf.HistoryEvent) {
 }
 
 func (a *EventCorrelator) incrementSignalAttempts(h swf.HistoryEvent) {
-	id := a.safeActivityID(h)
+	id := a.safeSignalID(h)
 	if id != "" {
-		a.ActivityAttempts[id]++
+		a.SignalAttempts[id]++
 	}
 }
 

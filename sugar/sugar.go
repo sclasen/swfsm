@@ -68,13 +68,168 @@ var eventTypes = map[string]func(swf.HistoryEvent) interface{}{
 	swf.EventTypeExternalWorkflowExecutionCancelRequested: func(h swf.HistoryEvent) interface{} { return h.ExternalWorkflowExecutionCancelRequestedEventAttributes },
 }
 
+func EventFromPayload(eventId int, data interface{}) swf.HistoryEvent {
+	event := &swf.HistoryEvent{}
+	event.EventID = I(eventId)
+	switch t := data.(type) {
+	case *swf.ActivityTaskCancelRequestedEventAttributes:
+		event.ActivityTaskCancelRequestedEventAttributes = t
+		event.EventType = S(swf.EventTypeActivityTaskCancelRequested)
+	case *swf.ActivityTaskCanceledEventAttributes:
+		event.ActivityTaskCanceledEventAttributes = t
+		event.EventType = S(swf.EventTypeActivityTaskCanceled)
+	case *swf.ActivityTaskCompletedEventAttributes:
+		event.ActivityTaskCompletedEventAttributes = t
+		event.EventType = S(swf.EventTypeActivityTaskCompleted)
+	case *swf.ActivityTaskFailedEventAttributes:
+		event.ActivityTaskFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeActivityTaskFailed)
+	case *swf.ActivityTaskScheduledEventAttributes:
+		event.ActivityTaskScheduledEventAttributes = t
+		event.EventType = S(swf.EventTypeActivityTaskScheduled)
+	case *swf.ActivityTaskStartedEventAttributes:
+		event.ActivityTaskStartedEventAttributes = t
+		event.EventType = S(swf.EventTypeActivityTaskStarted)
+	case *swf.ActivityTaskTimedOutEventAttributes:
+		event.ActivityTaskTimedOutEventAttributes = t
+		event.EventType = S(swf.EventTypeActivityTaskTimedOut)
+	case *swf.CancelTimerFailedEventAttributes:
+		event.CancelTimerFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeCancelTimerFailed)
+	case *swf.CancelWorkflowExecutionFailedEventAttributes:
+		event.CancelWorkflowExecutionFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeCancelWorkflowExecutionFailed)
+	case *swf.ChildWorkflowExecutionCanceledEventAttributes:
+		event.ChildWorkflowExecutionCanceledEventAttributes = t
+		event.EventType = S(swf.EventTypeChildWorkflowExecutionCanceled)
+	case *swf.ChildWorkflowExecutionCompletedEventAttributes:
+		event.ChildWorkflowExecutionCompletedEventAttributes = t
+		event.EventType = S(swf.EventTypeChildWorkflowExecutionCompleted)
+	case *swf.ChildWorkflowExecutionFailedEventAttributes:
+		event.ChildWorkflowExecutionFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeChildWorkflowExecutionFailed)
+	case *swf.ChildWorkflowExecutionStartedEventAttributes:
+		event.ChildWorkflowExecutionStartedEventAttributes = t
+		event.EventType = S(swf.EventTypeChildWorkflowExecutionStarted)
+	case *swf.ChildWorkflowExecutionTerminatedEventAttributes:
+		event.ChildWorkflowExecutionTerminatedEventAttributes = t
+		event.EventType = S(swf.EventTypeChildWorkflowExecutionTerminated)
+	case *swf.ChildWorkflowExecutionTimedOutEventAttributes:
+		event.ChildWorkflowExecutionTimedOutEventAttributes = t
+		event.EventType = S(swf.EventTypeChildWorkflowExecutionTimedOut)
+	case *swf.CompleteWorkflowExecutionFailedEventAttributes:
+		event.CompleteWorkflowExecutionFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeCompleteWorkflowExecutionFailed)
+	case *swf.ContinueAsNewWorkflowExecutionFailedEventAttributes:
+		event.ContinueAsNewWorkflowExecutionFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeContinueAsNewWorkflowExecutionFailed)
+	case *swf.DecisionTaskCompletedEventAttributes:
+		event.DecisionTaskCompletedEventAttributes = t
+		event.EventType = S(swf.EventTypeDecisionTaskCompleted)
+	case *swf.DecisionTaskScheduledEventAttributes:
+		event.DecisionTaskScheduledEventAttributes = t
+		event.EventType = S(swf.EventTypeDecisionTaskScheduled)
+	case *swf.DecisionTaskStartedEventAttributes:
+		event.DecisionTaskStartedEventAttributes = t
+		event.EventType = S(swf.EventTypeDecisionTaskStarted)
+	case *swf.DecisionTaskTimedOutEventAttributes:
+		event.DecisionTaskTimedOutEventAttributes = t
+		event.EventType = S(swf.EventTypeDecisionTaskTimedOut)
+	case *swf.ExternalWorkflowExecutionCancelRequestedEventAttributes:
+		event.ExternalWorkflowExecutionCancelRequestedEventAttributes = t
+		event.EventType = S(swf.EventTypeExternalWorkflowExecutionCancelRequested)
+	case *swf.ExternalWorkflowExecutionSignaledEventAttributes:
+		event.ExternalWorkflowExecutionSignaledEventAttributes = t
+		event.EventType = S(swf.EventTypeExternalWorkflowExecutionSignaled)
+	case *swf.FailWorkflowExecutionFailedEventAttributes:
+		event.FailWorkflowExecutionFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeFailWorkflowExecutionFailed)
+	case *swf.MarkerRecordedEventAttributes:
+		event.MarkerRecordedEventAttributes = t
+		event.EventType = S(swf.EventTypeMarkerRecorded)
+	case *swf.RecordMarkerFailedEventAttributes:
+		event.RecordMarkerFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeRecordMarkerFailed)
+	case *swf.RequestCancelActivityTaskFailedEventAttributes:
+		event.RequestCancelActivityTaskFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeRequestCancelActivityTaskFailed)
+	case *swf.RequestCancelExternalWorkflowExecutionFailedEventAttributes:
+		event.RequestCancelExternalWorkflowExecutionFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeRequestCancelExternalWorkflowExecutionFailed)
+	case *swf.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes:
+		event.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes = t
+		event.EventType = S(swf.EventTypeRequestCancelExternalWorkflowExecutionInitiated)
+	case *swf.ScheduleActivityTaskFailedEventAttributes:
+		event.ScheduleActivityTaskFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeScheduleActivityTaskFailed)
+	case *swf.SignalExternalWorkflowExecutionFailedEventAttributes:
+		event.SignalExternalWorkflowExecutionFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeSignalExternalWorkflowExecutionFailed)
+	case *swf.SignalExternalWorkflowExecutionInitiatedEventAttributes:
+		event.SignalExternalWorkflowExecutionInitiatedEventAttributes = t
+		event.EventType = S(swf.EventTypeSignalExternalWorkflowExecutionInitiated)
+	case *swf.StartChildWorkflowExecutionFailedEventAttributes:
+		event.StartChildWorkflowExecutionFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeStartChildWorkflowExecutionFailed)
+	case *swf.StartChildWorkflowExecutionInitiatedEventAttributes:
+		event.StartChildWorkflowExecutionInitiatedEventAttributes = t
+		event.EventType = S(swf.EventTypeStartChildWorkflowExecutionInitiated)
+	case *swf.StartTimerFailedEventAttributes:
+		event.StartTimerFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeStartTimerFailed)
+	case *swf.TimerCanceledEventAttributes:
+		event.TimerCanceledEventAttributes = t
+		event.EventType = S(swf.EventTypeTimerCanceled)
+	case *swf.TimerFiredEventAttributes:
+		event.TimerFiredEventAttributes = t
+		event.EventType = S(swf.EventTypeTimerFired)
+	case *swf.TimerStartedEventAttributes:
+		event.TimerStartedEventAttributes = t
+		event.EventType = S(swf.EventTypeTimerStarted)
+	case *swf.WorkflowExecutionCancelRequestedEventAttributes:
+		event.WorkflowExecutionCancelRequestedEventAttributes = t
+		event.EventType = S(swf.EventTypeWorkflowExecutionCancelRequested)
+	case *swf.WorkflowExecutionCanceledEventAttributes:
+		event.WorkflowExecutionCanceledEventAttributes = t
+		event.EventType = S(swf.EventTypeWorkflowExecutionCanceled)
+	case *swf.WorkflowExecutionCompletedEventAttributes:
+		event.WorkflowExecutionCompletedEventAttributes = t
+		event.EventType = S(swf.EventTypeWorkflowExecutionCompleted)
+	case *swf.WorkflowExecutionContinuedAsNewEventAttributes:
+		event.WorkflowExecutionContinuedAsNewEventAttributes = t
+		event.EventType = S(swf.EventTypeWorkflowExecutionContinuedAsNew)
+	case *swf.WorkflowExecutionFailedEventAttributes:
+		event.WorkflowExecutionFailedEventAttributes = t
+		event.EventType = S(swf.EventTypeWorkflowExecutionFailed)
+	case *swf.WorkflowExecutionSignaledEventAttributes:
+		event.WorkflowExecutionSignaledEventAttributes = t
+		event.EventType = S(swf.EventTypeWorkflowExecutionSignaled)
+	case *swf.WorkflowExecutionStartedEventAttributes:
+		event.WorkflowExecutionStartedEventAttributes = t
+		event.EventType = S(swf.EventTypeWorkflowExecutionStarted)
+	case *swf.WorkflowExecutionTerminatedEventAttributes:
+		event.WorkflowExecutionTerminatedEventAttributes = t
+		event.EventType = S(swf.EventTypeWorkflowExecutionTerminated)
+	case *swf.WorkflowExecutionTimedOutEventAttributes:
+		event.WorkflowExecutionTimedOutEventAttributes = t
+		event.EventType = S(swf.EventTypeWorkflowExecutionTimedOut)
+	}
+	return *event
+}
+
 func PrettyHistoryEvent(h swf.HistoryEvent) string {
 	var buffer bytes.Buffer
 	buffer.WriteString("HistoryEvent{ ")
-	buffer.WriteString(fmt.Sprintf("EventId: %d,", *h.EventID))
-	buffer.WriteString(fmt.Sprintf("EventTimestamp: %s, ", *h.EventTimestamp))
-	buffer.WriteString(fmt.Sprintf("EventType:, %s", *h.EventType))
-	buffer.WriteString(fmt.Sprintf("%+v", eventTypes[*h.EventType](h)))
+	if h.EventID != nil {
+		buffer.WriteString(fmt.Sprintf("EventId: %d,", *h.EventID))
+	}
+	if h.EventTimestamp != nil {
+		buffer.WriteString(fmt.Sprintf("EventTimestamp: %s, ", *h.EventTimestamp))
+	}
+	if h.EventType != nil {
+		buffer.WriteString(fmt.Sprintf("EventType: %s,", *h.EventType))
+	}
+	buffer.WriteString(fmt.Sprintf(" %+v", eventTypes[*h.EventType](h)))
 	buffer.WriteString(" }")
 	return buffer.String()
 }

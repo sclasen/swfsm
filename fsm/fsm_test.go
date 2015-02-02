@@ -1,10 +1,8 @@
 package fsm
 
 import (
-	"fmt"
 	"log"
 	"math/rand"
-	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -82,13 +80,9 @@ func TestFSM(t *testing.T) {
 	events := []swf.HistoryEvent{
 		swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
 		swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
-		swf.HistoryEvent{
-			EventID:   I(1),
-			EventType: S("WorkflowExecutionStarted"),
-			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: StartFSMWorkflowInput(fsm.Serializer, new(TestData)),
-			},
-		},
+		EventFromPayload(1, &swf.WorkflowExecutionStartedEventAttributes{
+			Input: StartFSMWorkflowInput(fsm.Serializer, new(TestData)),
+		}),
 	}
 
 	first := testDecisionTask(0, events)
@@ -476,310 +470,6 @@ func TestKinesisReplication(t *testing.T) {
 	}
 }
 
-func TestTrackPendingActivities(t *testing.T) {
-	fsm := testFSM()
-
-	fsm.AddInitialState(&FSMState{
-		Name: "start",
-		Decider: func(f *FSMContext, lastEvent swf.HistoryEvent, data interface{}) Outcome {
-			testData := data.(*TestData)
-			testData.States = append(testData.States, "start")
-			serialized := f.Serialize(testData)
-			decision := swf.Decision{
-				DecisionType: S(swf.DecisionTypeScheduleActivityTask),
-				ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
-					ActivityID:   S(testActivityInfo.ActivityID),
-					ActivityType: testActivityInfo.ActivityType,
-					TaskList:     &swf.TaskList{Name: S("taskList")},
-					Input:        S(serialized),
-				},
-			}
-			return f.Goto("working", testData, []swf.Decision{decision})
-		},
-	})
-
-	// Deciders should be able to retrieve info about the pending activity
-	fsm.AddState(&FSMState{
-		Name: "working",
-		Decider: typedFuncs.Decider(func(f *FSMContext, lastEvent swf.HistoryEvent, testData *TestData) Outcome {
-			testData.States = append(testData.States, "working")
-			serialized := f.Serialize(testData)
-			var decisions = f.EmptyDecisions()
-			if *lastEvent.EventType == swf.EventTypeActivityTaskCompleted {
-				trackedActivityInfo := f.ActivityInfo(lastEvent)
-				log.Printf("----->>>>> %+v %+v", trackedActivityInfo, testActivityInfo)
-				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
-					t.Fatalf("pending activity not being tracked\nExpected:\n%+v\nGot:\n%+v",
-						testActivityInfo, trackedActivityInfo,
-					)
-				}
-				timeoutSeconds := "5" //swf uses stringy numbers in many places
-				decision := swf.Decision{
-					DecisionType: S(swf.DecisionTypeStartTimer),
-					StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
-						StartToFireTimeout: S(timeoutSeconds),
-						TimerID:            S("timeToComplete"),
-					},
-				}
-				return f.Goto("done", testData, []swf.Decision{decision})
-			} else if *lastEvent.EventType == swf.EventTypeActivityTaskFailed {
-				trackedActivityInfo := f.ActivityInfo(lastEvent)
-				log.Printf("----->>>>> %+v %+v %+v", trackedActivityInfo, testActivityInfo, f.ActivitiesInfo())
-				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
-					t.Fatalf("pending activity not being tracked\nExpected:\n%+v\nGot:\n%+v",
-						testActivityInfo, trackedActivityInfo,
-					)
-				}
-				decision := swf.Decision{
-					DecisionType: S(swf.DecisionTypeScheduleActivityTask),
-					ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
-						ActivityID:   S(testActivityInfo.ActivityID),
-						ActivityType: testActivityInfo.ActivityType,
-						TaskList:     &swf.TaskList{Name: S("taskList")},
-						Input:        S(serialized),
-					},
-				}
-				decisions = append(decisions, decision)
-			}
-			return f.Stay(testData, decisions)
-		}),
-	})
-
-	// Pending activities are cleared after finished
-	fsm.AddState(&FSMState{
-		Name: "done",
-		Decider: typedFuncs.Decider(func(f *FSMContext, lastEvent swf.HistoryEvent, testData *TestData) Outcome {
-			decisions := f.EmptyDecisions()
-			if *lastEvent.EventType == swf.EventTypeTimerFired {
-				testData.States = append(testData.States, "done")
-				serialized := f.Serialize(testData)
-				trackedActivityInfo := f.ActivityInfo(lastEvent)
-				if trackedActivityInfo != nil {
-					t.Fatalf("pending activity not being cleared\nGot:\n%+v", trackedActivityInfo)
-				}
-				decision := swf.Decision{
-					DecisionType: S(swf.DecisionTypeCompleteWorkflowExecution),
-					CompleteWorkflowExecutionDecisionAttributes: &swf.CompleteWorkflowExecutionDecisionAttributes{
-						Result: S(serialized),
-					},
-				}
-				decisions = append(decisions, decision)
-			}
-			return f.Stay(testData, decisions)
-		}),
-	})
-
-	// Schedule a task
-	events := []swf.HistoryEvent{
-		swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
-		swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
-		swf.HistoryEvent{
-			EventID:   I(1),
-			EventType: S("WorkflowExecutionStarted"),
-			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: StartFSMWorkflowInput(fsm.Serializer, new(TestData)),
-			},
-		},
-	}
-	first := testDecisionTask(0, events)
-
-	decisions, _ := fsm.Tick(first)
-	recordMarker := FindDecision(decisions, stateMarkerPredicate)
-	if recordMarker == nil {
-		t.Fatal("No Record State Marker")
-	}
-	if !Find(decisions, scheduleActivityPredicate) {
-		t.Fatal("No ScheduleActivityTask")
-	}
-
-	// Fail the task
-	secondEvents := []swf.HistoryEvent{
-		{
-			EventType: S("ActivityTaskFailed"),
-			EventID:   I(7),
-			ActivityTaskFailedEventAttributes: &swf.ActivityTaskFailedEventAttributes{
-				ScheduledEventID: I(6),
-			},
-		},
-		{
-			EventType: S("ActivityTaskScheduled"),
-			EventID:   I(6),
-			ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
-				ActivityID:   S(testActivityInfo.ActivityID),
-				ActivityType: testActivityInfo.ActivityType,
-			},
-		},
-		{
-			EventType: S("MarkerRecorded"),
-			EventID:   I(5),
-			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
-				MarkerName: S(StateMarker),
-				Details:    recordMarker.RecordMarkerDecisionAttributes.Details,
-			},
-		},
-	}
-	secondEvents = append(secondEvents, events...)
-	if state, _ := fsm.findSerializedState(secondEvents); state.StateName != "working" {
-		t.Fatal("current state is not 'working'", secondEvents)
-	}
-	second := testDecisionTask(3, secondEvents)
-
-	secondDecisions, _ := fsm.Tick(second)
-	recordMarker = FindDecision(secondDecisions, stateMarkerPredicate)
-	if recordMarker == nil {
-		t.Fatal("No Record State Marker")
-	}
-	if !Find(secondDecisions, scheduleActivityPredicate) {
-		t.Fatal("No ScheduleActivityTask (retry)")
-	}
-
-	// Complete the task
-	thirdEvents := []swf.HistoryEvent{
-		{
-			EventType: S("ActivityTaskCompleted"),
-			EventID:   I(11),
-			ActivityTaskCompletedEventAttributes: &swf.ActivityTaskCompletedEventAttributes{
-				ScheduledEventID: I(10),
-			},
-		},
-		{
-			EventType: S("ActivityTaskScheduled"),
-			EventID:   I(10),
-			ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
-				ActivityID:   S(testActivityInfo.ActivityID),
-				ActivityType: testActivityInfo.ActivityType,
-			},
-		},
-		{
-			EventType: S("MarkerRecorded"),
-			EventID:   I(9),
-			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
-				MarkerName: S(StateMarker),
-				Details:    recordMarker.RecordMarkerDecisionAttributes.Details,
-			},
-		},
-	}
-	thirdEvents = append(thirdEvents, secondEvents...)
-	if state, _ := fsm.findSerializedState(thirdEvents); state.StateName != "working" {
-		t.Fatal("current state is not 'working'", thirdEvents)
-	}
-	third := testDecisionTask(7, thirdEvents)
-	thirdDecisions, _ := fsm.Tick(third)
-	recordMarker = FindDecision(thirdDecisions, stateMarkerPredicate)
-	if recordMarker == nil {
-		t.Fatal("No Record State Marker")
-	}
-	if !Find(thirdDecisions, startTimerPredicate) {
-		t.Fatal("No StartTimer")
-	}
-
-	// Finish the workflow, check if pending activities were cleared
-	fourthEvents := []swf.HistoryEvent{
-		{
-			EventType: S("TimerFired"),
-			EventID:   I(14),
-		},
-		{
-			EventType: S("MarkerRecorded"),
-			EventID:   I(13),
-			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
-				MarkerName: S(StateMarker),
-				Details:    recordMarker.RecordMarkerDecisionAttributes.Details,
-			},
-		},
-	}
-	fourthEvents = append(fourthEvents, thirdEvents...)
-	if state, _ := fsm.findSerializedState(fourthEvents); state.StateName != "done" {
-		t.Fatal("current state is not 'done'", fourthEvents)
-	}
-	fourth := testDecisionTask(11, fourthEvents)
-	fourthDecisions, _ := fsm.Tick(fourth)
-	recordMarker = FindDecision(fourthDecisions, stateMarkerPredicate)
-	if recordMarker == nil {
-		t.Fatal("No Record State Marker")
-	}
-	if !Find(fourthDecisions, completeWorkflowPredicate) {
-		t.Fatal("No CompleteWorkflow")
-	}
-}
-
-func TestFSMContextActivityTracking(t *testing.T) {
-	ctx := testContext(testFSM())
-	scheduledEventID := rand.Int()
-	activityID := fmt.Sprintf("test-activity-%d", scheduledEventID)
-	taskScheduled := swf.HistoryEvent{
-		EventType: S("ActivityTaskScheduled"),
-		EventID:   I(scheduledEventID),
-		ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
-			ActivityID: S(activityID),
-			ActivityType: &swf.ActivityType{
-				Name:    S("test-activity"),
-				Version: S("1"),
-			},
-		},
-	}
-	ctx.Decide(taskScheduled, &TestData{}, func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
-		if len(ctx.ActivitiesInfo()) != 0 {
-			t.Fatal("There should be no activies being tracked yet")
-		}
-		if !reflect.DeepEqual(h, taskScheduled) {
-			t.Fatal("Got an unexpected event")
-		}
-		return ctx.Stay(data, ctx.EmptyDecisions())
-	})
-	if len(ctx.ActivitiesInfo()) < 1 {
-		t.Fatal("Pending activity task is not being tracked")
-	}
-
-	// the pending activity can now be retrieved
-	taskCompleted := swf.HistoryEvent{
-		EventType: S("ActivityTaskCompleted"),
-		EventID:   I(rand.Int()),
-		ActivityTaskCompletedEventAttributes: &swf.ActivityTaskCompletedEventAttributes{
-			ScheduledEventID: I(scheduledEventID),
-		},
-	}
-	taskFailed := swf.HistoryEvent{
-		EventType: S("ActivityTaskFailed"),
-		EventID:   I(rand.Int()),
-		ActivityTaskFailedEventAttributes: &swf.ActivityTaskFailedEventAttributes{
-			ScheduledEventID: I(scheduledEventID),
-		},
-	}
-	infoOnCompleted := ctx.ActivityInfo(taskCompleted)
-	infoOnFailed := ctx.ActivityInfo(taskFailed)
-	if infoOnCompleted.ActivityID != activityID ||
-		*infoOnCompleted.Name != "test-activity" ||
-		*infoOnCompleted.Version != "1" {
-		t.Fatal("Pending activity can not be retrieved when completed")
-	}
-	if infoOnFailed.ActivityID != activityID ||
-		*infoOnFailed.Name != "test-activity" ||
-		*infoOnFailed.Version != "1" {
-		t.Fatal("Pending activity can not be retrieved when failed")
-	}
-
-	// pending activities are also cleared after terminated
-	ctx.Decide(taskCompleted, &TestData{}, func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
-		if len(ctx.ActivitiesInfo()) != 1 {
-			t.Fatal("There should be one activity being tracked")
-		}
-		if !reflect.DeepEqual(h, taskCompleted) {
-			t.Fatal("Got an unexpected event")
-		}
-		infoOnCompleted := ctx.ActivityInfo(taskCompleted)
-		if infoOnCompleted.ActivityID != activityID ||
-			*infoOnCompleted.Name != "test-activity" ||
-			*infoOnCompleted.Version != "1" {
-			t.Fatal("Pending activity can not be retrieved when completed")
-		}
-		return ctx.Stay(data, ctx.EmptyDecisions())
-	})
-	if len(ctx.ActivitiesInfo()) > 0 {
-		t.Fatal("Pending activity task is not being cleared after completed")
-	}
-}
-
 func TestContinueWorkflowDecision(t *testing.T) {
 
 	fsm := testFSM()
@@ -872,6 +562,13 @@ func testDecisionTask(prevStarted int, events []swf.HistoryEvent) *swf.DecisionT
 		d.Events[i] = e
 	}
 	return d
+}
+
+func testHistoryEvent(eventId int, eventType string) swf.HistoryEvent {
+	return swf.HistoryEvent{
+		EventID:   I(eventId),
+		EventType: S(eventType),
+	}
 }
 
 var testWorkflowExecution = &swf.WorkflowExecution{WorkflowID: S("workflow-id"), RunID: S("run-id")}
