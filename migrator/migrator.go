@@ -8,6 +8,7 @@ import (
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	. "github.com/sclasen/swfsm/sugar"
 	//"github.com/awslabs/aws-sdk-go/gen/dynamodb"
+	"time"
 )
 
 // TypesMigrator is composed of a DomainMigrator, a WorkflowTypeMigrator and an ActivityTypeMigrator.
@@ -272,6 +273,7 @@ func (s *StreamMigrator) Migrate() {
 			s.create(st)
 			log.Printf("action=migrate at=create-stream stream=%s status=created", LS(st.StreamName))
 		}
+		s.awaitActive(st.StreamName, 30)
 	}
 }
 
@@ -305,4 +307,27 @@ func (s *StreamMigrator) describe(st kinesis.CreateStreamInput) (*kinesis.Descri
 		return nil, err
 	}
 	return resp, nil
+}
+
+func (s *StreamMigrator)awaitActive(stream aws.StringValue, atMostSeconds int) {
+
+	waited := 0
+	status := kinesis.StreamStatusCreating
+	for status != kinesis.StreamStatusActive {
+		desc, err := s.Client.DescribeStream(&kinesis.DescribeStreamInput{
+			StreamName: stream,
+		})
+		if err != nil {
+			log.Printf("component=kinesis-migrator fn=awaitActive at=describe-error error=%s", err)
+			panic(err)
+		}
+		log.Printf("component=kinesis-migrator fn=awaitActive stream=%s at=describe status=%s", *stream, *desc.StreamDescription.StreamStatus)
+		status = *desc.StreamDescription.StreamStatus
+		time.Sleep(1 * time.Second)
+		waited++
+		if waited >= atMostSeconds {
+			log.Printf("component=kinesis-migrator fn=awaitActive streal=%s  at=error error=exeeeded-max-wait", *stream)
+			panic("waited too long")
+		}
+	}
 }
