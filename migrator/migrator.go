@@ -309,7 +309,7 @@ func (s *StreamMigrator) describe(st kinesis.CreateStreamInput) (*kinesis.Descri
 	return resp, nil
 }
 
-func (s *StreamMigrator)awaitActive(stream aws.StringValue, atMostSeconds int) {
+func (s *StreamMigrator) awaitActive(stream aws.StringValue, atMostSeconds int) {
 
 	waited := 0
 	status := kinesis.StreamStatusCreating
