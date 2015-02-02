@@ -1,5 +1,7 @@
-swf-go
+swfsm
 ======
+
+* simple workflow finite state machines
 
 go library that provides a Finite State Machine abstraction and other niceities on top of swf apis.
 

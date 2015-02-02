@@ -9,8 +9,8 @@ import (
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/kinesis"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
-	"github.com/sclasen/swf-go/poller"
-	. "github.com/sclasen/swf-go/sugar"
+	"github.com/sclasen/swfsm/poller"
+	. "github.com/sclasen/swfsm/sugar"
 )
 
 type SWFOps interface {
