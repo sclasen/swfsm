@@ -14,7 +14,6 @@ import (
 //the sub deciders should return Pass when they dont wish to handle an event.
 type ComposedDecider struct {
 	deciders []Decider
-	last     bool
 }
 
 //NewComposedDecider builds a Composed Decider from a list of sub Deciders.
