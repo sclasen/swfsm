@@ -260,7 +260,7 @@ func OnSignalSent(signalName string, deciders ...Decider) Decider {
 	}
 }
 
-// OnSignalSent builds a composed decider that fires on when a matching signal is recieved.
+// OnTimerFired builds a composed decider that fires on when a matching timer is fired.
 func OnTimerFired(timerID string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
@@ -448,6 +448,7 @@ func ManagedContinuations(historySize int, timerRetrySeconds int) Decider {
 
 }
 
+//RepairState is a decider that can be composed in which updates the current state data with the one recieved in the signal.
 func RepairState() Decider {
 	return OnSignalReceived(RepiarStateSignal, UpdateState(
 		func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) {

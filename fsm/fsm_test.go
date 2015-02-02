@@ -615,9 +615,9 @@ func testDecisionTask(prevStarted int, events []swf.HistoryEvent) *swf.DecisionT
 	return d
 }
 
-func testHistoryEvent(eventId int, eventType string) swf.HistoryEvent {
+func testHistoryEvent(eventID int, eventType string) swf.HistoryEvent {
 	return swf.HistoryEvent{
-		EventID:   I(eventId),
+		EventID:   I(eventID),
 		EventType: S(eventType),
 	}
 }

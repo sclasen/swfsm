@@ -13,12 +13,14 @@ import (
 	. "github.com/sclasen/swfsm/sugar"
 )
 
+//SWFOps is the subset of swf.SWF ops required by the fsm package
 type SWFOps interface {
 	PollForDecisionTask(*swf.PollForDecisionTaskInput) (*swf.DecisionTask, error)
 	PollForActivityTask(*swf.PollForActivityTaskInput) (*swf.ActivityTask, error)
 	RespondDecisionTaskCompleted(*swf.RespondDecisionTaskCompletedInput) error
 }
 
+//KinesisOps is the subset of kinesis.Kinesis ops required by the fsm package
 type KinesisOps interface {
 	PutRecord(*kinesis.PutRecordInput) (*kinesis.PutRecordOutput, error)
 }

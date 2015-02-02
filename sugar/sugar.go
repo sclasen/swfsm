@@ -10,6 +10,7 @@ import (
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
+//error code constants
 const (
 	ErrorTypeUnknownResourceFault                 = "com.amazonaws.swf.base.model#UnknownResourceFault"
 	ErrorTypeWorkflowExecutionAlreadyStartedFault = "com.amazonaws.swf.base.model#WorkflowExecutionAlreadyStartedFault"
@@ -70,9 +71,11 @@ var eventTypes = map[string]func(swf.HistoryEvent) interface{}{
 	swf.EventTypeExternalWorkflowExecutionCancelRequested: func(h swf.HistoryEvent) interface{} { return h.ExternalWorkflowExecutionCancelRequestedEventAttributes },
 }
 
-func EventFromPayload(eventId int, data interface{}) swf.HistoryEvent {
+//EventFromPayload will construct swf.HistoryEvent with the correct id, event type and Attributes struct set, based on the type of the data passed to it,
+//which should be one of the swf.*EventAttributes structs.
+func EventFromPayload(eventID int, data interface{}) swf.HistoryEvent {
 	event := &swf.HistoryEvent{}
-	event.EventID = I(eventId)
+	event.EventID = I(eventID)
 	switch t := data.(type) {
 	case *swf.ActivityTaskCancelRequestedEventAttributes:
 		event.ActivityTaskCancelRequestedEventAttributes = t
@@ -219,6 +222,7 @@ func EventFromPayload(eventId int, data interface{}) swf.HistoryEvent {
 	return *event
 }
 
+//PrettyHistoryEvent pretty prints a swf.HistoryEvent in a readable form for logging.
 func PrettyHistoryEvent(h swf.HistoryEvent) string {
 	var buffer bytes.Buffer
 	buffer.WriteString("HistoryEvent{ ")
@@ -236,7 +240,7 @@ func PrettyHistoryEvent(h swf.HistoryEvent) string {
 	return buffer.String()
 }
 
-// EventTypes returns a slice containing the valid values of the HistoryEvent.EventType field.
+// SWFHistoryEventTypes returns a slice containing the valid values of the HistoryEvent.EventType field.
 func SWFHistoryEventTypes() []string {
 	es := make([]string, 0, len(eventTypes))
 	for k := range eventTypes {
@@ -260,16 +264,24 @@ var decisionTypes = map[string]func(swf.Decision) interface{}{
 	swf.DecisionTypeStartChildWorkflowExecution:            func(d swf.Decision) interface{} { return d.StartChildWorkflowExecutionDecisionAttributes },
 }
 
+//PrettyDecision pretty prints a swf.Decision in a readable form for logging.
 func PrettyDecision(d swf.Decision) string {
 	var buffer bytes.Buffer
 	buffer.WriteString("Decision{ ")
-	buffer.WriteString(fmt.Sprintf("DecisionType: %s,", *d.DecisionType))
-	buffer.WriteString(fmt.Sprintf("%+v", decisionTypes[*d.DecisionType](d)))
+	if d.DecisionType != nil {
+		buffer.WriteString(fmt.Sprintf("DecisionType: %s,", *d.DecisionType))
+		if decisionTypes[*d.DecisionType](d) != nil {
+			buffer.WriteString(fmt.Sprintf("%+v", decisionTypes[*d.DecisionType](d)))
+		}
+	} else {
+		buffer.WriteString("NIL DECISION TYPE")
+	}
+
 	buffer.WriteString(" }")
 	return buffer.String()
 }
 
-// DecisionTypes returns a slice containing the valid values of the Decision.DecisionType field.
+// SWFDecisionTypes returns a slice containing the valid values of the Decision.DecisionType field.
 func SWFDecisionTypes() []string {
 	ds := make([]string, 0, len(decisionTypes))
 	for k := range eventTypes {

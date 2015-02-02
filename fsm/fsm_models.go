@@ -278,7 +278,7 @@ func (f *FSMContext) Goto(state string, data interface{}, decisions []swf.Decisi
 	}
 }
 
-// Complete is a helper func to easily create a CompleteOutcome.
+// CompleteWorkflow is a helper func to easily create a CompleteOutcome that sends a CompleteWorkflow decision.
 func (f *FSMContext) CompleteWorkflow(data interface{}, decisions ...swf.Decision) Outcome {
 	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != swf.DecisionTypeCompleteWorkflowExecution {
 		decisions = append(decisions, f.CompleteWorkflowDecision(data))
@@ -289,7 +289,7 @@ func (f *FSMContext) CompleteWorkflow(data interface{}, decisions ...swf.Decisio
 	}
 }
 
-// Complete is a helper func to easily create a CompleteOutcome.
+// ContinueWorkflow is a helper func to easily create a CompleteOutcome that sends a ContinueWorklfow decision.
 func (f *FSMContext) ContinueWorkflow(data interface{}, decisions ...swf.Decision) Outcome {
 	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != swf.DecisionTypeContinueAsNewWorkflowExecution {
 		decisions = append(decisions, f.ContinueWorkflowDecision(f.State, data))
@@ -385,7 +385,7 @@ func (f *FSMContext) ContinueWorkflowDecision(continuedState string, data interf
 	}
 }
 
-// CompletionDecision will build a CompleteWorkflowExecutionDecision decision that has the expected SerializedState marshalled to json as its result.
+// CompleteWorkflowDecision will build a CompleteWorkflowExecutionDecision decision that has the expected SerializedState marshalled to json as its result.
 // This decision should be used when it is appropriate to Complete your workflow.
 func (f *FSMContext) CompleteWorkflowDecision(data interface{}) swf.Decision {
 	return swf.Decision{
