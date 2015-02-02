@@ -260,6 +260,20 @@ func OnSignalSent(signalName string, deciders ...Decider) Decider {
 	}
 }
 
+// OnSignalSent builds a composed decider that fires on when a matching signal is recieved.
+func OnTimerFired(timerID string, deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeTimerFired:
+			if *h.TimerFiredEventAttributes.TimerID == timerID {
+				logf(ctx, "at=on-timer-fired")
+				return NewComposedDecider(deciders...)(ctx, h, data)
+			}
+		}
+		return Pass
+	}
+}
+
 // OnSignalFailed builds a composed decider that fires on when a matching signal fails.
 func OnSignalFailed(signalName string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {

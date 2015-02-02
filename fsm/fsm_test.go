@@ -288,6 +288,8 @@ func ExampleFSM() {
 	type Hello struct {
 		Message string `json:"message,omitempty"`
 	}
+
+	//This is an example of building Deciders without using decider composition.
 	//the FSM we will create will oscillate between 2 states,
 	//waitForSignal -> will wait till the workflow is started or signalled, and update the StateData based on the Hello message received, set a timer, and transition to waitForTimer
 	//waitForTimer -> will wait till the timer set by waitForSignal fires, and will signal the workflow with a Hello message, and transition to waitFotSignal
@@ -341,10 +343,59 @@ func ExampleFSM() {
 		return f.Stay(d, decisions)
 	}
 
+	//These 2 deciders are the same as the ones above, but use composable decider bits.
+	typed := Typed(new(StateData))
+
+	updateState := typed.StateFunc(func(f *FSMContext, h swf.HistoryEvent, d *StateData) {
+		hello := &Hello{}
+		f.EventData(h, &Hello{})
+		d.Count++
+		d.Message = hello.Message
+	})
+
+	setTimer := typed.DecisionFunc(func(f *FSMContext, h swf.HistoryEvent, d *StateData) swf.Decision {
+		timeoutSeconds := "5" //swf uses stringy numbers in many places
+		return swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartTimer),
+			StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+				StartToFireTimeout: S(timeoutSeconds),
+				TimerID:            S("timeToSignal"),
+			},
+		}
+	})
+
+	sendSignal := typed.DecisionFunc(func(f *FSMContext, h swf.HistoryEvent, d *StateData) swf.Decision {
+		message := strconv.FormatInt(time.Now().Unix(), 10)
+		signalInput := &Hello{message}
+		return swf.Decision{
+			DecisionType: S(swf.DecisionTypeSignalExternalWorkflowExecution),
+			SignalExternalWorkflowExecutionDecisionAttributes: &swf.SignalExternalWorkflowExecutionDecisionAttributes{
+				SignalName: S("hello"),
+				Input:      S(f.Serialize(signalInput)),
+				RunID:      f.RunID,
+				WorkflowID: f.WorkflowID,
+			},
+		}
+	})
+
+	waitForSignalComposedDecider := NewComposedDecider(
+		OnStarted(UpdateState(updateState), AddDecision(setTimer), Transition("waitForTimer")),
+		OnSignalReceived("hello", UpdateState(updateState), AddDecision(setTimer), Transition("waitForTimer")),
+		DefaultDecider(),
+	)
+
+	waitForTimerComposedDecider := NewComposedDecider(
+		OnTimerFired("timeToSignal", AddDecision(sendSignal), Transition("waitForSignal")),
+		DefaultDecider(),
+	)
+
 	//create the FSMState by passing the decider function through TypedDecider(),
 	//which lets you use d *StateData rather than d interface{} in your decider.
-	waitForSignalState := &FSMState{Name: "waitForSignal", Decider: typedFuncs.Decider(waitForSignal)}
-	waitForTimerState := &FSMState{Name: "waitForTimer", Decider: typedFuncs.Decider(waitForTimer)}
+	waitForSignalState := &FSMState{Name: "waitForSignal", Decider: typed.Decider(waitForSignal)}
+	waitForTimerState := &FSMState{Name: "waitForTimer", Decider: typed.Decider(waitForTimer)}
+	//or with the composed deciders
+	waitForSignalState = &FSMState{Name: "waitForSignal", Decider: waitForSignalComposedDecider}
+	waitForTimerState = &FSMState{Name: "waitForTimer", Decider: waitForTimerComposedDecider}
 	//wire it up in an fsm
 	fsm := &FSM{
 		Name:       "example-fsm",
