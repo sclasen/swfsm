@@ -22,8 +22,9 @@ tidy:
 	test -z "$$(goimports -l -d $(GO_PACKAGES) | tee /dev/stderr)"
 
 lint:
-	go vet ./...
 	test -z "$$(golint ./... | tee /dev/stderr)"
+	go vet ./...
+
 
 imports:
 	go get github.com/golang/lint/golint

@@ -18,6 +18,7 @@ const (
 	CorrelatorMarker  = "FSM.Correlator"
 	ErrorSignal       = "FSM.Error"
 	SystemErrorSignal = "FSM.SystemError"
+	RepiarStateSignal = "FSM.RepairState"
 	ContinueTimer     = "FSM.ContinueWorkflow"
 	ContinueSignal    = "FSM.ContinueWorkflow"
 	CompleteState     = "complete"

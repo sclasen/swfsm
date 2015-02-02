@@ -433,3 +433,10 @@ func ManagedContinuations(historySize int, timerRetrySeconds int) Decider {
 	)
 
 }
+
+func RepairState() Decider {
+	return OnSignalReceived(RepiarStateSignal, UpdateState(
+		func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) {
+			ctx.EventData(h, data) //deserializes the signal input into data
+		}))
+}

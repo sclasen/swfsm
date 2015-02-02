@@ -278,18 +278,23 @@ func SWFDecisionTypes() []string {
 	return ds
 }
 
+//L is a helper so you dont have to type aws.Long(myLong)
 func L(l int64) aws.LongValue {
 	return aws.Long(l)
 }
 
+//I is a helper so you dont have to type aws.Long(int64(myInt))
 func I(i int) aws.LongValue {
 	return aws.Long(int64(i))
 }
 
+//S is a helper so you dont have to type aws.String(myString)
 func S(s string) aws.StringValue {
 	return aws.String(s)
 }
 
+
+//LS is a helper so you dont have to do nil checks before logging aws.StringValue values
 func LS(s aws.StringValue) string {
 	if s == nil {
 		return "nil"
@@ -297,6 +302,7 @@ func LS(s aws.StringValue) string {
 	return *s
 }
 
+//LL is a helper so you dont have to do nil checks before logging aws.LongValue values
 func LL(l aws.LongValue) string {
 	if l == nil {
 		return "nil"
