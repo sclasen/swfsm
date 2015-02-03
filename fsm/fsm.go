@@ -7,7 +7,6 @@ import (
 	"reflect"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/kinesis"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"github.com/sclasen/swfsm/poller"
 	. "github.com/sclasen/swfsm/sugar"
@@ -18,17 +17,6 @@ type SWFOps interface {
 	PollForDecisionTask(*swf.PollForDecisionTaskInput) (*swf.DecisionTask, error)
 	PollForActivityTask(*swf.PollForActivityTaskInput) (*swf.ActivityTask, error)
 	RespondDecisionTaskCompleted(*swf.RespondDecisionTaskCompletedInput) error
-}
-
-//KinesisOps is the subset of kinesis.Kinesis ops required by the fsm package
-type KinesisOps interface {
-	PutRecord(*kinesis.PutRecordInput) (*kinesis.PutRecordOutput, error)
-}
-
-func defaultKinesisReplicator() KinesisReplicator {
-	return func(fsm, workflowID string, put func() (*kinesis.PutRecordOutput, error)) (*kinesis.PutRecordOutput, error) {
-		return put()
-	}
 }
 
 // FSM models the decision handling logic a workflow in SWF
@@ -43,12 +31,8 @@ type FSM struct {
 	Identity string
 	// Client used to make SWF api requests.
 	SWF SWFOps
-	// KinesisClient used to make Kinesis api requests.
-	Kinesis KinesisOps
-	// Kinesis stream in the same region to replicate state to.
-	KinesisStream string
-	// Strategy for replication of state to Kinesis.
-	KinesisReplicator KinesisReplicator
+	// Strategy for replication of state to the systems the build the Query side model.
+	ReplicationHandler ReplicationHandler
 	// DataType of the data struct associated with this FSM.
 	// The data is automatically peristed to and loaded from workflow history by the FSM.
 	DataType interface{}
@@ -149,9 +133,6 @@ func (f *FSM) Init() {
 		f.DecisionTaskDispatcher = &CallingGoroutineDispatcher{}
 	}
 
-	if f.KinesisReplicator == nil {
-		f.KinesisReplicator = defaultKinesisReplicator()
-	}
 }
 
 // Start begins processing DecisionTasks with the FSM. It creates a DecisionTaskPoller and spawns a goroutine that continues polling until Stop() is called and any in-flight polls have completed.
@@ -167,46 +148,26 @@ func (f *FSM) dispatchTask(decisionTask *swf.DecisionTask) {
 }
 
 func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
-	decisions, state := f.Tick(decisionTask)
-	complete := swf.RespondDecisionTaskCompletedInput{
+	context, decisions, state := f.Tick(decisionTask)
+	complete := &swf.RespondDecisionTaskCompletedInput{
 		Decisions: decisions,
 		TaskToken: decisionTask.TaskToken,
 	}
-	//currently we arent returning state when in in an error state so only set context in non-error state.
-	if state != nil {
-		complete.ExecutionContext = aws.String(state.StateName)
-	}
 
-	if err := f.SWF.RespondDecisionTaskCompleted(&complete); err != nil {
+	complete.ExecutionContext = aws.String(state.StateName)
+
+	if err := f.SWF.RespondDecisionTaskCompleted(complete); err != nil {
 		f.log("action=tick at=decide-request-failed error=%q", err.Error())
 		return
 	}
 
-	if state == nil || f.KinesisStream == "" {
-		return // nothing to replicate
-	}
-	stateToReplicate, err := f.Serializer.Serialize(state)
-	if err != nil {
-		f.log("action=tick at=serialize-state-failed error=%q", err.Error())
-		return
+	if f.ReplicationHandler != nil {
+		repErr := f.ReplicationHandler(context, decisionTask, complete, state)
+		if repErr != nil {
+			f.log("action=tick at=replication-handler-failed error=%q", repErr.Error())
+		}
 	}
 
-	put := func() (*kinesis.PutRecordOutput, error) {
-		return f.Kinesis.PutRecord(&kinesis.PutRecordInput{
-			StreamName: aws.String(f.KinesisStream),
-			//partition by workflow
-			PartitionKey: decisionTask.WorkflowExecution.WorkflowID,
-			Data:         []byte(stateToReplicate),
-		})
-	}
-
-	resp, err := f.KinesisReplicator(f.Name, *decisionTask.WorkflowExecution.WorkflowID, put)
-
-	if err != nil {
-		f.log("action=tick at=replicate-state-failed error=%q", err.Error())
-		return
-	}
-	f.log("action=tick at=replicated-state shard=%s sequence=%s", resp.ShardID, resp.SequenceNumber)
 }
 
 func (f *FSM) stateFromDecisions(decisions []swf.Decision) string {
@@ -243,17 +204,24 @@ func (f *FSM) Deserialize(serialized string, data interface{}) {
 // Tick is called when the DecisionTaskPoller receives a PollForDecisionTaskResponse in its polling loop.
 // On errors, a nil *SerializedState is returned, and an error Outcome is included in the Decision list.
 // It is exported to facilitate testing.
-func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedState) {
+func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision, *SerializedState) {
 	lastEvents := f.findLastEvents(*decisionTask.PreviousStartedEventID, decisionTask.Events)
 	execution := decisionTask.WorkflowExecution
 	outcome := new(intermediateOutcome)
+	context := NewFSMContext(f,
+		*decisionTask.WorkflowType,
+		*decisionTask.WorkflowExecution,
+		nil,
+		"", nil, uint64(0),
+	)
+
 	serializedState, err := f.findSerializedState(decisionTask.Events)
 	if err != nil {
 		f.log("action=tick at=error=find-serialized-state-failed err=%q", err)
 		if f.allowPanics {
 			panic(err)
 		}
-		return append(outcome.decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
+		return context, append(outcome.decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
 	}
 	eventCorrelator, err := f.findSerializedEventCorrelator(decisionTask.Events)
 	if err != nil {
@@ -261,15 +229,11 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 		if f.allowPanics {
 			panic(err)
 		}
-		return append(outcome.decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
+		return context, append(outcome.decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
 	}
+	context.eventCorrelator = eventCorrelator
+
 	f.log("action=tick at=find-serialized-state state=%s", serializedState.StateName)
-	context := NewFSMContext(f,
-		*decisionTask.WorkflowType,
-		*decisionTask.WorkflowExecution,
-		eventCorrelator,
-		"", nil, uint64(0),
-	)
 
 	//todo now on any error on processing an event simply sends an error signal to the workflow
 	//decider stack should all handle errors
@@ -281,7 +245,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 			if f.allowPanics {
 				panic(err)
 			}
-			return append(outcome.decisions, f.captureSystemError(execution, "DeserializeStateError", decisionTask.Events, err)...), nil
+			return context, append(outcome.decisions, f.captureSystemError(execution, "DeserializeStateError", decisionTask.Events, err)...), nil
 		}
 		f.log("action=tick at=find-current-data data=%v", data)
 
@@ -307,7 +271,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 					panic(err)
 				}
 				//todo make a synthetic error signal event and make the decider handle
-				return append(outcome.decisions, f.captureDecisionError(execution, e, err)...), nil
+				return context, append(outcome.decisions, f.captureDecisionError(execution, e, err)...), nil
 			}
 			eventCorrelator.Track(e)
 			curr := outcome.state
@@ -315,7 +279,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 			f.log("action=tick at=decided-event state=%s next-state=%s decisions=%d", curr, outcome.state, len(anOutcome.Decisions()))
 		} else {
 			f.log("action=tick at=error error=marked-state-not-in-fsm state=%s", outcome.state)
-			return append(outcome.decisions, f.captureSystemError(execution, "MissingFsmStateError", lastEvents[i:], errors.New(outcome.state))...), nil
+			return context, append(outcome.decisions, f.captureSystemError(execution, "MissingFsmStateError", lastEvents[i:], errors.New(outcome.state))...), nil
 		}
 	}
 
@@ -331,10 +295,10 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) ([]swf.Decision, *SerializedS
 		if f.allowPanics {
 			panic(err)
 		}
-		return append(outcome.decisions, f.captureSystemError(execution, "StateSerializationError", []swf.HistoryEvent{}, err)...), nil
+		return context, append(outcome.decisions, f.captureSystemError(execution, "StateSerializationError", []swf.HistoryEvent{}, err)...), nil
 	}
 
-	return final, serializedState
+	return context, final, serializedState
 }
 
 func (f *FSM) mergeOutcomes(final *intermediateOutcome, intermediate Outcome) {

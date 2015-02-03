@@ -118,7 +118,7 @@ func TestTrackPendingActivities(t *testing.T) {
 	}
 	first := testDecisionTask(0, events)
 
-	decisions, _ := fsm.Tick(first)
+	_, decisions, _ := fsm.Tick(first)
 	recordMarker := FindDecision(decisions, stateMarkerPredicate)
 	if recordMarker == nil {
 		t.Fatal("No Record State Marker")
@@ -159,7 +159,7 @@ func TestTrackPendingActivities(t *testing.T) {
 	}
 	second := testDecisionTask(3, secondEvents)
 
-	secondDecisions, _ := fsm.Tick(second)
+	_, secondDecisions, _ := fsm.Tick(second)
 	recordMarker = FindDecision(secondDecisions, stateMarkerPredicate)
 	if recordMarker == nil {
 		t.Fatal("No Record State Marker")
@@ -199,7 +199,7 @@ func TestTrackPendingActivities(t *testing.T) {
 		t.Fatal("current state is not 'working'", thirdEvents)
 	}
 	third := testDecisionTask(7, thirdEvents)
-	thirdDecisions, _ := fsm.Tick(third)
+	_, thirdDecisions, _ := fsm.Tick(third)
 	recordMarker = FindDecision(thirdDecisions, stateMarkerPredicate)
 	if recordMarker == nil {
 		t.Fatal("No Record State Marker")
@@ -228,7 +228,7 @@ func TestTrackPendingActivities(t *testing.T) {
 		t.Fatal("current state is not 'done'", fourthEvents)
 	}
 	fourth := testDecisionTask(11, fourthEvents)
-	fourthDecisions, _ := fsm.Tick(fourth)
+	_, fourthDecisions, _ := fsm.Tick(fourth)
 	recordMarker = FindDecision(fourthDecisions, stateMarkerPredicate)
 	if recordMarker == nil {
 		t.Fatal("No Record State Marker")

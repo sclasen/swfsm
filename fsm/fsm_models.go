@@ -8,7 +8,6 @@ import (
 
 	"code.google.com/p/goprotobuf/proto"
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/kinesis"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
@@ -132,9 +131,6 @@ type intermediateOutcome struct {
 	data         interface{}
 	decisions    []swf.Decision
 }
-
-//KinesisReplicator lets you customize the retry logic around Replicating State to Kinesis.
-type KinesisReplicator func(fsm, workflowID string, put func() (*kinesis.PutRecordOutput, error)) (*kinesis.PutRecordOutput, error)
 
 // FSMState defines the behavior of one state of an FSM
 type FSMState struct {
