@@ -91,6 +91,10 @@ func TestFSM(t *testing.T) {
 		t.Fatal("No Record State Marker")
 	}
 
+	if !Find(decisions, correlationMarkerPredicate) {
+		t.Fatal("No Record Correlator Marker")
+	}
+
 	if !Find(decisions, scheduleActivityPredicate) {
 		t.Fatal("No ScheduleActivityTask")
 	}
@@ -132,6 +136,11 @@ func FindDecision(decisions []swf.Decision, predicate func(swf.Decision) bool) *
 func stateMarkerPredicate(d swf.Decision) bool {
 	return *d.DecisionType == "RecordMarker" && *d.RecordMarkerDecisionAttributes.MarkerName == StateMarker
 }
+
+func correlationMarkerPredicate(d swf.Decision) bool {
+	return *d.DecisionType == "RecordMarker" && *d.RecordMarkerDecisionAttributes.MarkerName == CorrelatorMarker
+}
+
 
 func scheduleActivityPredicate(d swf.Decision) bool {
 	return *d.DecisionType == "ScheduleActivityTask"
