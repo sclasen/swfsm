@@ -37,22 +37,21 @@ func (c *ComposedDecider) Decide(ctx *FSMContext, h swf.HistoryEvent, data inter
 		// contribute the outcome's decisions and data
 		decisions = append(decisions, outcome.Decisions...)
 		data = outcome.Data
-		state = outcome.State
-		if outcome.Continue {
+		if outcome.State == "" {
 			continue
 		}
+		state = outcome.State
+
 		return Outcome{
 			Data:      data,
 			State:     state,
 			Decisions: decisions,
-			Continue:  false,
 		}
 	}
 	return Outcome{
 		Data:      data,
-		State:     state,
+		State:     "",
 		Decisions: decisions,
-		Continue:  true,
 	}
 }
 

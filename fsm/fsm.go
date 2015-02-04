@@ -248,6 +248,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	//iterate through events oldest to newest, calling the decider for the current state.
 	//if the outcome changes the state use the right FSMState
 	for i := len(lastEvents) - 1; i >= 0; i-- {
+
 		e := lastEvents[i]
 		f.log("action=tick at=history id=%d type=%s", e.EventID, e.EventType)
 		fsmState, ok := f.states[outcome.State]
@@ -294,7 +295,9 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 func (f *FSM) mergeOutcomes(final *Outcome, intermediate Outcome) {
 	final.Decisions = append(final.Decisions, intermediate.Decisions...)
 	final.Data = intermediate.Data
-	final.State = intermediate.State
+	if intermediate.State != "" {
+		final.State = intermediate.State
+	}
 }
 
 func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event swf.HistoryEvent, data interface{}) (anOutcome Outcome, anErr error) {

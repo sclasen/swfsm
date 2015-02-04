@@ -32,10 +32,11 @@ type Decider func(*FSMContext, swf.HistoryEvent, interface{}) Outcome
 
 //Outcome is the result of a Decider processing a HistoryEvent
 type Outcome struct {
+	//State is the desired next state in the FSM. the empty string ("") is a signal that you wish decision processing to continue
+	//if the FSM machinery recieves the empty string as the state of a final outcome, it will substitute the current state.
 	State     string
 	Data      interface{}
 	Decisions []swf.Decision
-	Continue  bool
 }
 
 // FSMState defines the behavior of one state of an FSM
@@ -157,10 +158,9 @@ func NewFSMContext(
 // ContinueDecider is a helper func to easily create a ContinueOutcome.
 func (f *FSMContext) ContinueDecider(data interface{}, decisions []swf.Decision) Outcome {
 	return Outcome{
-		State:     f.State,
+		State:     "",
 		Data:      data,
 		Decisions: decisions,
-		Continue:  true,
 	}
 }
 
@@ -184,10 +184,9 @@ func (f *FSMContext) Goto(state string, data interface{}, decisions []swf.Decisi
 
 func (f *FSMContext) Pass() Outcome {
 	return Outcome{
-		State:     f.State,
+		State:     "",
 		Data:      f.stateData,
 		Decisions: []swf.Decision{},
-		Continue:  true,
 	}
 }
 
