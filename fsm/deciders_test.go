@@ -116,7 +116,7 @@ func TestNestedDeciderComposition(t *testing.T) {
 	composed := NewComposedDecider(
 		NewComposedDecider(
 			OnData(func(data interface{}) bool { return true }, Transition("ok"))),
-		OnData(func(data interface{}) bool { return false }, Transition("bad")),
+		OnData(func(data interface{}) bool { return true }, Transition("bad")),
 		DefaultDecider(),
 	)
 
