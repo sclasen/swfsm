@@ -170,15 +170,6 @@ func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
 
 }
 
-func (f *FSM) stateFromDecisions(decisions []swf.Decision) string {
-	for _, d := range decisions {
-		if *d.DecisionType == swf.DecisionTypeRecordMarker && *d.RecordMarkerDecisionAttributes.MarkerName == StateMarker {
-			return *d.RecordMarkerDecisionAttributes.Details
-		}
-	}
-	return ""
-}
-
 // Serialize uses the FSM.Serializer to serialize data to a string.
 // If there is an error in serialization this func will panic, so this should usually only be used inside Deciders
 // where the panics are recovered and proper errors are recorded in the workflow.
@@ -309,8 +300,6 @@ func (f *FSM) mergeOutcomes(final *intermediateOutcome, intermediate Outcome) {
 	}
 }
 
-//if the outcome is good good if its an error, we capture the error state above
-
 func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event swf.HistoryEvent, data interface{}) (anOutcome Outcome, anErr error) {
 	defer func() {
 		if !f.allowPanics {
@@ -416,15 +405,23 @@ func (f *FSM) findSerializedState(events []swf.HistoryEvent) (*SerializedState, 
 			err := f.Serializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, state)
 			return state, err
 		} else if *event.EventType == swf.EventTypeWorkflowExecutionStarted {
-			log.Println(event)
 			state := &SerializedState{}
-			err := f.Serializer.Deserialize(*event.WorkflowExecutionStartedEventAttributes.Input, state)
-			if err == nil {
-				if state.StateName == "" {
-					state.StateName = f.initialState.Name
+			//If the workflow is continued, we expect a full SerializedState as Input
+			if event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunID != nil {
+				err := f.Serializer.Deserialize(*event.WorkflowExecutionStartedEventAttributes.Input, state)
+				if err == nil {
+					if state.StateName == "" {
+						state.StateName = f.initialState.Name
+					}
 				}
+				return state, err
+			} else {
+				//Otherwise we expect just a stateData struct
+				state.StateVersion = 0
+				state.StateName = f.initialState.Name
+				state.StateData = *event.WorkflowExecutionStartedEventAttributes.Input
+				return state, nil
 			}
-			return state, err
 		}
 	}
 	return nil, errors.New("Cant Find Current Data")
@@ -453,7 +450,7 @@ func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) []swf
 			swf.EventTypeDecisionTaskStarted:
 			//no-op, dont even process these?
 		case swf.EventTypeMarkerRecorded:
-			if !f.isStateMarker(event) {
+			if !f.isStateMarker(event) && !f.isCorrelatorMarker(event) {
 				lastEvents = append(lastEvents, event)
 			}
 		default:
@@ -543,31 +540,4 @@ func (f *FSM) EmptyDecisions() []swf.Decision {
 	return make([]swf.Decision, 0)
 }
 
-// StartFSMWorkflowInput should be used to construct the input for any StartWorkflowExecutionRequests.
-// This panics on errors cause really this should never err.
-func StartFSMWorkflowInput(serializer StateSerializer, data interface{}) aws.StringValue {
-	ss := new(SerializedState)
-	stateData, err := serializer.Serialize(data)
-	if err != nil {
-		panic(err)
-	}
 
-	ss.StateData = stateData
-	serialized, err := serializer.Serialize(ss)
-	if err != nil {
-		panic(err)
-	}
-	return aws.String(serialized)
-}
-
-//ContinueFSMWorkflowInput should be used to construct the input for any ContinueAsNewWorkflowExecution decisions.
-func ContinueFSMWorkflowInput(ctx *FSMContext, data interface{}) aws.StringValue {
-	ss := new(SerializedState)
-	stateData := ctx.Serialize(data)
-
-	ss.StateData = stateData
-	ss.StateName = ctx.serialization.InitialState()
-	ss.StateVersion = ctx.stateVersion
-
-	return aws.String(ctx.Serialize(ss))
-}

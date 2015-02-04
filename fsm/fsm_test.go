@@ -79,7 +79,7 @@ func TestFSM(t *testing.T) {
 		swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
 		swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
 		EventFromPayload(1, &swf.WorkflowExecutionStartedEventAttributes{
-			Input: StartFSMWorkflowInput(fsm.Serializer, new(TestData)),
+			Input: S(fsm.Serialize(new(TestData))),
 		}),
 	}
 
@@ -140,7 +140,6 @@ func stateMarkerPredicate(d swf.Decision) bool {
 func correlationMarkerPredicate(d swf.Decision) bool {
 	return *d.DecisionType == "RecordMarker" && *d.RecordMarkerDecisionAttributes.MarkerName == CorrelatorMarker
 }
-
 
 func scheduleActivityPredicate(d swf.Decision) bool {
 	return *d.DecisionType == "ScheduleActivityTask"
@@ -425,8 +424,7 @@ func ExampleFSM() {
 		WorkflowID: S("your-id"),
 		//you will have previously regiestered a WorkflowType that this FSM will work.
 		WorkflowType: &swf.WorkflowType{Name: S("the-name"), Version: S("the-version")},
-		// It is *very* important to use StartFSMWorkflowInput so the state management works properly
-		Input: StartFSMWorkflowInput(fsm.Serializer, &StateData{Count: 0, Message: "starting message"}),
+		Input: S(fsm.Serialize(&StateData{Count: 0, Message: "starting message"})),
 	})
 }
 
@@ -455,6 +453,7 @@ func TestContinuedWorkflows(t *testing.T) {
 		EventType: S(swf.EventTypeWorkflowExecutionStarted),
 		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
 			Input: S(serializedState),
+			ContinuedExecutionRunID: S("someRunId"),
 		},
 	}})
 
@@ -507,7 +506,7 @@ func TestCompleteState(t *testing.T) {
 		EventID:   I(1),
 		EventType: S("WorkflowExecutionStarted"),
 		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-			Input: StartFSMWorkflowInput(ctx.Serializer(), new(TestData)),
+			Input: S(fsm.Serialize(new(TestData))),
 		},
 	}
 
@@ -530,7 +529,7 @@ func testFSM() *FSM {
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
 		systemSerializer: JSONStateSerializer{},
-		allowPanics:      true,
+		allowPanics:      false,
 	}
 	return fsm
 }

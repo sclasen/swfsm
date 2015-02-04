@@ -68,7 +68,7 @@ func TestKinesisReplication(t *testing.T) {
 			EventID:   I(1),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: StartFSMWorkflowInput(fsm.Serializer, new(TestData)),
+				Input: S(fsm.Serialize(new(TestData))),
 			},
 		},
 	}
