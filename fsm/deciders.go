@@ -30,31 +30,28 @@ func NewComposedDecider(deciders ...Decider) Decider {
 
 //Decide is the the Decider func for a ComposedDecider
 func (c *ComposedDecider) Decide(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+	state := ctx.State
 	decisions := ctx.EmptyDecisions()
 	for _, d := range c.deciders {
 		outcome := d(ctx, h, data)
-		if outcome == Pass {
+		// contribute the outcome's decisions and data
+		decisions = append(decisions, outcome.Decisions...)
+		data = outcome.Data
+		if outcome.State == "" {
 			continue
 		}
+		state = outcome.State
 
-		// contribute the outcome's decisions and data
-		decisions = append(decisions, outcome.Decisions()...)
-		data = outcome.Data()
-		switch outcome.(type) {
-		case ContinueOutcome:
-			// ContinueOutcome's only job is to contribute to later outcomes
-			continue
-		default:
-			return TransitionOutcome{
-				data:      data,
-				state:     outcome.State(),
-				decisions: decisions,
-			}
+		return Outcome{
+			Data:      data,
+			State:     state,
+			Decisions: decisions,
 		}
 	}
-	return ContinueOutcome{
-		data:      data,
-		decisions: decisions,
+	return Outcome{
+		Data:      data,
+		State:     "",
+		Decisions: decisions,
 	}
 }
 
@@ -136,9 +133,6 @@ type marshalledFunc struct {
 
 func (m marshalledFunc) decider(f *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 	ret := m.v.Call([]reflect.Value{reflect.ValueOf(f), reflect.ValueOf(h), reflect.ValueOf(data)})[0]
-	if ret.IsNil() {
-		return nil
-	}
 	return ret.Interface().(Outcome)
 }
 
@@ -206,7 +200,7 @@ func OnStarted(deciders ...Decider) Decider {
 			logf(ctx, "at=on-started")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}
-		return Pass
+		return ctx.Pass()
 	}
 }
 
@@ -218,7 +212,7 @@ func OnChildStarted(deciders ...Decider) Decider {
 			logf(ctx, "at=on-child-started")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}
-		return Pass
+		return ctx.Pass()
 	}
 }
 
@@ -229,7 +223,7 @@ func OnData(predicate PredicateFunc, deciders ...Decider) Decider {
 			logf(ctx, "at=on-data")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}
-		return Pass
+		return ctx.Pass()
 	}
 }
 
@@ -243,7 +237,7 @@ func OnSignalReceived(signalName string, deciders ...Decider) Decider {
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
 		}
-		return Pass
+		return ctx.Pass()
 	}
 }
 
@@ -256,7 +250,7 @@ func OnSignalSent(signalName string, deciders ...Decider) Decider {
 			logf(ctx, "at=on-signal-sent")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}
-		return Pass
+		return ctx.Pass()
 	}
 }
 
@@ -270,7 +264,7 @@ func OnTimerFired(timerID string, deciders ...Decider) Decider {
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
 		}
-		return Pass
+		return ctx.Pass()
 	}
 }
 
@@ -283,7 +277,7 @@ func OnSignalFailed(signalName string, deciders ...Decider) Decider {
 			logf(ctx, "at=on-signal-failed")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}
-		return Pass
+		return ctx.Pass()
 	}
 }
 
@@ -297,7 +291,7 @@ func OnActivityCompleted(activityName string, deciders ...Decider) Decider {
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
 		}
-		return Pass
+		return ctx.Pass()
 	}
 }
 
@@ -311,7 +305,7 @@ func OnActivityFailed(activityName string, deciders ...Decider) Decider {
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
 		}
-		return Pass
+		return ctx.Pass()
 	}
 }
 
@@ -399,7 +393,7 @@ func ManagedContinuations(historySize int, timerRetrySeconds int) Decider {
 			return ctx.Stay(data, decisions)
 
 		}
-		return Pass
+		return ctx.Pass()
 	}
 
 	handleContinuationSignal := func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
@@ -421,7 +415,7 @@ func ManagedContinuations(historySize int, timerRetrySeconds int) Decider {
 			return ctx.Stay(data, decisions)
 
 		}
-		return Pass
+		return ctx.Pass()
 	}
 
 	signalContinuationWhenHistoryLarge := func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
@@ -437,7 +431,7 @@ func ManagedContinuations(historySize int, timerRetrySeconds int) Decider {
 			decisions := append(ctx.EmptyDecisions(), d)
 			return ctx.Stay(data, decisions)
 		}
-		return Pass
+		return ctx.Pass()
 	}
 
 	return NewComposedDecider(

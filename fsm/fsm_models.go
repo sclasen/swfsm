@@ -26,110 +26,17 @@ const (
 
 // Decider decides an Outcome based on an event and the current data for an
 // FSM. You can assert the interface{} parameter that is passed to the Decider
-// as the type of the DataType field in the FSM. Alternatively, you can use the
-// TypedDecider to avoid having to do the assertion.
+// as the type of the DataType field in the FSM. Alternatively, you can use
+// TypedFuncs to create a typed decider to avoid having to do the assertion.
 type Decider func(*FSMContext, swf.HistoryEvent, interface{}) Outcome
 
-// Outcome represents the minimum data needed to be returned by a Decider.
-type Outcome interface {
-	// Data returns the data for this Outcome.
-	Data() interface{}
-	// Decisions returns the list of Decisions for this Outcome.
-	Decisions() []swf.Decision
-	// State returns the state to transition to. An empty string means no
-	// transition.
-	State() string
-}
-
-// Pass is nil, a sentinel value to represent 'no outcome'
-var Pass Outcome
-
-// ContinueOutcome is an Outcome used to contribute decisions and data to a
-// composed Decider.
-type ContinueOutcome struct {
-	data      interface{}
-	decisions []swf.Decision
-}
-
-// Data returns the data for this Outcome.
-func (s ContinueOutcome) Data() interface{} { return s.data }
-
-// Decisions returns the list of Decisions for this Outcome.
-func (s ContinueOutcome) Decisions() []swf.Decision { return s.decisions }
-
-// State returns the next state for the ContinueOutcome, which is always empty.
-func (s ContinueOutcome) State() string { return "" }
-
-// TransitionOutcome is an Outcome in which the FSM will transtion to a new state.
-type TransitionOutcome struct {
-	data      interface{}
-	state     string
-	decisions []swf.Decision
-}
-
-// Data returns the data for this Outcome.
-func (t TransitionOutcome) Data() interface{} { return t.data }
-
-// Decisions returns the list of Decisions for this Outcome.
-func (t TransitionOutcome) Decisions() []swf.Decision { return t.decisions }
-
-// State returns the next state for this TransitionOutcome.
-func (t TransitionOutcome) State() string { return t.state }
-
-// StayOutcome is an Outcome in which the FSM will remain in the same state.
-type StayOutcome struct {
-	data      interface{}
-	decisions []swf.Decision
-}
-
-// Data returns the data for this Outcome.
-func (s StayOutcome) Data() interface{} { return s.data }
-
-// Decisions returns the list of Decisions for this Outcome.
-func (s StayOutcome) Decisions() []swf.Decision { return s.decisions }
-
-// State returns the next state for the StayOutcome, which is always empty.
-func (s StayOutcome) State() string { return "" }
-
-// CompleteOutcome will send a CompleteWorkflowExecutionDecision, and transition to a 'managed' fsm state
-// that will respond to any further events by attempting to Complete the workflow. This can happen only if there were
-// unhandled decisions
-type CompleteOutcome struct {
-	data      interface{}
-	decisions []swf.Decision
-}
-
-// Data returns the data for this Outcome.
-func (t CompleteOutcome) Data() interface{} { return t.data }
-
-// Decisions returns the list of Decisions for this Outcome.
-func (t CompleteOutcome) Decisions() []swf.Decision { return t.decisions }
-
-// State returns the next state for the CompleteOutcome, which is always
-// "complete".
-func (t CompleteOutcome) State() string { return CompleteState }
-
-// ErrorOutcome can be used to purposefully put the workflow into an error state.
-type ErrorOutcome struct {
-	state     string
-	data      interface{}
-	decisions []swf.Decision
-}
-
-// Data returns the data for this Outcome.
-func (e ErrorOutcome) Data() interface{} { return e.data }
-
-// Decisions returns the list of Decisions for this Outcome.
-func (e ErrorOutcome) Decisions() []swf.Decision { return e.decisions }
-
-// State returns the next state for the ErrorOutcome, which is always "error".
-func (e ErrorOutcome) State() string { return "error" }
-
-type intermediateOutcome struct {
-	stateVersion uint64
-	state        string
-	data         interface{}
-	decisions    []swf.Decision
+//Outcome is the result of a Decider processing a HistoryEvent
+type Outcome struct {
+	//State is the desired next state in the FSM. the empty string ("") is a signal that you wish decision processing to continue
+	//if the FSM machinery recieves the empty string as the state of a final outcome, it will substitute the current state.
+	State     string
+	Data      interface{}
+	Decisions []swf.Decision
 }
 
 // FSMState defines the behavior of one state of an FSM
@@ -236,8 +143,7 @@ func NewFSMContext(
 	serialization Serialization,
 	wfType swf.WorkflowType, wfExec swf.WorkflowExecution,
 	eventCorrelator *EventCorrelator,
-	state string, stateData interface{}, stateVersion uint64,
-) *FSMContext {
+	state string, stateData interface{}, stateVersion uint64) *FSMContext {
 	return &FSMContext{
 		serialization:     serialization,
 		WorkflowType:      wfType,
@@ -251,26 +157,36 @@ func NewFSMContext(
 
 // ContinueDecider is a helper func to easily create a ContinueOutcome.
 func (f *FSMContext) ContinueDecider(data interface{}, decisions []swf.Decision) Outcome {
-	return ContinueOutcome{
-		data:      data,
-		decisions: decisions,
+	return Outcome{
+		State:     "",
+		Data:      data,
+		Decisions: decisions,
 	}
 }
 
 // Stay is a helper func to easily create a StayOutcome.
 func (f *FSMContext) Stay(data interface{}, decisions []swf.Decision) Outcome {
-	return StayOutcome{
-		data:      data,
-		decisions: decisions,
+	return Outcome{
+		State:     f.State,
+		Data:      data,
+		Decisions: decisions,
 	}
 }
 
 // Goto is a helper func to easily create a TransitionOutcome.
 func (f *FSMContext) Goto(state string, data interface{}, decisions []swf.Decision) Outcome {
-	return TransitionOutcome{
-		state:     state,
-		data:      data,
-		decisions: decisions,
+	return Outcome{
+		State:     state,
+		Data:      data,
+		Decisions: decisions,
+	}
+}
+
+func (f *FSMContext) Pass() Outcome {
+	return Outcome{
+		State:     "",
+		Data:      f.stateData,
+		Decisions: []swf.Decision{},
 	}
 }
 
@@ -279,9 +195,10 @@ func (f *FSMContext) CompleteWorkflow(data interface{}, decisions ...swf.Decisio
 	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != swf.DecisionTypeCompleteWorkflowExecution {
 		decisions = append(decisions, f.CompleteWorkflowDecision(data))
 	}
-	return CompleteOutcome{
-		data:      data,
-		decisions: decisions,
+	return Outcome{
+		State:     CompleteState,
+		Data:      data,
+		Decisions: decisions,
 	}
 }
 
@@ -290,18 +207,10 @@ func (f *FSMContext) ContinueWorkflow(data interface{}, decisions ...swf.Decisio
 	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != swf.DecisionTypeContinueAsNewWorkflowExecution {
 		decisions = append(decisions, f.ContinueWorkflowDecision(f.State, data))
 	}
-	return CompleteOutcome{
-		data:      data,
-		decisions: decisions,
-	}
-}
-
-// Goto is a helper func to easily create an ErrorOutcome.
-func (f *FSMContext) Error(data interface{}, decisions []swf.Decision) Outcome {
-	return ErrorOutcome{
-		state:     ErrorState,
-		data:      data,
-		decisions: decisions,
+	return Outcome{
+		State:     CompleteState,
+		Data:      data,
+		Decisions: decisions,
 	}
 }
 

@@ -198,7 +198,7 @@ func (f *FSM) Deserialize(serialized string, data interface{}) {
 func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision, *SerializedState) {
 	lastEvents := f.findLastEvents(*decisionTask.PreviousStartedEventID, decisionTask.Events)
 	execution := decisionTask.WorkflowExecution
-	outcome := new(intermediateOutcome)
+	outcome := new(Outcome)
 	context := NewFSMContext(f,
 		*decisionTask.WorkflowType,
 		*decisionTask.WorkflowExecution,
@@ -212,7 +212,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		if f.allowPanics {
 			panic(err)
 		}
-		return context, append(outcome.decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
+		return context, append(outcome.Decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
 	}
 	eventCorrelator, err := f.findSerializedEventCorrelator(decisionTask.Events)
 	if err != nil {
@@ -220,7 +220,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		if f.allowPanics {
 			panic(err)
 		}
-		return context, append(outcome.decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
+		return context, append(outcome.Decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
 	}
 	context.eventCorrelator = eventCorrelator
 
@@ -229,74 +229,74 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	//todo now on any error on processing an event simply sends an error signal to the workflow
 	//decider stack should all handle errors
 	//if there was no error processing, we recover the state + data from the marker
-	if outcome.data == nil && outcome.state == "" {
+	if outcome.Data == nil && outcome.State == "" {
 		data := reflect.New(reflect.TypeOf(f.DataType)).Interface()
 		if err = f.Serializer.Deserialize(serializedState.StateData, data); err != nil {
 			f.log("action=tick at=error=deserialize-state-failed err=&s", err)
 			if f.allowPanics {
 				panic(err)
 			}
-			return context, append(outcome.decisions, f.captureSystemError(execution, "DeserializeStateError", decisionTask.Events, err)...), nil
+			return context, append(outcome.Decisions, f.captureSystemError(execution, "DeserializeStateError", decisionTask.Events, err)...), nil
 		}
 		f.log("action=tick at=find-current-data data=%v", data)
 
-		outcome.data = data
-		outcome.state = serializedState.StateName
-		outcome.stateVersion = serializedState.StateVersion
+		outcome.Data = data
+		outcome.State = serializedState.StateName
 		context.stateVersion = serializedState.StateVersion
 	}
 
 	//iterate through events oldest to newest, calling the decider for the current state.
 	//if the outcome changes the state use the right FSMState
 	for i := len(lastEvents) - 1; i >= 0; i-- {
+
 		e := lastEvents[i]
 		f.log("action=tick at=history id=%d type=%s", e.EventID, e.EventType)
-		fsmState, ok := f.states[outcome.state]
+		fsmState, ok := f.states[outcome.State]
 		if ok {
-			context.State = outcome.state
-			context.stateData = outcome.data
-			anOutcome, err := f.panicSafeDecide(fsmState, context, e, outcome.data)
+			context.State = outcome.State
+			context.stateData = outcome.Data
+			anOutcome, err := f.panicSafeDecide(fsmState, context, e, outcome.Data)
 			if err != nil {
-				f.log("at=error error=decision-execution-error err=%q state=%s next-state=%s", err, fsmState.Name, outcome.state)
+				f.log("at=error error=decision-execution-error err=%q state=%s next-state=%s", err, fsmState.Name, outcome.State)
 				if f.allowPanics {
 					panic(err)
 				}
 				//todo make a synthetic error signal event and make the decider handle
-				return context, append(outcome.decisions, f.captureDecisionError(execution, e, err)...), nil
+				return context, append(outcome.Decisions, f.captureDecisionError(execution, e, err)...), nil
 			}
 			eventCorrelator.Track(e)
-			curr := outcome.state
+			curr := outcome.State
 			f.mergeOutcomes(outcome, anOutcome)
-			f.log("action=tick at=decided-event state=%s next-state=%s decisions=%d", curr, outcome.state, len(anOutcome.Decisions()))
+			f.log("action=tick at=decided-event state=%s next-state=%s decisions=%d", curr, outcome.State, len(anOutcome.Decisions))
 		} else {
-			f.log("action=tick at=error error=marked-state-not-in-fsm state=%s", outcome.state)
-			return context, append(outcome.decisions, f.captureSystemError(execution, "MissingFsmStateError", lastEvents[i:], errors.New(outcome.state))...), nil
+			f.log("action=tick at=error error=marked-state-not-in-fsm state=%s", outcome.State)
+			return context, append(outcome.Decisions, f.captureSystemError(execution, "MissingFsmStateError", lastEvents[i:], errors.New(outcome.State))...), nil
 		}
 	}
 
-	f.log("action=tick at=events-processed next-state=%s decisions=%d", outcome.state, len(outcome.decisions))
+	f.log("action=tick at=events-processed next-state=%s decisions=%d", outcome.State, len(outcome.Decisions))
 
-	for _, d := range outcome.decisions {
-		f.log("action=tick at=decide next-state=%s decision=%s", outcome.state, d.DecisionType)
+	for _, d := range outcome.Decisions {
+		f.log("action=tick at=decide next-state=%s decision=%s", outcome.State, d.DecisionType)
 	}
 
-	final, serializedState, err := f.recordStateMarkers(outcome, eventCorrelator)
+	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator)
 	if err != nil {
 		f.log("action=tick at=error error=state-serialization-error err=%q error-type=system", err)
 		if f.allowPanics {
 			panic(err)
 		}
-		return context, append(outcome.decisions, f.captureSystemError(execution, "StateSerializationError", []swf.HistoryEvent{}, err)...), nil
+		return context, append(outcome.Decisions, f.captureSystemError(execution, "StateSerializationError", []swf.HistoryEvent{}, err)...), nil
 	}
 
 	return context, final, serializedState
 }
 
-func (f *FSM) mergeOutcomes(final *intermediateOutcome, intermediate Outcome) {
-	final.decisions = append(final.decisions, intermediate.Decisions()...)
-	final.data = intermediate.Data()
-	if _, ok := intermediate.(StayOutcome); !ok {
-		final.state = intermediate.State()
+func (f *FSM) mergeOutcomes(final *Outcome, intermediate Outcome) {
+	final.Decisions = append(final.Decisions, intermediate.Decisions...)
+	final.Data = intermediate.Data
+	if intermediate.State != "" {
+		final.State = intermediate.State
 	}
 }
 
@@ -462,12 +462,12 @@ func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) []swf
 	return lastEvents
 }
 
-func (f *FSM) recordStateMarkers(outcome *intermediateOutcome, eventCorrelator *EventCorrelator) ([]swf.Decision, *SerializedState, error) {
-	serializedData, err := f.Serializer.Serialize(outcome.data)
+func (f *FSM) recordStateMarkers(stateVersion uint64, outcome *Outcome, eventCorrelator *EventCorrelator) ([]swf.Decision, *SerializedState, error) {
+	serializedData, err := f.Serializer.Serialize(outcome.Data)
 
 	state := &SerializedState{
-		StateVersion: outcome.stateVersion + 1, //increment the version here only.
-		StateName:    outcome.state,
+		StateVersion: stateVersion + 1, //increment the version here only.
+		StateName:    outcome.State,
 		StateData:    serializedData,
 	}
 	serializedMarker, err := f.systemSerializer.Serialize(state)
@@ -486,7 +486,7 @@ func (f *FSM) recordStateMarkers(outcome *intermediateOutcome, eventCorrelator *
 	c := f.recordStringMarker(CorrelatorMarker, serializedCorrelator)
 	decisions := f.EmptyDecisions()
 	decisions = append(decisions, d, c)
-	decisions = append(decisions, outcome.decisions...)
+	decisions = append(decisions, outcome.Decisions...)
 	return decisions, state, nil
 }
 

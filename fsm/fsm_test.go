@@ -207,7 +207,7 @@ func TestMarshalledDecider(t *testing.T) {
 
 	outcome := wrapped(&FSMContext{}, swf.HistoryEvent{}, &TestData{States: []string{"marshalled"}})
 
-	if outcome.(TransitionOutcome).state != "ok" {
+	if outcome.State != "ok" {
 		t.Fatal("NextState was not 'ok'")
 	}
 }
@@ -481,7 +481,7 @@ func TestContinueWorkflowDecision(t *testing.T) {
 	fsm.AddInitialState(&FSMState{
 		Name: "InitialState",
 		Decider: func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
-			return nil
+			return ctx.Pass()
 		},
 	},
 	)
@@ -514,11 +514,11 @@ func TestCompleteState(t *testing.T) {
 	fsm.Init()
 	outcome := fsm.completeState.Decider(ctx, event, new(TestData))
 
-	if len(outcome.Decisions()) != 1 {
+	if len(outcome.Decisions) != 1 {
 		t.Fatal(outcome)
 	}
 
-	if *outcome.Decisions()[0].DecisionType != swf.DecisionTypeCompleteWorkflowExecution {
+	if *outcome.Decisions[0].DecisionType != swf.DecisionTypeCompleteWorkflowExecution {
 		t.Fatal(outcome)
 	}
 }

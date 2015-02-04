@@ -51,7 +51,7 @@ func TestKinesisReplication(t *testing.T) {
 				return f.Goto("done", d, f.EmptyDecisions())
 			}
 			t.Fatal("unexpected")
-			return nil // unreachable
+			return f.Pass()
 		},
 	})
 	fsm.AddState(&FSMState{
