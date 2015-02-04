@@ -539,5 +539,3 @@ func (f *FSM) isErrorSignal(e swf.HistoryEvent) bool {
 func (f *FSM) EmptyDecisions() []swf.Decision {
 	return make([]swf.Decision, 0)
 }
-
-
