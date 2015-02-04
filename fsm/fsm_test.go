@@ -85,7 +85,7 @@ func TestFSM(t *testing.T) {
 
 	first := testDecisionTask(0, events)
 
-	_, decisions, _ := fsm.Tick(first)
+	_, decisions, _, _ := fsm.Tick(first)
 
 	if !Find(decisions, stateMarkerPredicate) {
 		t.Fatal("No Record State Marker")
@@ -108,7 +108,7 @@ func TestFSM(t *testing.T) {
 
 	second := testDecisionTask(3, secondEvents)
 
-	_, secondDecisions, _ := fsm.Tick(second)
+	_, secondDecisions, _, _ := fsm.Tick(second)
 
 	if !Find(secondDecisions, stateMarkerPredicate) {
 		t.Fatal("No Record State Marker")
@@ -458,7 +458,7 @@ func TestContinuedWorkflows(t *testing.T) {
 	}})
 
 	log.Printf("%+v", resp)
-	_, decisions, updatedState := fsm.Tick(resp)
+	_, decisions, updatedState, _ := fsm.Tick(resp)
 
 	log.Println(updatedState)
 
