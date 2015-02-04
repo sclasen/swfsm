@@ -101,11 +101,28 @@ func (f *FSM) DefaultCompleteState() *FSMState {
 }
 
 func (f *FSM) DefaultDecisionErrorHandler(ctx *FSMContext, event swf.HistoryEvent, stateBeforeEvent interface{}, stateAfterError interface{}, err error) (*Outcome, error) {
+	f.log("action=tick workflow=%s workflow-id=%s at=decider-error err=%q", ctx.WorkflowType.Name, ctx.WorkflowID, err)
 	return nil, err
 }
 
-func (f *FSM) DefaultFSMErrorHandler(ctx *FSMContext, event swf.HistoryEvent, stateData interface{}, errorType string, err error) (*Outcome, error) {
-	return nil, err
+func (f *FSM) ErrorFindingStateData(decisionTask *swf.DecisionTask, err error) {
+	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-state-failed err=%q", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, err)
+}
+
+func (f *FSM) ErrorFindingCorrelator(decisionTask *swf.DecisionTask, err error) {
+	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-event-correlator-failed err=%q", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, err)
+}
+
+func (f *FSM) ErrorMissingFSMState(decisionTask *swf.DecisionTask, outcome Outcome) {
+	f.log("action=tick workflow=%s workflow-id=%s at=error error=marked-state-not-in-fsm state=%s", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, outcome.State)
+}
+
+func (f *FSM) ErrorDeserializingStateData(decisionTask *swf.DecisionTask, serializedStateData string, err error) {
+	f.log("action=tick workflow=%s workflow-id=%s at=error=deserialize-state-failed err=&s", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, err)
+}
+func (f *FSM) ErrorSerializingStateData(decisionTask *swf.DecisionTask, outcome Outcome, eventCorrelator EventCorrelator, err error) {
+	f.log("action=tick workflow=%s workflow-id=%s at=error error=state-serialization-error err=%q error-type=system", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, err)
+
 }
 
 // Init initializaed any optional, unspecified values such as the error state, stop channel, serializer, PollerShutdownManager.
@@ -147,6 +164,10 @@ func (f *FSM) Init() {
 
 	if f.DecisionErrorHandler == nil {
 		f.DecisionErrorHandler = f.DefaultDecisionErrorHandler
+	}
+
+	if f.FSMErrorReporter == nil {
+		f.FSMErrorReporter = f
 	}
 
 }
@@ -227,7 +248,6 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 
 	serializedState, err := f.findSerializedState(decisionTask.Events)
 	if err != nil {
-		f.log("action=tick at=error=find-serialized-state-failed err=%q", err)
 		f.FSMErrorReporter.ErrorFindingStateData(decisionTask, err)
 		if f.allowPanics {
 			panic(err)
@@ -236,7 +256,6 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	}
 	eventCorrelator, err := f.findSerializedEventCorrelator(decisionTask.Events)
 	if err != nil {
-		f.log("action=tick at=error=find-serialized-event-correlator-failed err=%q", err)
 		f.FSMErrorReporter.ErrorFindingCorrelator(decisionTask, err)
 		if f.allowPanics {
 			panic(err)
@@ -250,7 +269,6 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	if outcome.Data == nil && outcome.State == "" {
 		data := reflect.New(reflect.TypeOf(f.DataType)).Interface()
 		if err = f.Serializer.Deserialize(serializedState.StateData, data); err != nil {
-			f.log("action=tick at=error=deserialize-state-failed err=&s", err)
 			f.FSMErrorReporter.ErrorDeserializingStateData(decisionTask, serializedState.StateData, err)
 			if f.allowPanics {
 				panic(err)
@@ -290,7 +308,6 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 			f.mergeOutcomes(outcome, anOutcome)
 			f.log("action=tick at=decided-event state=%s next-state=%s decisions=%d", curr, outcome.State, len(anOutcome.Decisions))
 		} else {
-			f.log("action=tick at=error error=marked-state-not-in-fsm state=%s", outcome.State)
 			f.FSMErrorReporter.ErrorMissingFSMState(decisionTask, *outcome)
 			return nil, nil, nil, errors.New("marked-state-not-in-fsm state=" + outcome.State)
 		}
@@ -304,7 +321,6 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 
 	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator)
 	if err != nil {
-		f.log("action=tick at=error error=state-serialization-error err=%q error-type=system", err)
 		f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
 		if f.allowPanics {
 			panic(err)
