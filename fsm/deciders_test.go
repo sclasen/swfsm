@@ -111,3 +111,52 @@ func ExampleComposedDecider() {
 	decider(new(FSMContext), swf.HistoryEvent{}, new(TestData))
 
 }
+
+func TestNestedDeciderComposition(t *testing.T) {
+	composed := NewComposedDecider(
+		NewComposedDecider(
+			OnData(func(data interface{}) bool { return true }, Transition("ok"))),
+		OnData(func(data interface{}) bool { return false }, Transition("bad")),
+		DefaultDecider(),
+	)
+
+	ctx := &FSMContext{
+		State: "start",
+	}
+
+	outcome := composed(ctx, swf.HistoryEvent{}, new(TestingType))
+
+	if outcome.State != "ok" {
+		t.Fatal(outcome)
+	}
+}
+
+func TestOnStarted(t *testing.T) {}
+
+func TestOnChildStarted(t *testing.T) {}
+
+func TestOnData(t *testing.T) {}
+
+func TestOnSignalReceived(t *testing.T) {}
+
+func TestOnSignalSent(t *testing.T) {}
+
+func TestOnTimerFired(t *testing.T) {}
+
+func TestOnSignalFailed(t *testing.T) {}
+
+func TestOnActivityCompleted(t *testing.T) {}
+
+func TestOnActivityFailed(t *testing.T) {}
+
+func TestAddDecision(t *testing.T) {}
+
+func TestAddDecisions(t *testing.T) {}
+
+func TestUpdateState(t *testing.T) {}
+
+func TestTransition(t *testing.T) {}
+
+func TestCompleteWorkflow(t *testing.T) {}
+
+func TestStay(t *testing.T) {}

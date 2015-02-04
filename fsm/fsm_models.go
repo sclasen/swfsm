@@ -26,10 +26,11 @@ const (
 
 // Decider decides an Outcome based on an event and the current data for an
 // FSM. You can assert the interface{} parameter that is passed to the Decider
-// as the type of the DataType field in the FSM. Alternatively, you can use the
-// TypedDecider to avoid having to do the assertion.
+// as the type of the DataType field in the FSM. Alternatively, you can use
+// TypedFuncs to create a typed decider to avoid having to do the assertion.
 type Decider func(*FSMContext, swf.HistoryEvent, interface{}) Outcome
 
+//Outcome is the result of a Decider processing a HistoryEvent
 type Outcome struct {
 	State     string
 	Data      interface{}
