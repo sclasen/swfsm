@@ -44,12 +44,16 @@ type FSM struct {
 	ShutdownManager *poller.ShutdownManager
 	//DecisionTaskDispatcher determines the concurrency strategy for processing tasks in your fsm
 	DecisionTaskDispatcher DecisionTaskDispatcher
-	states                 map[string]*FSMState
-	initialState           *FSMState
-	completeState          *FSMState
-	stop                   chan bool
-	stopAck                chan bool
-	allowPanics            bool //makes testing easier
+	//DecisionErrorHandler  is called whenever there is a panic in your decider. if it returns a non-nil error, the attempt to handle the DecisionTask is abandoned and will time out.
+	DecisionErrorHandler DecisionErrorHandler
+	//FSMErrorHandler  is called whenever there is an error within the FSM, usually indicating bad state or configuration of your FSM. if it returns a non-nil error, the attempt to handle the DecisionTask is abandoned and will time out.
+	FSMErrorReporter FSMErrorReporter
+	states           map[string]*FSMState
+	initialState     *FSMState
+	completeState    *FSMState
+	stop             chan bool
+	stopAck          chan bool
+	allowPanics      bool //makes testing easier
 }
 
 // StateSerializer is the implementation of FSMSerializer.StateSerializer()
@@ -96,6 +100,14 @@ func (f *FSM) DefaultCompleteState() *FSMState {
 	}
 }
 
+func (f *FSM) DefaultDecisionErrorHandler(ctx *FSMContext, event swf.HistoryEvent, stateBeforeEvent interface{}, stateAfterError interface{}, err error) (*Outcome, error) {
+	return nil, err
+}
+
+func (f *FSM) DefaultFSMErrorHandler(ctx *FSMContext, event swf.HistoryEvent, stateData interface{}, errorType string, err error) (*Outcome, error) {
+	return nil, err
+}
+
 // Init initializaed any optional, unspecified values such as the error state, stop channel, serializer, PollerShutdownManager.
 // it gets called by Start(), so you should only call this if you are manually managing polling for tasks, and calling Tick yourself.
 func (f *FSM) Init() {
@@ -133,6 +145,10 @@ func (f *FSM) Init() {
 		f.DecisionTaskDispatcher = &CallingGoroutineDispatcher{}
 	}
 
+	if f.DecisionErrorHandler == nil {
+		f.DecisionErrorHandler = f.DefaultDecisionErrorHandler
+	}
+
 }
 
 // Start begins processing DecisionTasks with the FSM. It creates a DecisionTaskPoller and spawns a goroutine that continues polling until Stop() is called and any in-flight polls have completed.
@@ -148,7 +164,11 @@ func (f *FSM) dispatchTask(decisionTask *swf.DecisionTask) {
 }
 
 func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
-	context, decisions, state := f.Tick(decisionTask)
+	context, decisions, state, err := f.Tick(decisionTask)
+	if err != nil {
+		f.log("action=tick at=tick-error status=abandoning-task error=%q", err.Error())
+		return
+	}
 	complete := &swf.RespondDecisionTaskCompletedInput{
 		Decisions: decisions,
 		TaskToken: decisionTask.TaskToken,
@@ -195,9 +215,8 @@ func (f *FSM) Deserialize(serialized string, data interface{}) {
 // Tick is called when the DecisionTaskPoller receives a PollForDecisionTaskResponse in its polling loop.
 // On errors, a nil *SerializedState is returned, and an error Outcome is included in the Decision list.
 // It is exported to facilitate testing.
-func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision, *SerializedState) {
+func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision, *SerializedState, error) {
 	lastEvents := f.findLastEvents(*decisionTask.PreviousStartedEventID, decisionTask.Events)
-	execution := decisionTask.WorkflowExecution
 	outcome := new(Outcome)
 	context := NewFSMContext(f,
 		*decisionTask.WorkflowType,
@@ -209,37 +228,36 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	serializedState, err := f.findSerializedState(decisionTask.Events)
 	if err != nil {
 		f.log("action=tick at=error=find-serialized-state-failed err=%q", err)
+		f.FSMErrorReporter.ErrorFindingStateData(decisionTask, err)
 		if f.allowPanics {
 			panic(err)
 		}
-		return context, append(outcome.Decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
+		return nil, nil, nil, err
 	}
 	eventCorrelator, err := f.findSerializedEventCorrelator(decisionTask.Events)
 	if err != nil {
 		f.log("action=tick at=error=find-serialized-event-correlator-failed err=%q", err)
+		f.FSMErrorReporter.ErrorFindingCorrelator(decisionTask, err)
 		if f.allowPanics {
 			panic(err)
 		}
-		return context, append(outcome.Decisions, f.captureSystemError(execution, "FindSerializedStateError", decisionTask.Events, err)...), nil
+		return nil, nil, nil, err
 	}
 	context.eventCorrelator = eventCorrelator
 
 	f.log("action=tick at=find-serialized-state state=%s", serializedState.StateName)
 
-	//todo now on any error on processing an event simply sends an error signal to the workflow
-	//decider stack should all handle errors
-	//if there was no error processing, we recover the state + data from the marker
 	if outcome.Data == nil && outcome.State == "" {
 		data := reflect.New(reflect.TypeOf(f.DataType)).Interface()
 		if err = f.Serializer.Deserialize(serializedState.StateData, data); err != nil {
 			f.log("action=tick at=error=deserialize-state-failed err=&s", err)
+			f.FSMErrorReporter.ErrorDeserializingStateData(decisionTask, serializedState.StateData, err)
 			if f.allowPanics {
 				panic(err)
 			}
-			return context, append(outcome.Decisions, f.captureSystemError(execution, "DeserializeStateError", decisionTask.Events, err)...), nil
+			return nil, nil, nil, err
 		}
 		f.log("action=tick at=find-current-data data=%v", data)
-
 		outcome.Data = data
 		outcome.State = serializedState.StateName
 		context.stateVersion = serializedState.StateVersion
@@ -248,21 +266,24 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	//iterate through events oldest to newest, calling the decider for the current state.
 	//if the outcome changes the state use the right FSMState
 	for i := len(lastEvents) - 1; i >= 0; i-- {
-
 		e := lastEvents[i]
 		f.log("action=tick at=history id=%d type=%s", e.EventID, e.EventType)
 		fsmState, ok := f.states[outcome.State]
 		if ok {
 			context.State = outcome.State
 			context.stateData = outcome.Data
+			//stash a copy of the state before the decision in case we need to call the error handler
+			stashed := f.Serialize(outcome.Data)
 			anOutcome, err := f.panicSafeDecide(fsmState, context, e, outcome.Data)
 			if err != nil {
-				f.log("at=error error=decision-execution-error err=%q state=%s next-state=%s", err, fsmState.Name, outcome.State)
-				if f.allowPanics {
-					panic(err)
+				stashedData := reflect.New(reflect.TypeOf(f.DataType)).Interface()
+				f.Deserialize(stashed, stashedData)
+				rescued, notRescued := f.DecisionErrorHandler(context, e, stashedData, outcome.Data, err)
+				if rescued != nil {
+					anOutcome = *rescued
+				} else {
+					return nil, nil, nil, notRescued
 				}
-				//todo make a synthetic error signal event and make the decider handle
-				return context, append(outcome.Decisions, f.captureDecisionError(execution, e, err)...), nil
 			}
 			eventCorrelator.Track(e)
 			curr := outcome.State
@@ -270,7 +291,8 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 			f.log("action=tick at=decided-event state=%s next-state=%s decisions=%d", curr, outcome.State, len(anOutcome.Decisions))
 		} else {
 			f.log("action=tick at=error error=marked-state-not-in-fsm state=%s", outcome.State)
-			return context, append(outcome.Decisions, f.captureSystemError(execution, "MissingFsmStateError", lastEvents[i:], errors.New(outcome.State))...), nil
+			f.FSMErrorReporter.ErrorMissingFSMState(decisionTask, *outcome)
+			return nil, nil, nil, errors.New("marked-state-not-in-fsm state=" + outcome.State)
 		}
 	}
 
@@ -283,13 +305,14 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator)
 	if err != nil {
 		f.log("action=tick at=error error=state-serialization-error err=%q error-type=system", err)
+		f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
 		if f.allowPanics {
 			panic(err)
 		}
-		return context, append(outcome.Decisions, f.captureSystemError(execution, "StateSerializationError", []swf.HistoryEvent{}, err)...), nil
+		return nil, nil, nil, err
 	}
 
-	return context, final, serializedState
+	return context, final, serializedState, nil
 }
 
 func (f *FSM) mergeOutcomes(final *Outcome, intermediate Outcome) {
@@ -317,48 +340,6 @@ func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event swf.Hi
 	}()
 	anOutcome = context.Decide(event, data, state.Decider)
 	return
-}
-
-func (f *FSM) captureDecisionError(execution *swf.WorkflowExecution, event swf.HistoryEvent, err error) []swf.Decision {
-	return f.captureError(ErrorSignal, execution, &SerializedDecisionError{
-		ErrorEvent: event,
-		Error:      err,
-	})
-}
-
-func (f *FSM) captureSystemError(execution *swf.WorkflowExecution, errorType string, lastEvents []swf.HistoryEvent, err error) []swf.Decision {
-	return f.captureError(SystemErrorSignal, execution, &SerializedSystemError{
-		ErrorType:           errorType,
-		UnprocessedEventIDs: f.eventIDs(lastEvents),
-		Error:               err,
-	})
-}
-
-func (f *FSM) eventIDs(events []swf.HistoryEvent) []int64 {
-	ids := make([]int64, len(events))
-	for _, e := range events {
-		ids = append(ids, *e.EventID)
-	}
-	return ids
-}
-
-func (f *FSM) captureError(signal string, execution *swf.WorkflowExecution, error interface{}) []swf.Decision {
-	decisions := f.EmptyDecisions()
-	r, err := f.recordMarker(signal, error)
-	if err != nil {
-		//really bail
-		panic(fmt.Sprintf("giving up, can't even create a RecordMarker decsion: %s", err))
-	}
-	d := swf.Decision{
-		DecisionType: aws.String(swf.DecisionTypeSignalExternalWorkflowExecution),
-		SignalExternalWorkflowExecutionDecisionAttributes: &swf.SignalExternalWorkflowExecutionDecisionAttributes{
-			WorkflowID: execution.WorkflowID,
-			RunID:      execution.RunID,
-			SignalName: aws.String(signal),
-			Input:      r.RecordMarkerDecisionAttributes.Details,
-		},
-	}
-	return append(decisions, d)
 }
 
 // EventData works in combination with the FSM.Serializer to provide

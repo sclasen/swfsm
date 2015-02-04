@@ -22,6 +22,14 @@ const (
 	ContinueSignal    = "FSM.ContinueWorkflow"
 	CompleteState     = "complete"
 	ErrorState        = "error"
+	//the FSM was not configured with a state named in an outcome.
+	FSMErrorMissingState = "ErrorMissingFsmState"
+	//the FSM encountered an erryor while serializaing stateData
+	FSMErrorStateSerialization = "ErrorStateSerialization"
+	//the FSM encountered an erryor while deserializaing stateData
+	FSMErrorStateDeserialization = "ErrorStateDeserialization"
+	//the FSM encountered an erryor while deserializaing stateData
+	FSMErrorCorrelationDeserialization = "ErrorCorrelationDeserialization"
 )
 
 // Decider decides an Outcome based on an event and the current data for an
@@ -45,6 +53,22 @@ type FSMState struct {
 	Name string
 	// Decider decides an Outcome given the current state, data, and an event.
 	Decider Decider
+}
+
+//DecisionErrorHandler is the error handling contract for panics that occur in Deciders.
+//If your DecisionErrorHandler does not return a non nil Outcome, any further attempt to process the decisionTask is abandoned and the task will time out.
+type DecisionErrorHandler func(ctx *FSMContext, event swf.HistoryEvent, stateBeforeEvent interface{}, stateAfterError interface{}, err error) (*Outcome, error)
+
+//FSMErrorHandler is the error handling contract for errors in the FSM machinery itself.
+//These are generally a misconfiguration of your FSM or mismatch between struct and serialized form and cant be resolved without config/code changes
+//the paramaters to each method provide all availabe info at the time of the error so you can diagnose issues.
+//Note that this is a diagnostic interface that basically leaks implementation details, and as such may change from release to release.
+type FSMErrorReporter interface {
+	ErrorFindingStateData(decisionTask *swf.DecisionTask, err error)
+	ErrorFindingCorrelator(decisionTask *swf.DecisionTask, err error)
+	ErrorMissingFSMState(decisionTask *swf.DecisionTask, outcome Outcome)
+	ErrorDeserializingStateData(decisionTask *swf.DecisionTask, serializedStateData string, err error)
+	ErrorSerializingStateData(decisionTask *swf.DecisionTask, outcome Outcome, eventCorrelator EventCorrelator, err error)
 }
 
 // ReplicationData is the part of SerializedState that will be replicated onto Kinesis streams.
