@@ -95,7 +95,7 @@ func ExampleComposedDecider() {
 					return ctx.Stay(data, decisions)
 				}
 			}
-			return Pass
+			return ctx.Pass()
 		}
 	}
 
