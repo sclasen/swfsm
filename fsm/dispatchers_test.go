@@ -1,9 +1,10 @@
 package fsm
 
 import (
-	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"sync/atomic"
 	"testing"
+
+	"github.com/awslabs/aws-sdk-go/gen/swf"
 
 	"time"
 )
