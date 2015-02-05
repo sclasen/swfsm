@@ -9,7 +9,7 @@ import (
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"github.com/juju/errors"
 	"github.com/sclasen/swfsm/poller"
-	. "github.com/sclasen/swfsm/sugar"
+	s "github.com/sclasen/swfsm/sugar"
 )
 
 //SWFOps is the subset of swf.SWF ops required by the fsm package
@@ -44,9 +44,20 @@ type FSM struct {
 	ShutdownManager *poller.ShutdownManager
 	//DecisionTaskDispatcher determines the concurrency strategy for processing tasks in your fsm
 	DecisionTaskDispatcher DecisionTaskDispatcher
-	//DecisionErrorHandler  is called whenever there is a panic in your decider. if it returns a non-nil error, the attempt to handle the DecisionTask is abandoned and will time out.
+	//DecisionErrorHandler  is called whenever there is a panic in your decider.
+	//if it returns a nil *Outcome, the attempt to handle the DecisionTask is abandoned.
+	//fsm will then mark the workflow as being in error, by recording 3 markers. state, correlator and error
+	//the error marker  contains an ErrorState which tracks the range of unprocessed events since the error occurred.
+	//on subsequent decision tasks if the fsm detects an error state, it will get the ErrorEvent from the ErrorState
+	//and call the DecisionErrorHandler again.
+	//
+	//If there are errors here a new ErrorMarker with the increased range of unprocessed events
+	//will be recorded.
+	//If there is a good outcome, then we use that as the starting point from which to grab and Decide on the range of unprocessed
+	//events. If this works out fine, we then process the initiating decisionTask range of events.
 	DecisionErrorHandler DecisionErrorHandler
-	//FSMErrorHandler  is called whenever there is an error within the FSM, usually indicating bad state or configuration of your FSM. if it returns a non-nil error, the attempt to handle the DecisionTask is abandoned and will time out.
+	//FSMErrorHandler  is called whenever there is an error within the FSM, usually indicating bad state or configuration of your FSM.
+	//if it returns a non-nil error, the attempt to handle the DecisionTask is abandoned and will time out.
 	FSMErrorReporter FSMErrorReporter
 	states           map[string]*FSMState
 	errorHandlers    map[string]DecisionErrorHandler
@@ -292,7 +303,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	f.log("action=tick at=find-serialized-state state=%s", serializedState.StateName)
 
 	if outcome.Data == nil && outcome.State == "" {
-		data := reflect.New(reflect.TypeOf(f.DataType)).Interface()
+		data := f.zeroStateData()
 		if err = f.Serializer.Deserialize(serializedState.StateData, data); err != nil {
 			f.FSMErrorReporter.ErrorDeserializingStateData(decisionTask, serializedState.StateData, err)
 			if f.allowPanics {
@@ -304,6 +315,21 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		outcome.Data = data
 		outcome.State = serializedState.StateName
 		context.stateVersion = serializedState.StateVersion
+	}
+
+	errorState, err := f.findSerializedErrorState(decisionTask.Events)
+	if errorState != nil {
+		recovery, err := f.ErrorStateTick(decisionTask, errorState, context, outcome.Data)
+		if recovery != nil {
+			outcome = recovery
+		} else {
+			logf(context, "at=error error=error-recovery-failed cause=%s", err)
+			//bump the unprocessed window, and re-record the error marker
+			errorState.LatestUnprocessedEventID = *decisionTask.StartedEventID
+			final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator, errorState)
+			//update Error State Marker and exit with 3 marker decisions
+			return context, final, serializedState, err
+		}
 	}
 
 	//iterate through events oldest to newest, calling the decider for the current state.
@@ -319,7 +345,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 			stashed := f.Serialize(outcome.Data)
 			anOutcome, err := f.panicSafeDecide(fsmState, context, e, outcome.Data)
 			if err != nil {
-				stashedData := reflect.New(reflect.TypeOf(f.DataType)).Interface()
+				stashedData := f.zeroStateData()
 				f.Deserialize(stashed, stashedData)
 				handler := f.errorHandlers[fsmState.Name]
 				if handler == nil {
@@ -329,7 +355,20 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 				if rescued != nil {
 					anOutcome = *rescued
 				} else {
-					return nil, nil, nil, errors.Trace(notRescued)
+					errorState := &SerializedErrorState{
+						ErrorEvent:                 e,
+						EarliestUnprocessedEventID: *decisionTask.PreviousStartedEventID + 1,
+						LatestUnprocessedEventID:   *decisionTask.StartedEventID,
+					}
+					final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator, errorState)
+					if err != nil {
+						f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
+						if f.allowPanics {
+							panic(err)
+						}
+						return nil, nil, nil, errors.Trace(err)
+					}
+					return context, final, serializedState, notRescued
 				}
 			}
 			eventCorrelator.Track(e)
@@ -348,7 +387,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		f.log("action=tick at=decide next-state=%s decision=%s", outcome.State, d.DecisionType)
 	}
 
-	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator)
+	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator, nil)
 	if err != nil {
 		f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
 		if f.allowPanics {
@@ -358,6 +397,56 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	}
 
 	return context, final, serializedState, nil
+}
+
+func (f *FSM) ErrorStateTick(decisionTask *swf.DecisionTask, error *SerializedErrorState, context *FSMContext, data interface{}) (*Outcome, error) {
+	handler := f.errorHandlers[context.State]
+	if handler == nil {
+		handler = f.DecisionErrorHandler
+	}
+	handled, notHandled := handler(context, error.ErrorEvent, data, data, nil)
+	if handled == nil {
+		return nil, notHandled
+	}
+
+	//todo we are assuming all history events in the range
+	//error.EarliestUnprocessedEventID to error.LatestUnprocessedEventID
+	//are in the decisionTaks.History
+	filteredDecisionTask := new(swf.DecisionTask)
+	s, e := f.systemSerializer.Serialize(decisionTask)
+	if e != nil {
+		return nil, e
+	}
+	e = f.systemSerializer.Deserialize(s, filteredDecisionTask)
+	if e != nil {
+		return nil, e
+	}
+
+	filtered := make([]swf.HistoryEvent, 0)
+	for _, h := range decisionTask.Events {
+		if f.isErrorMarker(h) {
+			continue
+		}
+		filtered = append(filtered, h)
+	}
+	filteredDecisionTask.Events = filtered
+	filteredDecisionTask.StartedEventID = &error.LatestUnprocessedEventID
+	filteredDecisionTask.PreviousStartedEventID = &error.EarliestUnprocessedEventID
+
+	_, decisions, serializedState, err := f.Tick(filteredDecisionTask)
+	if err != nil {
+		data := f.zeroStateData()
+		f.Deserialize(serializedState.StateData, data)
+
+		return &Outcome{
+			State:     serializedState.StateName,
+			Decisions: decisions,
+			Data:      data,
+		}, nil
+
+	}
+
+	return nil, err
 }
 
 func (f *FSM) mergeOutcomes(final *Outcome, intermediate Outcome) {
@@ -413,7 +502,7 @@ func (f *FSM) EventData(event swf.HistoryEvent, eventData interface{}) {
 		if serialized != "" {
 			f.Deserialize(serialized, eventData)
 		} else {
-			panic(fmt.Sprintf("event payload was empty for %s", PrettyHistoryEvent(event)))
+			panic(fmt.Sprintf("event payload was empty for %s", s.PrettyHistoryEvent(event)))
 		}
 	}
 
@@ -464,6 +553,17 @@ func (f *FSM) findSerializedEventCorrelator(events []swf.HistoryEvent) (*EventCo
 	return &EventCorrelator{}, nil
 }
 
+func (f *FSM) findSerializedErrorState(events []swf.HistoryEvent) (*SerializedErrorState, error) {
+	for _, event := range events {
+		if f.isErrorMarker(event) {
+			errState := &SerializedErrorState{}
+			err := f.Serializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, errState)
+			return errState, err
+		}
+	}
+	return nil, nil
+}
+
 func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) []swf.HistoryEvent {
 	var lastEvents []swf.HistoryEvent
 
@@ -488,7 +588,7 @@ func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) []swf
 	return lastEvents
 }
 
-func (f *FSM) recordStateMarkers(stateVersion uint64, outcome *Outcome, eventCorrelator *EventCorrelator) ([]swf.Decision, *SerializedState, error) {
+func (f *FSM) recordStateMarkers(stateVersion uint64, outcome *Outcome, eventCorrelator *EventCorrelator, errorState *SerializedErrorState) ([]swf.Decision, *SerializedState, error) {
 	serializedData, err := f.Serializer.Serialize(outcome.Data)
 
 	state := &SerializedState{
@@ -512,6 +612,17 @@ func (f *FSM) recordStateMarkers(stateVersion uint64, outcome *Outcome, eventCor
 	c := f.recordStringMarker(CorrelatorMarker, serializedCorrelator)
 	decisions := f.EmptyDecisions()
 	decisions = append(decisions, d, c)
+
+	if errorState != nil {
+		serializedError, err := f.systemSerializer.Serialize(*errorState)
+
+		if err != nil {
+			return nil, state, errors.Trace(err)
+		}
+		e := f.recordStringMarker(ErrorMarker, serializedError)
+		decisions = append(decisions, e)
+	}
+
 	decisions = append(decisions, outcome.Decisions...)
 	return decisions, state, nil
 }
@@ -535,6 +646,10 @@ func (f *FSM) recordStringMarker(markerName string, details string) swf.Decision
 	}
 }
 
+func (f *FSM) zeroStateData() interface{} {
+	return reflect.New(reflect.TypeOf(f.DataType)).Interface()
+}
+
 // Stop causes the DecisionTask select loop to exit, and to stop the DecisionTaskPoller
 func (f *FSM) Stop() {
 	f.stop <- true
@@ -548,17 +663,8 @@ func (f *FSM) isCorrelatorMarker(e swf.HistoryEvent) bool {
 	return *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == CorrelatorMarker
 }
 
-func (f *FSM) isErrorSignal(e swf.HistoryEvent) bool {
-	if *e.EventType == swf.EventTypeWorkflowExecutionSignaled {
-		switch *e.WorkflowExecutionSignaledEventAttributes.SignalName {
-		case SystemErrorSignal, ErrorSignal:
-			return true
-		default:
-			return false
-		}
-	} else {
-		return false
-	}
+func (f *FSM) isErrorMarker(e swf.HistoryEvent) bool {
+	return *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == ErrorMarker
 }
 
 // EmptyDecisions is a helper method to give you an empty decisions array for use in your Deciders.

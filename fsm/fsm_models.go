@@ -16,8 +16,7 @@ import (
 const (
 	StateMarker       = "FSM.State"
 	CorrelatorMarker  = "FSM.Correlator"
-	ErrorSignal       = "FSM.Error"
-	SystemErrorSignal = "FSM.SystemError"
+	ErrorMarker       = "FSM.Error"
 	RepiarStateSignal = "FSM.RepairState"
 	ContinueTimer     = "FSM.ContinueWorkflow"
 	ContinueSignal    = "FSM.ContinueWorkflow"
@@ -77,22 +76,6 @@ type ReplicationData struct {
 	StateVersion uint64 `json:"stateVersion"`
 	StateName    string `json:"stateName"`
 	StateData    string `json:"stateData"`
-}
-
-// SerializedDecisionError is a wrapper struct that allows serializing the context in which an error in a Decider occurred
-// into a WorkflowSignaledEvent in the workflow history.
-type SerializedDecisionError struct {
-	ErrorEvent swf.HistoryEvent `json:"errorEvent"`
-	Error      interface{}      `json:"error"`
-}
-
-// SerializedSystemError is a wrapper struct that allows serializing the context in which an error internal to FSM processing has occurred
-// into a WorkflowSignaledEvent in the workflow history. These errors are generally in finding the current state and data for a workflow, or
-// in serializing and deserializing said state.
-type SerializedSystemError struct {
-	ErrorType           string      `json:"errorType"`
-	Error               interface{} `json:"error"`
-	UnprocessedEventIDs []int64     `json:"unprocessedEventIds"`
 }
 
 // StateSerializer defines the interface for serializing state to and deserializing state from the workflow history.
@@ -334,4 +317,11 @@ type SerializedState struct {
 	StateVersion uint64 `json:"stateVersion"`
 	StateName    string `json:"stateName"`
 	StateData    string `json:"stateData"`
+}
+
+//ErrorState is used as the input to a marker that signifies that the workflow is in an error state.
+type SerializedErrorState struct {
+	EarliestUnprocessedEventID int64
+	LatestUnprocessedEventID   int64
+	ErrorEvent                 swf.HistoryEvent
 }
