@@ -9,6 +9,7 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/juju/errors"
 )
 
 // constants used as marker names or signal names
@@ -125,7 +126,7 @@ type ProtobufStateSerializer struct{}
 func (p ProtobufStateSerializer) Serialize(state interface{}) (string, error) {
 	bin, err := proto.Marshal(state.(proto.Message))
 	if err != nil {
-		return "", err
+		return "", errors.Trace(err)
 	}
 	return base64.StdEncoding.EncodeToString(bin), nil
 }
@@ -138,7 +139,7 @@ func (p ProtobufStateSerializer) Deserialize(serialized string, state interface{
 	}
 	err = proto.Unmarshal(bin, state.(proto.Message))
 
-	return err
+	return errors.Trace(err)
 }
 
 // Serialization is the contract for de/serializing state inside an FSM, typically implemented by the FSM itself

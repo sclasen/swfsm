@@ -1,13 +1,13 @@
 package fsm
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"reflect"
 
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/juju/errors"
 	"github.com/sclasen/swfsm/poller"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -49,6 +49,7 @@ type FSM struct {
 	//FSMErrorHandler  is called whenever there is an error within the FSM, usually indicating bad state or configuration of your FSM. if it returns a non-nil error, the attempt to handle the DecisionTask is abandoned and will time out.
 	FSMErrorReporter FSMErrorReporter
 	states           map[string]*FSMState
+	errorHandlers    map[string]DecisionErrorHandler
 	initialState     *FSMState
 	completeState    *FSMState
 	stop             chan bool
@@ -84,6 +85,30 @@ func (f *FSM) AddState(state *FSMState) {
 // it will only receive events if you returned FSMContext.Complete(...) and the workflow was unable to complete.
 func (f *FSM) AddCompleteState(state *FSMState) {
 	f.AddState(state)
+	f.completeState = state
+}
+
+// AddInitialState adds a state to the FSM and uses it as the initial state when a workflow execution is started.
+// it uses the FSM DefaultDecisionErrorHandler, which defaults to FSM.DefaultDecisionErrorHandler if unset.
+func (f *FSM) AddInitialStateWithHandler(state *FSMState, handler DecisionErrorHandler) {
+	f.AddState(state)
+	f.AddErrorHandler(state.Name, handler)
+	f.initialState = state
+}
+
+// AddState adds a state to the FSM.
+func (f *FSM) AddErrorHandler(state string, handler DecisionErrorHandler) {
+	if f.errorHandlers == nil {
+		f.errorHandlers = make(map[string]DecisionErrorHandler)
+	}
+	f.errorHandlers[state] = handler
+}
+
+// AddCompleteState adds a state to the FSM and uses it as the final state of a workflow.
+// it will only receive events if you returned FSMContext.Complete(...) and the workflow was unable to complete.
+func (f *FSM) AddCompleteStateWithHandler(state *FSMState, handler DecisionErrorHandler) {
+	f.AddState(state)
+	f.AddErrorHandler(state.Name, handler)
 	f.completeState = state
 }
 
@@ -252,7 +277,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		if f.allowPanics {
 			panic(err)
 		}
-		return nil, nil, nil, err
+		return nil, nil, nil, errors.Trace(err)
 	}
 	eventCorrelator, err := f.findSerializedEventCorrelator(decisionTask.Events)
 	if err != nil {
@@ -260,7 +285,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		if f.allowPanics {
 			panic(err)
 		}
-		return nil, nil, nil, err
+		return nil, nil, nil, errors.Trace(err)
 	}
 	context.eventCorrelator = eventCorrelator
 
@@ -273,7 +298,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 			if f.allowPanics {
 				panic(err)
 			}
-			return nil, nil, nil, err
+			return nil, nil, nil, errors.Trace(err)
 		}
 		f.log("action=tick at=find-current-data data=%v", data)
 		outcome.Data = data
@@ -296,11 +321,15 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 			if err != nil {
 				stashedData := reflect.New(reflect.TypeOf(f.DataType)).Interface()
 				f.Deserialize(stashed, stashedData)
-				rescued, notRescued := f.DecisionErrorHandler(context, e, stashedData, outcome.Data, err)
+				handler := f.errorHandlers[fsmState.Name]
+				if handler == nil {
+					handler = f.DecisionErrorHandler
+				}
+				rescued, notRescued := handler(context, e, stashedData, outcome.Data, err)
 				if rescued != nil {
 					anOutcome = *rescued
 				} else {
-					return nil, nil, nil, notRescued
+					return nil, nil, nil, errors.Trace(notRescued)
 				}
 			}
 			eventCorrelator.Track(e)
@@ -325,7 +354,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		if f.allowPanics {
 			panic(err)
 		}
-		return nil, nil, nil, err
+		return nil, nil, nil, errors.Trace(err)
 	}
 
 	return context, final, serializedState, nil
@@ -345,7 +374,7 @@ func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event swf.Hi
 			if r := recover(); r != nil {
 				f.log("at=error error=decide-panic-recovery %v", r)
 				if err, ok := r.(error); ok && err != nil {
-					anErr = err
+					anErr = errors.Trace(err)
 				} else {
 					anErr = errors.New("panic in decider, null error, capture error state")
 				}
@@ -470,13 +499,13 @@ func (f *FSM) recordStateMarkers(stateVersion uint64, outcome *Outcome, eventCor
 	serializedMarker, err := f.systemSerializer.Serialize(state)
 
 	if err != nil {
-		return nil, state, err
+		return nil, state, errors.Trace(err)
 	}
 
 	serializedCorrelator, err := f.systemSerializer.Serialize(eventCorrelator)
 
 	if err != nil {
-		return nil, state, err
+		return nil, state, errors.Trace(err)
 	}
 
 	d := f.recordStringMarker(StateMarker, serializedMarker)
@@ -490,7 +519,7 @@ func (f *FSM) recordStateMarkers(stateVersion uint64, outcome *Outcome, eventCor
 func (f *FSM) recordMarker(markerName string, details interface{}) (swf.Decision, error) {
 	serialized, err := f.Serializer.Serialize(details)
 	if err != nil {
-		return swf.Decision{}, err
+		return swf.Decision{}, errors.Trace(err)
 	}
 
 	return f.recordStringMarker(markerName, serialized), nil

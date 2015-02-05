@@ -6,6 +6,7 @@ import (
 
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/juju/errors"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -44,7 +45,7 @@ func (p *DecisionTaskPoller) Poll() (*swf.DecisionTask, error) {
 	})
 	if err != nil {
 		log.Printf("component=DecisionTaskPoller at=error error=%s", err.Error())
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if resp.TaskToken != nil {
 		log.Printf("component=DecisionTaskPoller at=decision-task-recieved workflow=%s", LS(resp.WorkflowType.Name))
@@ -119,7 +120,7 @@ func (p *ActivityTaskPoller) Poll() (*swf.ActivityTask, error) {
 	})
 	if err != nil {
 		log.Printf("component=ActivityTaskPoller at=error error=%s", err.Error())
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if resp.TaskToken != nil {
 		log.Printf("component=ActivityTaskPoller at=activity-task-recieved activity=%s", LS(resp.ActivityType.Name))

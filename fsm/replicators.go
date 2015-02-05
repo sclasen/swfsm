@@ -6,6 +6,7 @@ import (
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/kinesis"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/juju/errors"
 )
 
 //ReplicationHandler can be configured on an FSM and will be called when a DecisionTask is successfully completed.
@@ -40,7 +41,7 @@ func (f *KinesisReplication) Handler(ctx *FSMContext, decisionTask *swf.Decision
 	stateToReplicate, err := ctx.Serializer().Serialize(state)
 	if err != nil {
 		log.Printf("component=kinesis-replication at=serialize-state-failed error=%q", err.Error())
-		return err
+		return errors.Trace(err)
 	}
 
 	put := func() (*kinesis.PutRecordOutput, error) {
@@ -59,5 +60,5 @@ func (f *KinesisReplication) Handler(ctx *FSMContext, decisionTask *swf.Decision
 	} else {
 		log.Printf("component=kinesis-replication at=replicated-state shard=%s sequence=%s", resp.ShardID, resp.SequenceNumber)
 	}
-	return err
+	return errors.Trace(err)
 }
