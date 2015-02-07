@@ -2,12 +2,13 @@ package test
 
 import (
 	"encoding/json"
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/endpoints"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"log"
 	"net/http"
 	"net/http/httptest"
+
+	"github.com/awslabs/aws-sdk-go/aws"
+	"github.com/awslabs/aws-sdk-go/gen/endpoints"
+	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
 type SWFService struct {
