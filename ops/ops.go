@@ -23,7 +23,7 @@ type SWFOperations interface {
 	ListOpenWorkflowExecutions(req *ListOpenWorkflowExecutionsInput) (resp *WorkflowExecutionInfos, err error)
 	ListWorkflowTypes(req *ListWorkflowTypesInput) (resp *WorkflowTypeInfos, err error)
 	PollForActivityTask(req *PollForActivityTaskInput) (resp *ActivityTask, err error)
-	PollForDecisionTask(req *PollForDecisionTaskInput) (resp *DecisionTask, err error)git
+	PollForDecisionTask(req *PollForDecisionTaskInput) (resp *DecisionTask, err error)
 	RecordActivityTaskHeartbeat(req *RecordActivityTaskHeartbeatInput) (resp *ActivityTaskStatus, err error)
 	RegisterActivityType(req *RegisterActivityTypeInput) (err error)
 	RegisterDomain(req *RegisterDomainInput) (err error)
