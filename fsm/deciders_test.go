@@ -3,8 +3,11 @@ package fsm
 import (
 	"testing"
 
+	"reflect"
+
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
+	s "github.com/sclasen/swfsm/sugar"
 )
 
 func TestTypedFuncs(t *testing.T) {
@@ -131,9 +134,63 @@ func TestNestedDeciderComposition(t *testing.T) {
 	}
 }
 
-func TestOnStarted(t *testing.T) {}
+func TestOnStarted(t *testing.T) {
+	decider := func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+		return ctx.Goto("some-state", data, ctx.EmptyDecisions())
+	}
 
-func TestOnChildStarted(t *testing.T) {}
+	composedDecider := OnStarted(decider)
+
+	for _, et := range s.SWFHistoryEventTypes() {
+		ctx := deciderTestContext()
+		switch et {
+		case swf.EventTypeWorkflowExecutionStarted:
+			event := s.EventFromPayload(129, &swf.WorkflowExecutionStartedEventAttributes{})
+			data := new(TestData)
+			outcome := composedDecider(ctx, event, data)
+			expected := decider(ctx, event, data)
+			if !reflect.DeepEqual(outcome, expected) {
+				t.Fatal("Outcomes not equal", outcome, expected)
+			}
+		default:
+			event := swf.HistoryEvent{
+				EventType: s.S(et),
+			}
+			if composedDecider(ctx, event, new(TestData)).State != "" {
+				t.Fatal("Non nil decision")
+			}
+		}
+	}
+}
+
+func TestOnChildStarted(t *testing.T) {
+	decider := func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+		return ctx.Goto("some-state", data, ctx.EmptyDecisions())
+	}
+
+	composedDecider := OnChildStarted(decider)
+
+	for _, et := range s.SWFHistoryEventTypes() {
+		ctx := deciderTestContext()
+		switch et {
+		case swf.EventTypeChildWorkflowExecutionStarted:
+			event := s.EventFromPayload(129, &swf.ChildWorkflowExecutionStartedEventAttributes{})
+			data := new(TestData)
+			outcome := composedDecider(ctx, event, data)
+			expected := decider(ctx, event, data)
+			if !reflect.DeepEqual(outcome, expected) {
+				t.Fatal("Outcomes not equal", outcome, expected)
+			}
+		default:
+			event := swf.HistoryEvent{
+				EventType: s.S(et),
+			}
+			if composedDecider(ctx, event, new(TestData)).State != "" {
+				t.Fatal("Non nil decision")
+			}
+		}
+	}
+}
 
 func TestOnData(t *testing.T) {}
 
@@ -160,3 +217,20 @@ func TestTransition(t *testing.T) {}
 func TestCompleteWorkflow(t *testing.T) {}
 
 func TestStay(t *testing.T) {}
+
+func testContextWithActivity(scheduledEventId int, event *swf.ActivityTaskScheduledEventAttributes) func() *FSMContext {
+	return func() *FSMContext {
+		correlator := &EventCorrelator{}
+		correlator.Track(s.EventFromPayload(scheduledEventId, event))
+		ctx := deciderTestContext()
+		ctx.eventCorrelator = correlator
+		return ctx
+	}
+}
+
+func deciderTestContext() *FSMContext {
+	return NewFSMContext(nil,
+		swf.WorkflowType{Name: s.S("foo"), Version: s.S("1")},
+		swf.WorkflowExecution{WorkflowID: s.S("id"), RunID: s.S("runid")},
+		nil, "state", nil, 1)
+}
