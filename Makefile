@@ -42,3 +42,4 @@ dependencies:
 	go get github.com/awslabs/aws-sdk-go/gen/swf
 	go get github.com/juju/errors
 	go get code.google.com/p/go-uuid/uuid
+	go get github.com/juju/errors
