@@ -1,9 +1,10 @@
 package fsm
 
 import (
+	"testing"
+
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	. "github.com/sclasen/swfsm/sugar"
-	"testing"
 )
 
 func TestInterceptors(t *testing.T) {
