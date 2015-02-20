@@ -44,6 +44,8 @@ type FSM struct {
 	ShutdownManager *poller.ShutdownManager
 	//DecisionTaskDispatcher determines the concurrency strategy for processing tasks in your fsm
 	DecisionTaskDispatcher DecisionTaskDispatcher
+	// DecisionInterceptor fsm will call BeforeDecision/AfterDecision
+	DecisionInterceptor DecisionInterceptor
 	//DecisionErrorHandler  is called whenever there is a panic in your decider.
 	//if it returns a nil *Outcome, the attempt to handle the DecisionTask is abandoned.
 	//fsm will then mark the workflow as being in error, by recording 3 markers. state, correlator and error
@@ -273,6 +275,10 @@ func (f *FSM) Deserialize(serialized string, data interface{}) {
 // On errors, a nil *SerializedState is returned, and an error Outcome is included in the Decision list.
 // It is exported to facilitate testing.
 func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision, *SerializedState, error) {
+	//BeforeDecision interceptor invocation
+	if f.DecisionInterceptor != nil {
+		f.DecisionInterceptor.BeforeTask(decisionTask)
+	}
 	lastEvents := f.findLastEvents(*decisionTask.PreviousStartedEventID, decisionTask.Events)
 	outcome := new(Outcome)
 	context := NewFSMContext(f,
@@ -315,6 +321,14 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		outcome.Data = data
 		outcome.State = serializedState.StateName
 		context.stateVersion = serializedState.StateVersion
+		// BeforeDecisionContext interceptor invocation
+		if f.DecisionInterceptor != nil {
+			before := Outcome{Data: outcome.Data, Decisions: outcome.Decisions, State: outcome.State}
+			f.DecisionInterceptor.BeforeDecision(decisionTask, context, before)
+			outcome.State = before.State
+			outcome.Decisions = before.Decisions
+			outcome.Data = before.Data
+		}
 	}
 
 	errorState, err := f.findSerializedErrorState(decisionTask.Events)
@@ -385,6 +399,14 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 
 	for _, d := range outcome.Decisions {
 		f.log("action=tick at=decide next-state=%s decision=%s", outcome.State, d.DecisionType)
+	}
+	//AfterDecision interceptor invocation
+	if f.DecisionInterceptor != nil {
+		after := Outcome{Data: outcome.Data, Decisions: outcome.Decisions, State: outcome.State}
+		f.DecisionInterceptor.AfterDecision(decisionTask, context, after)
+		outcome.State = after.State
+		outcome.Decisions = after.Decisions
+		outcome.Data = after.Data
 	}
 
 	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator, nil)
