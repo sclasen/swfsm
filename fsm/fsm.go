@@ -101,7 +101,7 @@ func (f *FSM) AddCompleteState(state *FSMState) {
 	f.completeState = state
 }
 
-// AddInitialState adds a state to the FSM and uses it as the initial state when a workflow execution is started.
+// AddInitialStateWithHandler adds a state to the FSM and uses it as the initial state when a workflow execution is started.
 // it uses the FSM DefaultDecisionErrorHandler, which defaults to FSM.DefaultDecisionErrorHandler if unset.
 func (f *FSM) AddInitialStateWithHandler(state *FSMState, handler DecisionErrorHandler) {
 	f.AddState(state)
@@ -109,7 +109,7 @@ func (f *FSM) AddInitialStateWithHandler(state *FSMState, handler DecisionErrorH
 	f.initialState = state
 }
 
-// AddState adds a state to the FSM.
+// AddErrorHandler adds a DecisionErrorHandler  to a state in the FSM.
 func (f *FSM) AddErrorHandler(state string, handler DecisionErrorHandler) {
 	if f.errorHandlers == nil {
 		f.errorHandlers = make(map[string]DecisionErrorHandler)
@@ -117,8 +117,9 @@ func (f *FSM) AddErrorHandler(state string, handler DecisionErrorHandler) {
 	f.errorHandlers[state] = handler
 }
 
-// AddCompleteState adds a state to the FSM and uses it as the final state of a workflow.
+// AddCompleteStateWithHandler adds a state to the FSM and uses it as the final state of a workflow.
 // it will only receive events if you returned FSMContext.Complete(...) and the workflow was unable to complete.
+// It also adds a DecisionErrorHandler to the state.
 func (f *FSM) AddCompleteStateWithHandler(state *FSMState, handler DecisionErrorHandler) {
 	f.AddState(state)
 	f.AddErrorHandler(state.Name, handler)
@@ -138,32 +139,39 @@ func (f *FSM) DefaultCompleteState() *FSMState {
 	}
 }
 
+// DefaultDecisionErrorHandler is the DefaultDecisionErrorHandler
 func (f *FSM) DefaultDecisionErrorHandler(ctx *FSMContext, event swf.HistoryEvent, stateBeforeEvent interface{}, stateAfterError interface{}, err error) (*Outcome, error) {
 	f.log("action=tick workflow=%s workflow-id=%s at=decider-error err=%q", ctx.WorkflowType.Name, ctx.WorkflowID, err)
 	return nil, err
 }
 
+// ErrorFindingStateData is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorFindingStateData(decisionTask *swf.DecisionTask, err error) {
 	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-state-failed err=%q", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, err)
 }
 
+// ErrorFindingCorrelator is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorFindingCorrelator(decisionTask *swf.DecisionTask, err error) {
 	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-event-correlator-failed err=%q", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, err)
 }
 
+// ErrorMissingFSMState is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorMissingFSMState(decisionTask *swf.DecisionTask, outcome Outcome) {
 	f.log("action=tick workflow=%s workflow-id=%s at=error error=marked-state-not-in-fsm state=%s", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, outcome.State)
 }
 
+// ErrorDeserializingStateData is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorDeserializingStateData(decisionTask *swf.DecisionTask, serializedStateData string, err error) {
 	f.log("action=tick workflow=%s workflow-id=%s at=error=deserialize-state-failed err=&s", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, err)
 }
+
+// ErrorSerializingStateData is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorSerializingStateData(decisionTask *swf.DecisionTask, outcome Outcome, eventCorrelator EventCorrelator, err error) {
 	f.log("action=tick workflow=%s workflow-id=%s at=error error=state-serialization-error err=%q error-type=system", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowID, err)
 
 }
 
-// Init initializaed any optional, unspecified values such as the error state, stop channel, serializer, PollerShutdownManager.
+// Init initializes any optional, unspecified values such as the error state, stop channel, serializer, PollerShutdownManager.
 // it gets called by Start(), so you should only call this if you are manually managing polling for tasks, and calling Tick yourself.
 func (f *FSM) Init() {
 	if f.initialState == nil {
@@ -421,6 +429,8 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	return context, final, serializedState, nil
 }
 
+// ErrorStateTick is called when the DecisionTaskPoller receives a PollForDecisionTaskResponse in its polling loop
+// that contains an error marker in its history.
 func (f *FSM) ErrorStateTick(decisionTask *swf.DecisionTask, error *SerializedErrorState, context *FSMContext, data interface{}) (*Outcome, error) {
 	handler := f.errorHandlers[context.State]
 	if handler == nil {
@@ -552,13 +562,12 @@ func (f *FSM) findSerializedState(events []swf.HistoryEvent) (*SerializedState, 
 					}
 				}
 				return state, err
-			} else {
-				//Otherwise we expect just a stateData struct
-				state.StateVersion = 0
-				state.StateName = f.initialState.Name
-				state.StateData = *event.WorkflowExecutionStartedEventAttributes.Input
-				return state, nil
 			}
+            //Otherwise we expect just a stateData struct
+            state.StateVersion = 0
+            state.StateName = f.initialState.Name
+            state.StateData = *event.WorkflowExecutionStartedEventAttributes.Input
+            return state, nil
 		}
 	}
 	return nil, errors.New("Cant Find Current Data")
