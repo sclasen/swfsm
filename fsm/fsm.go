@@ -17,6 +17,9 @@ type SWFOps interface {
 	PollForDecisionTask(*swf.PollForDecisionTaskInput) (*swf.DecisionTask, error)
 	PollForActivityTask(*swf.PollForActivityTaskInput) (*swf.ActivityTask, error)
 	RespondDecisionTaskCompleted(*swf.RespondDecisionTaskCompletedInput) error
+	//FSMs should generally be side effect free but sending signals requires looking up runIDs
+	//so allow this operation to be used in FSMs
+	ListOpenWorkflowExecutions(req *swf.ListOpenWorkflowExecutionsInput) (resp *swf.WorkflowExecutionInfos, err error)
 }
 
 // FSM models the decision handling logic a workflow in SWF
