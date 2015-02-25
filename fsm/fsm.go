@@ -58,8 +58,7 @@ type FSM struct {
 	//If there is a good outcome, then we use that as the starting point from which to grab and Decide on the range of unprocessed
 	//events. If this works out fine, we then process the initiating decisionTask range of events.
 	DecisionErrorHandler DecisionErrorHandler
-	//FSMErrorHandler  is called whenever there is an error within the FSM, usually indicating bad state or configuration of your FSM.
-	//if it returns a non-nil error, the attempt to handle the DecisionTask is abandoned and will time out.
+	//FSMErrorReporter  is called whenever there is an error within the FSM, usually indicating bad state or configuration of your FSM.
 	FSMErrorReporter FSMErrorReporter
 	states           map[string]*FSMState
 	errorHandlers    map[string]DecisionErrorHandler
