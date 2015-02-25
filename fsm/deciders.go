@@ -227,18 +227,25 @@ func OnData(predicate PredicateFunc, deciders ...Decider) Decider {
 	}
 }
 
-// OnSignalReceived builds a composed decider that fires on when a matching signal is recieved.
-func OnSignalReceived(signalName string, deciders ...Decider) Decider {
+// OnSignalsReceived builds a composed decider that fires on when one of the matching signal is recieved.
+func OnSignalsReceived(signalNames []string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
 		case swf.EventTypeWorkflowExecutionSignaled:
-			if *h.WorkflowExecutionSignaledEventAttributes.SignalName == signalName {
-				logf(ctx, "at=on-signal-received")
-				return NewComposedDecider(deciders...)(ctx, h, data)
+			for _, signalName := range signalNames {
+				if *h.WorkflowExecutionSignaledEventAttributes.SignalName == signalName {
+					logf(ctx, "at=on-signal-received")
+					return NewComposedDecider(deciders...)(ctx, h, data)
+				}
 			}
 		}
 		return ctx.Pass()
 	}
+}
+
+// OnSignalReceived builds a composed decider that fires on when a matching signal is recieved.
+func OnSignalReceived(signalName string, deciders ...Decider) Decider {
+	return OnSignalsReceived([]string{signalName}, deciders...)
 }
 
 // OnSignalSent builds a composed decider that fires on when a matching signal is recieved.
@@ -285,13 +292,11 @@ func OnSignalFailed(signalName string, deciders ...Decider) Decider {
 	}
 }
 
-// OnActivityCompleted builds a composed decider that fires on when a matching activity completes.
-func OnActivityCompleted(activityName string, deciders ...Decider) Decider {
+func OnActivityEvents(activityName string, eventTypes []string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
-		switch *h.EventType {
-		case swf.EventTypeActivityTaskCompleted:
-			if *ctx.ActivityInfo(h).Name == activityName {
-				logf(ctx, "at=on-activity-completed")
+		for _, eventType := range eventTypes {
+			if *h.EventType == eventType && *ctx.ActivityInfo(h).Name == activityName {
+				logf(ctx, "at=on-activity-event")
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
 		}
@@ -299,18 +304,48 @@ func OnActivityCompleted(activityName string, deciders ...Decider) Decider {
 	}
 }
 
-// OnActivityFailed builds a composed decider that fires on when a matching activity fails.
+// OnActivityStarted builds a composed decider that fires when a matching activity starts.
+func OnActivityStarted(activityName string, deciders ...Decider) Decider {
+	return OnActivityEvents(activityName, []string{
+		swf.EventTypeActivityTaskStarted,
+	}, deciders...)
+}
+
+// OnActivityCompleted builds a composed decider that fires when a matching activity completes.
+func OnActivityCompleted(activityName string, deciders ...Decider) Decider {
+	return OnActivityEvents(activityName, []string{
+		swf.EventTypeActivityTaskCompleted,
+	}, deciders...)
+}
+
+// OnActivityFailed builds a composed decider that fires when a matching activity fails.
 func OnActivityFailed(activityName string, deciders ...Decider) Decider {
-	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
-		switch *h.EventType {
-		case swf.EventTypeActivityTaskFailed, swf.EventTypeActivityTaskTimedOut, swf.EventTypeActivityTaskCanceled:
-			if *ctx.ActivityInfo(h).Name == activityName {
-				logf(ctx, "at=on-activity-failed")
-				return NewComposedDecider(deciders...)(ctx, h, data)
-			}
-		}
-		return ctx.Pass()
-	}
+	return OnActivityEvents(activityName, []string{
+		swf.EventTypeActivityTaskFailed,
+	}, deciders...)
+}
+
+// OnActivityTimedOut builds a composed decider that fires when a matching activity times out.
+func OnActivityTimedOut(activityName string, deciders ...Decider) Decider {
+	return OnActivityEvents(activityName, []string{
+		swf.EventTypeActivityTaskTimedOut,
+	}, deciders...)
+}
+
+// OnActivityCanceled builds a composed decider that fires when a matching activity is canceled.
+func OnActivityCanceled(activityName string, deciders ...Decider) Decider {
+	return OnActivityEvents(activityName, []string{
+		swf.EventTypeActivityTaskCanceled,
+	}, deciders...)
+}
+
+// OnActivityFailedTimedOutCanceled builds a composed decider that fires when a matching activity fails, times out, or is canceled.
+func OnActivityFailedTimedOutCanceled(activityName string, deciders ...Decider) Decider {
+	return OnActivityEvents(activityName, []string{
+		swf.EventTypeActivityTaskFailed,
+		swf.EventTypeActivityTaskTimedOut,
+		swf.EventTypeActivityTaskCanceled,
+	}, deciders...)
 }
 
 // AddDecision adds a single decision to a ContinueDecider outcome
