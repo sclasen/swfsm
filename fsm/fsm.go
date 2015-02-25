@@ -562,11 +562,11 @@ func (f *FSM) findSerializedState(events []swf.HistoryEvent) (*SerializedState, 
 				}
 				return state, err
 			}
-            //Otherwise we expect just a stateData struct
-            state.StateVersion = 0
-            state.StateName = f.initialState.Name
-            state.StateData = *event.WorkflowExecutionStartedEventAttributes.Input
-            return state, nil
+			//Otherwise we expect just a stateData struct
+			state.StateVersion = 0
+			state.StateName = f.initialState.Name
+			state.StateData = *event.WorkflowExecutionStartedEventAttributes.Input
+			return state, nil
 		}
 	}
 	return nil, errors.New("Cant Find Current Data")
