@@ -54,7 +54,6 @@ func (a *EventCorrelator) Correlate(h swf.HistoryEvent) {
 			SignalName: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
 			WorkflowID: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 		}
-		fmt.Printf("added signal @ %s\n %+v\n", a.key(h.EventID), a.Signals)
 	}
 }
 
@@ -76,9 +75,10 @@ func (a *EventCorrelator) RemoveCorrelation(h swf.HistoryEvent) {
 		delete(a.ActivityAttempts, a.safeActivityID(h))
 		delete(a.Activities, a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID))
 	case swf.EventTypeExternalWorkflowExecutionSignaled:
-		info := a.Signals[a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)]
+		key := a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)
+		info := a.Signals[key]
 		delete(a.SignalAttempts, a.signalIDFromInfo(info))
-		delete(a.Signals, a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID))
+		delete(a.Signals, key)
 	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
 		a.incrementSignalAttempts(h)
 		delete(a.Signals, a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))

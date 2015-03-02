@@ -316,7 +316,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	}
 	context.eventCorrelator = eventCorrelator
 
-	f.log("action=tick at=find-serialized-state state=%s", serializedState.StateName)
+	f.clog(context, "action=tick at=find-serialized-state state=%s", serializedState.StateName)
 
 	if outcome.Data == nil && outcome.State == "" {
 		data := f.zeroStateData()
@@ -327,7 +327,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 			}
 			return nil, nil, nil, errors.Trace(err)
 		}
-		f.log("action=tick at=find-current-data data=%v", data)
+		f.clog(context, "action=tick at=find-current-data data=%v", data)
 		outcome.Data = data
 		outcome.State = serializedState.StateName
 		context.stateVersion = serializedState.StateVersion
@@ -360,7 +360,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	//if the outcome changes the state use the right FSMState
 	for i := len(lastEvents) - 1; i >= 0; i-- {
 		e := lastEvents[i]
-		f.log("action=tick at=history id=%d type=%s", e.EventID, e.EventType)
+		f.clog(context, "action=tick at=history id=%d type=%s", *e.EventID, *e.EventType)
 		fsmState, ok := f.states[outcome.State]
 		if ok {
 			context.State = outcome.State
@@ -395,20 +395,21 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 					return context, final, serializedState, notRescued
 				}
 			}
-			eventCorrelator.Track(e)
+			//NOTE this call is handled in fsmContext.Decide. The double call causes nil panics
+			//eventCorrelator.Track(e)
 			curr := outcome.State
 			f.mergeOutcomes(outcome, anOutcome)
-			f.log("action=tick at=decided-event state=%s next-state=%s decisions=%d", curr, outcome.State, len(anOutcome.Decisions))
+			f.clog(context, "action=tick at=decided-event state=%s next-state=%s decisions=%d", curr, outcome.State, len(anOutcome.Decisions))
 		} else {
 			f.FSMErrorReporter.ErrorMissingFSMState(decisionTask, *outcome)
 			return nil, nil, nil, errors.New("marked-state-not-in-fsm state=" + outcome.State)
 		}
 	}
 
-	f.log("action=tick at=events-processed next-state=%s decisions=%d", outcome.State, len(outcome.Decisions))
+	f.clog(context, "action=tick at=events-processed next-state=%s decisions=%d", outcome.State, len(outcome.Decisions))
 
 	for _, d := range outcome.Decisions {
-		f.log("action=tick at=decide next-state=%s decision=%s", outcome.State, d.DecisionType)
+		f.clog(context, "action=tick at=decide next-state=%s decision=%s", outcome.State, *d.DecisionType)
 	}
 	//AfterDecision interceptor invocation
 	if f.DecisionInterceptor != nil {
@@ -419,7 +420,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		outcome.Data = after.Data
 	}
 
-	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator, nil)
+	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, context.eventCorrelator, nil)
 	if err != nil {
 		f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
 		if f.allowPanics {
@@ -544,6 +545,11 @@ func (f *FSM) EventData(event swf.HistoryEvent, eventData interface{}) {
 
 func (f *FSM) log(format string, data ...interface{}) {
 	actualFormat := fmt.Sprintf("component=FSM name=%s %s", f.Name, format)
+	log.Printf(actualFormat, data...)
+}
+
+func (f *FSM) clog(ctx *FSMContext, format string, data ...interface{}) {
+	actualFormat := fmt.Sprintf("component=FSM name=%s type=%s id=%s %s", f.Name, *ctx.WorkflowType.Name, *ctx.WorkflowID, format)
 	log.Printf(actualFormat, data...)
 }
 
