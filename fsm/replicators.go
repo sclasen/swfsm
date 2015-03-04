@@ -58,7 +58,7 @@ func (f *KinesisReplication) Handler(ctx *FSMContext, decisionTask *swf.Decision
 	if err != nil {
 		log.Printf("component=kinesis-replication  at=replicate-state-failed error=%q", err.Error())
 	} else {
-		log.Printf("component=kinesis-replication at=replicated-state shard=%s sequence=%s", resp.ShardID, resp.SequenceNumber)
+		log.Printf("component=kinesis-replication at=replicated-state shard=%s sequence=%s", *resp.ShardID, *resp.SequenceNumber)
 	}
 	return errors.Trace(err)
 }
