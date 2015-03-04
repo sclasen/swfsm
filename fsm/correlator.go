@@ -129,17 +129,29 @@ func (a *EventCorrelator) checkInit() {
 func (a *EventCorrelator) getID(h swf.HistoryEvent) (id string) {
 	switch *h.EventType {
 	case swf.EventTypeActivityTaskCompleted:
-		id = a.key(h.ActivityTaskCompletedEventAttributes.ScheduledEventID)
+		if h.ActivityTaskCompletedEventAttributes != nil {
+			id = a.key(h.ActivityTaskCompletedEventAttributes.ScheduledEventID)
+		}
 	case swf.EventTypeActivityTaskFailed:
-		id = a.key(h.ActivityTaskFailedEventAttributes.ScheduledEventID)
+		if h.ActivityTaskFailedEventAttributes != nil {
+			id = a.key(h.ActivityTaskFailedEventAttributes.ScheduledEventID)
+		}
 	case swf.EventTypeActivityTaskTimedOut:
-		id = a.key(h.ActivityTaskTimedOutEventAttributes.ScheduledEventID)
+		if h.ActivityTaskTimedOutEventAttributes != nil {
+			id = a.key(h.ActivityTaskTimedOutEventAttributes.ScheduledEventID)
+		}
 	case swf.EventTypeActivityTaskCanceled:
-		id = a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID)
+		if h.ActivityTaskCanceledEventAttributes != nil {
+			id = a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID)
+		}
 	case swf.EventTypeExternalWorkflowExecutionSignaled:
-		id = a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)
+		if h.ExternalWorkflowExecutionSignaledEventAttributes != nil {
+			id = a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)
+		}
 	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
-		id = a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID)
+		if h.SignalExternalWorkflowExecutionFailedEventAttributes != nil {
+			id = a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID)
+		}
 	}
 	return
 }

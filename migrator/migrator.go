@@ -20,22 +20,21 @@ type TypesMigrator struct {
 }
 
 type SWFOps interface {
-    DeprecateActivityType(req *swf.DeprecateActivityTypeInput) (err error)
-    DeprecateDomain(req *swf.DeprecateDomainInput) (err error)
-    DeprecateWorkflowType(req *swf.DeprecateWorkflowTypeInput) (err error)
-    DescribeActivityType(req *swf.DescribeActivityTypeInput) (resp *swf.ActivityTypeDetail, err error)
-    DescribeDomain(req *swf.DescribeDomainInput) (resp *swf.DomainDetail, err error)
-    DescribeWorkflowExecution(req *swf.DescribeWorkflowExecutionInput) (resp *swf.WorkflowExecutionDetail, err error)
-    DescribeWorkflowType(req *swf.DescribeWorkflowTypeInput) (resp *swf.WorkflowTypeDetail, err error)
-    RegisterActivityType(req *swf.RegisterActivityTypeInput) (err error)
-    RegisterDomain(req *swf.RegisterDomainInput) (err error)
-    RegisterWorkflowType(req *swf.RegisterWorkflowTypeInput) (err error)
+	DeprecateActivityType(req *swf.DeprecateActivityTypeInput) (err error)
+	DeprecateDomain(req *swf.DeprecateDomainInput) (err error)
+	DeprecateWorkflowType(req *swf.DeprecateWorkflowTypeInput) (err error)
+	DescribeActivityType(req *swf.DescribeActivityTypeInput) (resp *swf.ActivityTypeDetail, err error)
+	DescribeDomain(req *swf.DescribeDomainInput) (resp *swf.DomainDetail, err error)
+	DescribeWorkflowExecution(req *swf.DescribeWorkflowExecutionInput) (resp *swf.WorkflowExecutionDetail, err error)
+	DescribeWorkflowType(req *swf.DescribeWorkflowTypeInput) (resp *swf.WorkflowTypeDetail, err error)
+	RegisterActivityType(req *swf.RegisterActivityTypeInput) (err error)
+	RegisterDomain(req *swf.RegisterDomainInput) (err error)
+	RegisterWorkflowType(req *swf.RegisterWorkflowTypeInput) (err error)
 }
 
-
 type KinesisOps interface {
-    CreateStream(req *kinesis.CreateStreamInput) (err error)
-    DescribeStream(req *kinesis.DescribeStreamInput) (resp *kinesis.DescribeStreamOutput, err error)
+	CreateStream(req *kinesis.CreateStreamInput) (err error)
+	DescribeStream(req *kinesis.DescribeStreamInput) (resp *kinesis.DescribeStreamOutput, err error)
 }
 
 // Migrate runs Migrate on the underlying DomainMigrator, a WorkflowTypeMigrator and ActivityTypeMigrator.

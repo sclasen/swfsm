@@ -254,7 +254,7 @@ func OnSignalSent(signalName string, deciders ...Decider) Decider {
 		switch *h.EventType {
 		case swf.EventTypeExternalWorkflowExecutionSignaled:
 			// if we find a good signal info with matching signal, we have matched workflowId and signalId so fire deciders.
-            info := ctx.SignalInfo(h)
+			info := ctx.SignalInfo(h)
 			if info != nil && info.SignalName == signalName {
 				logf(ctx, "at=on-signal-sent")
 				return NewComposedDecider(deciders...)(ctx, h, data)
@@ -284,8 +284,8 @@ func OnSignalFailed(signalName string, deciders ...Decider) Decider {
 		switch *h.EventType {
 		case swf.EventTypeSignalExternalWorkflowExecutionFailed:
 			// if we find a good signal info with matching signal, we have matched workflowId and signalId so fire deciders.
-            info := ctx.SignalInfo(h)
-            if info != nil && info.SignalName == signalName  {
+			info := ctx.SignalInfo(h)
+			if info != nil && info.SignalName == signalName {
 				logf(ctx, "at=on-signal-failed")
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
@@ -297,8 +297,8 @@ func OnSignalFailed(signalName string, deciders ...Decider) Decider {
 func OnActivityEvents(activityName string, eventTypes []string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		for _, eventType := range eventTypes {
-            info := ctx.ActivityInfo(h)
-            if info != nil && *h.EventType == eventType && *ctx.ActivityInfo(h).Name == activityName {
+			info := ctx.ActivityInfo(h)
+			if info != nil && *h.EventType == eventType && *ctx.ActivityInfo(h).Name == activityName {
 				logf(ctx, "at=on-activity-event")
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
