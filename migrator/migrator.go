@@ -19,6 +19,25 @@ type TypesMigrator struct {
 	StreamMigrator       *StreamMigrator
 }
 
+type SWFOps interface {
+    DeprecateActivityType(req *swf.DeprecateActivityTypeInput) (err error)
+    DeprecateDomain(req *swf.DeprecateDomainInput) (err error)
+    DeprecateWorkflowType(req *swf.DeprecateWorkflowTypeInput) (err error)
+    DescribeActivityType(req *swf.DescribeActivityTypeInput) (resp *swf.ActivityTypeDetail, err error)
+    DescribeDomain(req *swf.DescribeDomainInput) (resp *swf.DomainDetail, err error)
+    DescribeWorkflowExecution(req *swf.DescribeWorkflowExecutionInput) (resp *swf.WorkflowExecutionDetail, err error)
+    DescribeWorkflowType(req *swf.DescribeWorkflowTypeInput) (resp *swf.WorkflowTypeDetail, err error)
+    RegisterActivityType(req *swf.RegisterActivityTypeInput) (err error)
+    RegisterDomain(req *swf.RegisterDomainInput) (err error)
+    RegisterWorkflowType(req *swf.RegisterWorkflowTypeInput) (err error)
+}
+
+
+type KinesisOps interface {
+    CreateStream(req *kinesis.CreateStreamInput) (err error)
+    DescribeStream(req *kinesis.DescribeStreamInput) (resp *kinesis.DescribeStreamOutput, err error)
+}
+
 // Migrate runs Migrate on the underlying DomainMigrator, a WorkflowTypeMigrator and ActivityTypeMigrator.
 func (t *TypesMigrator) Migrate() {
 	if t.ActivityTypeMigrator == nil {
@@ -43,7 +62,7 @@ func (t *TypesMigrator) Migrate() {
 type DomainMigrator struct {
 	RegisteredDomains []swf.RegisterDomainInput
 	DeprecatedDomains []swf.DeprecateDomainInput
-	Client            *swf.SWF
+	Client            SWFOps
 }
 
 // Migrate asserts that DeprecatedDomains are deprecated or deprecates them, then asserts that RegisteredDomains are registered or registers them.
@@ -116,7 +135,7 @@ func (d *DomainMigrator) describe(domain aws.StringValue) (*swf.DomainDetail, er
 type WorkflowTypeMigrator struct {
 	RegisteredWorkflowTypes []swf.RegisterWorkflowTypeInput
 	DeprecatedWorkflowTypes []swf.DeprecateWorkflowTypeInput
-	Client                  *swf.SWF
+	Client                  SWFOps
 }
 
 // Migrate asserts that DeprecatedWorkflowTypes are deprecated or deprecates them, then asserts that RegisteredWorkflowTypes are registered or registers them.
@@ -189,7 +208,7 @@ func (w *WorkflowTypeMigrator) describe(domain aws.StringValue, name aws.StringV
 type ActivityTypeMigrator struct {
 	RegisteredActivityTypes []swf.RegisterActivityTypeInput
 	DeprecatedActivityTypes []swf.DeprecateActivityTypeInput
-	Client                  *swf.SWF
+	Client                  SWFOps
 }
 
 // Migrate asserts that DeprecatedActivityTypes are deprecated or deprecates them, then asserts that RegisteredActivityTypes are registered or registers them.
@@ -261,7 +280,7 @@ func (a *ActivityTypeMigrator) describe(domain aws.StringValue, name aws.StringV
 // StreamMigrator will create any Kinesis Streams required.
 type StreamMigrator struct {
 	Streams []kinesis.CreateStreamInput
-	Client  *kinesis.Kinesis
+	Client  KinesisOps
 }
 
 // Migrate checks that the desired streams have been created and if they have not, creates them.s
