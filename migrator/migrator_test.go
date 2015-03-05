@@ -12,6 +12,8 @@ import (
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
+var testDomain = fmt.Sprintf("test-domain-%d", time.Now().UnixNano())
+
 func TestMigrateDomains(t *testing.T) {
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
 		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
@@ -21,7 +23,7 @@ func TestMigrateDomains(t *testing.T) {
 	creds, _ := aws.EnvCreds()
 	client := swf.New(creds, "us-east-1", nil)
 
-	domain := fmt.Sprintf("test-domain-%d", time.Now().UnixNano())
+	domain := fmt.Sprintf("test-domain-%d", time.Now().UnixNano()) //dont use the testDomain since we deprecate this one
 
 	req := swf.RegisterDomainInput{
 		Name:                                   aws.String(domain),
@@ -56,7 +58,7 @@ func TestMigrateWorkflowTypes(t *testing.T) {
 		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
-
+    createDomain()
 	creds, _ := aws.EnvCreds()
 	client := swf.New(creds, "us-east-1", nil)
 
@@ -67,7 +69,7 @@ func TestMigrateWorkflowTypes(t *testing.T) {
 		Name:        &workflow,
 		Description: aws.String("test workflow migration"),
 		Version:     &version,
-		Domain:      aws.String("test-domain"),
+		Domain:      aws.String(testDomain),
 	}
 
 	w := WorkflowTypeMigrator{
@@ -83,7 +85,7 @@ func TestMigrateWorkflowTypes(t *testing.T) {
 			Name:    aws.String(workflow),
 			Version: aws.String(version),
 		},
-		Domain: aws.String("test-domain"),
+		Domain: aws.String(testDomain),
 	}
 
 	wd := WorkflowTypeMigrator{
@@ -97,11 +99,12 @@ func TestMigrateWorkflowTypes(t *testing.T) {
 }
 
 func TestMigrateActivityTypes(t *testing.T) {
+
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
 		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
-
+    createDomain()
 	creds, _ := aws.EnvCreds()
 	client := swf.New(creds, "us-east-1", nil)
 
@@ -112,7 +115,7 @@ func TestMigrateActivityTypes(t *testing.T) {
 		Name:        &activity,
 		Description: aws.String("test activity migration"),
 		Version:     &version,
-		Domain:      aws.String("test-domain"),
+		Domain:      aws.String(testDomain),
 	}
 
 	a := ActivityTypeMigrator{
@@ -128,7 +131,7 @@ func TestMigrateActivityTypes(t *testing.T) {
 			Name:    &activity,
 			Version: &version,
 		},
-		Domain: aws.String("test-domain"),
+		Domain: aws.String(testDomain),
 	}
 
 	ad := ActivityTypeMigrator{
@@ -153,7 +156,7 @@ func TestMigrateStreams(t *testing.T) {
 	sm := StreamMigrator{
 		Streams: []kinesis.CreateStreamInput{
 			kinesis.CreateStreamInput{
-				StreamName: aws.String("test"),
+				StreamName: aws.String(testDomain),
 				ShardCount: aws.Integer(1),
 			},
 		},
@@ -163,4 +166,20 @@ func TestMigrateStreams(t *testing.T) {
 	sm.Migrate()
 	sm.Migrate()
 
+}
+
+func createDomain() {
+    creds, _ := aws.EnvCreds()
+    client := swf.New(creds, "us-east-1", nil)
+    req := swf.RegisterDomainInput{
+        Name:                                   aws.String(testDomain),
+        Description:                            aws.String("test domain"),
+        WorkflowExecutionRetentionPeriodInDays: aws.String("30"),
+    }
+    w := DomainMigrator{
+        RegisteredDomains:       []swf.RegisterDomainInput{req},
+        Client:                  client,
+    }
+
+    w.Migrate()
 }
