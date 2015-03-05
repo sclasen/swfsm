@@ -298,10 +298,9 @@ func (s *StreamMigrator) Migrate() {
 func (s *StreamMigrator) isCreated(st kinesis.CreateStreamInput) bool {
 	_, err := s.describe(st)
 	if err != nil {
-		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeUnknownResourceFault {
+		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeStreamNotFound {
 			return false
 		}
-
 		panic(err)
 
 	}
