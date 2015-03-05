@@ -31,6 +31,7 @@ type SignalInfo struct {
 	SignalName string
 	WorkflowID string
 }
+
 //TimerInfo holds the Control data from a Timer
 type TimerInfo struct {
 	Control string
