@@ -58,7 +58,7 @@ func TestMigrateWorkflowTypes(t *testing.T) {
 		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
-    createDomain()
+	createDomain()
 	creds, _ := aws.EnvCreds()
 	client := swf.New(creds, "us-east-1", nil)
 
@@ -104,7 +104,7 @@ func TestMigrateActivityTypes(t *testing.T) {
 		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
-    createDomain()
+	createDomain()
 	creds, _ := aws.EnvCreds()
 	client := swf.New(creds, "us-east-1", nil)
 
@@ -169,17 +169,17 @@ func TestMigrateStreams(t *testing.T) {
 }
 
 func createDomain() {
-    creds, _ := aws.EnvCreds()
-    client := swf.New(creds, "us-east-1", nil)
-    req := swf.RegisterDomainInput{
-        Name:                                   aws.String(testDomain),
-        Description:                            aws.String("test domain"),
-        WorkflowExecutionRetentionPeriodInDays: aws.String("30"),
-    }
-    w := DomainMigrator{
-        RegisteredDomains:       []swf.RegisterDomainInput{req},
-        Client:                  client,
-    }
+	creds, _ := aws.EnvCreds()
+	client := swf.New(creds, "us-east-1", nil)
+	req := swf.RegisterDomainInput{
+		Name:                                   aws.String(testDomain),
+		Description:                            aws.String("test domain"),
+		WorkflowExecutionRetentionPeriodInDays: aws.String("30"),
+	}
+	w := DomainMigrator{
+		RegisteredDomains: []swf.RegisterDomainInput{req},
+		Client:            client,
+	}
 
-    w.Migrate()
+	w.Migrate()
 }
