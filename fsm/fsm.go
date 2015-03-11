@@ -333,7 +333,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		context.stateVersion = serializedState.StateVersion
 		// BeforeDecisionContext interceptor invocation
 		if f.DecisionInterceptor != nil {
-			before := Outcome{Data: outcome.Data, Decisions: outcome.Decisions, State: outcome.State}
+			before := &Outcome{Data: outcome.Data, Decisions: outcome.Decisions, State: outcome.State}
 			f.DecisionInterceptor.BeforeDecision(decisionTask, context, before)
 			outcome.State = before.State
 			outcome.Decisions = before.Decisions
@@ -413,7 +413,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 	}
 	//AfterDecision interceptor invocation
 	if f.DecisionInterceptor != nil {
-		after := Outcome{Data: outcome.Data, Decisions: outcome.Decisions, State: outcome.State}
+		after := &Outcome{Data: outcome.Data, Decisions: outcome.Decisions, State: outcome.State}
 		f.DecisionInterceptor.AfterDecision(decisionTask, context, after)
 		outcome.State = after.State
 		outcome.Decisions = after.Decisions
