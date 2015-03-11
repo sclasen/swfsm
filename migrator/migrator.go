@@ -9,6 +9,7 @@ import (
 	. "github.com/sclasen/swfsm/sugar"
 	//"github.com/awslabs/aws-sdk-go/gen/dynamodb"
 	"time"
+    "fmt"
 )
 
 // TypesMigrator is composed of a DomainMigrator, a WorkflowTypeMigrator and an ActivityTypeMigrator.
@@ -91,7 +92,7 @@ func (d *DomainMigrator) isRegisteredNotDeprecated(rd swf.RegisterDomainInput) b
 			return false
 		}
 
-		panic(err)
+		panicWithError(err)
 
 	}
 
@@ -101,7 +102,7 @@ func (d *DomainMigrator) isRegisteredNotDeprecated(rd swf.RegisterDomainInput) b
 func (d *DomainMigrator) register(rd swf.RegisterDomainInput) {
 	err := d.Client.RegisterDomain(&rd)
 	if err != nil {
-		panic(err)
+		panicWithError(err)
 	}
 }
 
@@ -118,7 +119,7 @@ func (d *DomainMigrator) isDeprecated(domain aws.StringValue) bool {
 func (d *DomainMigrator) deprecate(dd swf.DeprecateDomainInput) {
 	err := d.Client.DeprecateDomain(&dd)
 	if err != nil {
-		panic(err)
+		panicWithError(err)
 	}
 }
 
@@ -164,7 +165,7 @@ func (w *WorkflowTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterWorkflow
 			return false
 		}
 
-		panic(err)
+		panicWithError(err)
 
 	}
 
@@ -174,7 +175,7 @@ func (w *WorkflowTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterWorkflow
 func (w *WorkflowTypeMigrator) register(rd swf.RegisterWorkflowTypeInput) {
 	err := w.Client.RegisterWorkflowType(&rd)
 	if err != nil {
-		panic(err)
+		panicWithError(err)
 	}
 }
 
@@ -191,7 +192,7 @@ func (w *WorkflowTypeMigrator) isDeprecated(domain aws.StringValue, name aws.Str
 func (w *WorkflowTypeMigrator) deprecate(dd swf.DeprecateWorkflowTypeInput) {
 	err := w.Client.DeprecateWorkflowType(&dd)
 	if err != nil {
-		panic(err)
+		panicWithError(err)
 	}
 }
 
@@ -237,7 +238,7 @@ func (a *ActivityTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterActivity
 			return false
 		}
 
-		panic(err)
+		panicWithError(err)
 
 	}
 
@@ -247,7 +248,7 @@ func (a *ActivityTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterActivity
 func (a *ActivityTypeMigrator) register(rd swf.RegisterActivityTypeInput) {
 	err := a.Client.RegisterActivityType(&rd)
 	if err != nil {
-		panic(err)
+		panicWithError(err)
 	}
 }
 
@@ -264,7 +265,7 @@ func (a *ActivityTypeMigrator) isDeprecated(domain aws.StringValue, name aws.Str
 func (a *ActivityTypeMigrator) deprecate(dd swf.DeprecateActivityTypeInput) {
 	err := a.Client.DeprecateActivityType(&dd)
 	if err != nil {
-		panic(err)
+		panicWithError(err)
 	}
 }
 
@@ -301,7 +302,7 @@ func (s *StreamMigrator) isCreated(st kinesis.CreateStreamInput) bool {
 		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeStreamNotFound {
 			return false
 		}
-		panic(err)
+		panicWithError(err)
 
 	}
 
@@ -311,7 +312,7 @@ func (s *StreamMigrator) isCreated(st kinesis.CreateStreamInput) bool {
 func (s *StreamMigrator) create(st kinesis.CreateStreamInput) {
 	err := s.Client.CreateStream(&st)
 	if err != nil {
-		panic(err)
+		panicWithError(err)
 	}
 }
 
@@ -336,7 +337,7 @@ func (s *StreamMigrator) awaitActive(stream aws.StringValue, atMostSeconds int) 
 		})
 		if err != nil {
 			log.Printf("component=kinesis-migrator fn=awaitActive at=describe-error error=%s", err)
-			panic(err)
+			panicWithError(err)
 		}
 		log.Printf("component=kinesis-migrator fn=awaitActive stream=%s at=describe status=%s", *stream, *desc.StreamDescription.StreamStatus)
 		status = *desc.StreamDescription.StreamStatus
@@ -347,4 +348,12 @@ func (s *StreamMigrator) awaitActive(stream aws.StringValue, atMostSeconds int) 
 			panic("waited too long")
 		}
 	}
+}
+
+func panicWithError(err error){
+    if ae, ok := err.(aws.APIError); ok {
+        panic(fmt.Sprintf("aws error while migrating type=%s message=%s code=%s request-id=%s", ae.Type, ae.Message, ae.Code, ae.RequestID))
+    }
+
+    panic(err)
 }
