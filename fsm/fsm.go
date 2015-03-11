@@ -235,7 +235,7 @@ func (f *FSM) dispatchTask(decisionTask *swf.DecisionTask) {
 func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
 	context, decisions, state, err := f.Tick(decisionTask)
 	if err != nil {
-		f.log("action=tick at=tick-error status=abandoning-task error=%q", err.Error())
+		f.log("workflow=%s workflow-id=%s run-id=%s action=tick at=tick-error status=abandoning-task error=%q", *decisionTask.WorkflowType.Name, *decisionTask.WorkflowExecution.WorkflowID, *decisionTask.WorkflowExecution.RunID, err.Error())
 		return
 	}
 	complete := &swf.RespondDecisionTaskCompletedInput{
@@ -246,14 +246,14 @@ func (f *FSM) handleDecisionTask(decisionTask *swf.DecisionTask) {
 	complete.ExecutionContext = aws.String(state.StateName)
 
 	if err := f.SWF.RespondDecisionTaskCompleted(complete); err != nil {
-		f.log("action=tick at=decide-request-failed error=%q", err.Error())
+		f.log("workflow=%s workflow-id=%s action=tick at=decide-request-failed error=%q", *decisionTask.WorkflowType.Name, *decisionTask.WorkflowExecution.WorkflowID, *decisionTask.WorkflowExecution.RunID, err.Error())
 		return
 	}
 
 	if f.ReplicationHandler != nil {
 		repErr := f.ReplicationHandler(context, decisionTask, complete, state)
 		if repErr != nil {
-			f.log("action=tick at=replication-handler-failed error=%q", repErr.Error())
+			f.log("workflow=%s workflow-id=%s action=tick at=replication-handler-failed error=%q", *decisionTask.WorkflowType.Name, *decisionTask.WorkflowExecution.WorkflowID, *decisionTask.WorkflowExecution.RunID, repErr.Error())
 		}
 	}
 
