@@ -101,9 +101,14 @@ func (d *DomainMigrator) isRegisteredNotDeprecated(rd swf.RegisterDomainInput) b
 
 func (d *DomainMigrator) register(rd swf.RegisterDomainInput) {
 	err := d.Client.RegisterDomain(&rd)
-	if err != nil {
-		panicWithError(err)
-	}
+    if err != nil {
+        if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeDomainAlreadyExistsFault {
+            return
+        }
+
+        panicWithError(err)
+
+    }
 }
 
 func (d *DomainMigrator) isDeprecated(domain aws.StringValue) bool {

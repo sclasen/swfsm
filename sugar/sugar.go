@@ -14,6 +14,7 @@ import (
 const (
 	ErrorTypeUnknownResourceFault                 = "com.amazonaws.swf.base.model#UnknownResourceFault"
 	ErrorTypeWorkflowExecutionAlreadyStartedFault = "com.amazonaws.swf.base.model#WorkflowExecutionAlreadyStartedFault"
+	ErrorTypeDomainAlreadyExistsFault             = "com.amazonaws.swf.base.model#DomainAlreadyExistsFault"
 	ErrorTypeStreamNotFound                       = "ResourceNotFoundException"
 )
 
