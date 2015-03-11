@@ -16,10 +16,19 @@ func TestInterceptors(t *testing.T) {
 		BeforeTaskFn: func(decision *swf.DecisionTask) {
 			calledBefore = true
 		},
-		BeforeDecisionFn: func(decision *swf.DecisionTask, ctx *FSMContext, outcome Outcome) {
+		BeforeDecisionFn: func(decision *swf.DecisionTask, ctx *FSMContext, outcome *Outcome) {
+			outcome.Decisions = append(outcome.Decisions, ctx.CompleteWorkflowDecision(&TestData{}))
+			outcome.Decisions = append(outcome.Decisions, ctx.CompleteWorkflowDecision(&TestData{}))
 			calledBeforeCtx = true
 		},
-		AfterDecisionFn: func(decision *swf.DecisionTask, ctx *FSMContext, outcome Outcome) {
+		AfterDecisionFn: func(decision *swf.DecisionTask, ctx *FSMContext, outcome *Outcome) {
+			if countCompletes(outcome.Decisions) != 2 {
+				t.Fatal("not 2 completes in after")
+			}
+			outcome.Decisions = dedupeCompletes(outcome.Decisions)
+			if countCompletes(outcome.Decisions) != 1 {
+				t.Fatal("not 1 completes in after dedupe")
+			}
 			calledAfter = true
 		},
 	}
@@ -53,7 +62,7 @@ func TestInterceptors(t *testing.T) {
 		},
 	}
 
-	fsm.Tick(decisionTask)
+	_, ds, _, _ := fsm.Tick(decisionTask)
 
 	if calledBefore == false {
 		t.Fatalf("before not called")
@@ -63,7 +72,39 @@ func TestInterceptors(t *testing.T) {
 		t.Fatalf("before context not called")
 	}
 
-	if calledBefore == false {
+	if calledAfter == false {
 		t.Fatalf("after not called")
 	}
+
+	if countCompletes(ds) != 1 {
+		t.Fatalf("Deduping completes failed %v", ds)
+	}
+}
+
+func dedupeCompletes(in []swf.Decision) []swf.Decision {
+	out := []swf.Decision{}
+	complete := false
+	for i := len(in) - 1; i >= 0; i-- {
+		d := in[i]
+		if *d.DecisionType == swf.DecisionTypeCompleteWorkflowExecution {
+			if !complete {
+				complete = true
+				out = append([]swf.Decision{d}, out...)
+			}
+		} else {
+			out = append([]swf.Decision{d}, out...)
+		}
+	}
+	println(len(out))
+	return out
+}
+
+func countCompletes(in []swf.Decision) int {
+	count := 0
+	for _, d := range in {
+		if *d.DecisionType == swf.DecisionTypeCompleteWorkflowExecution {
+			count++
+		}
+	}
+	return count
 }
