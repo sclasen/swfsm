@@ -57,7 +57,7 @@ func (c *ComposedDecider) Decide(ctx *FSMContext, h swf.HistoryEvent, data inter
 
 func logf(ctx *FSMContext, format string, data ...interface{}) {
 	format = fmt.Sprintf("workflow=%s workflow-id=%s state=%s ", LS(ctx.WorkflowType.Name), LS(ctx.WorkflowID), ctx.State) + format
-	log.Printf(format, data)
+	log.Printf(format, data...)
 }
 
 //DefaultDecider is a 'catch-all' decider that simply logs the unhandled decision.
