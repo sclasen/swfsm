@@ -17,6 +17,7 @@ type EventCorrelator struct {
 	ActivityAttempts map[string]int           //activityID -> attempts
 	Signals          map[string]*SignalInfo   //schedueledEventId -> info
 	SignalAttempts   map[string]int           //? workflowID + signalName -> attempts
+	Timers           map[string]*TimerInfo    //startedEventID -> info
 }
 
 // ActivityInfo holds the ActivityID and ActivityType for an activity
@@ -31,6 +32,12 @@ type SignalInfo struct {
 	WorkflowID string
 }
 
+//TimerInfo holds the Control data from a Timer
+type TimerInfo struct {
+	Control string
+	TimerID string
+}
+
 // Track will add or remove entries based on the EventType.
 // A new entry is added when there is a new ActivityTask, or an entry is removed when the ActivityTask is terminating.
 func (a *EventCorrelator) Track(h swf.HistoryEvent) {
@@ -42,17 +49,30 @@ func (a *EventCorrelator) Track(h swf.HistoryEvent) {
 func (a *EventCorrelator) Correlate(h swf.HistoryEvent) {
 	a.checkInit()
 
-	if *h.EventType == swf.EventTypeActivityTaskScheduled {
+	if a.nilSafeEq(h.EventType, swf.EventTypeActivityTaskScheduled) {
+
 		a.Activities[a.key(h.EventID)] = &ActivityInfo{
 			ActivityID:   *h.ActivityTaskScheduledEventAttributes.ActivityID,
 			ActivityType: h.ActivityTaskScheduledEventAttributes.ActivityType,
 		}
 	}
 
-	if *h.EventType == swf.EventTypeSignalExternalWorkflowExecutionInitiated {
+	if a.nilSafeEq(h.EventType, swf.EventTypeSignalExternalWorkflowExecutionInitiated) {
 		a.Signals[a.key(h.EventID)] = &SignalInfo{
 			SignalName: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
 			WorkflowID: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
+		}
+	}
+
+	if a.nilSafeEq(h.EventType, swf.EventTypeTimerStarted) {
+		control := ""
+		if h.TimerStartedEventAttributes.Control != nil {
+			control = *h.TimerStartedEventAttributes.Control
+		}
+
+		a.Timers[a.key(h.EventID)] = &TimerInfo{
+			Control: control,
+			TimerID: *h.TimerStartedEventAttributes.TimerID,
 		}
 	}
 }
@@ -60,7 +80,9 @@ func (a *EventCorrelator) Correlate(h swf.HistoryEvent) {
 // RemoveCorrelation gcs a mapping of eventId to ActivityType. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
 func (a *EventCorrelator) RemoveCorrelation(h swf.HistoryEvent) {
 	a.checkInit()
-
+	if h.EventType == nil {
+		return
+	}
 	switch *h.EventType {
 	case swf.EventTypeActivityTaskCompleted:
 		delete(a.ActivityAttempts, a.safeActivityID(h))
@@ -82,6 +104,10 @@ func (a *EventCorrelator) RemoveCorrelation(h swf.HistoryEvent) {
 	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
 		a.incrementSignalAttempts(h)
 		delete(a.Signals, a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))
+	case swf.EventTypeTimerFired:
+		delete(a.Timers, a.key(h.TimerFiredEventAttributes.StartedEventID))
+	case swf.EventTypeTimerCanceled:
+		delete(a.Timers, a.key(h.TimerCanceledEventAttributes.StartedEventID))
 	}
 }
 
@@ -95,6 +121,11 @@ func (a *EventCorrelator) ActivityInfo(h swf.HistoryEvent) *ActivityInfo {
 func (a *EventCorrelator) SignalInfo(h swf.HistoryEvent) *SignalInfo {
 	a.checkInit()
 	return a.Signals[a.getID(h)]
+}
+
+func (a *EventCorrelator) TimerInfo(h swf.HistoryEvent) *TimerInfo {
+	a.checkInit()
+	return a.Timers[a.getID(h)]
 }
 
 //AttemptsForActivity returns the number of times a given activity has been attempted.
@@ -124,6 +155,9 @@ func (a *EventCorrelator) checkInit() {
 	if a.SignalAttempts == nil {
 		a.SignalAttempts = make(map[string]int)
 	}
+	if a.Timers == nil {
+		a.Timers = make(map[string]*TimerInfo)
+	}
 }
 
 func (a *EventCorrelator) getID(h swf.HistoryEvent) (id string) {
@@ -152,6 +186,15 @@ func (a *EventCorrelator) getID(h swf.HistoryEvent) (id string) {
 		if h.SignalExternalWorkflowExecutionFailedEventAttributes != nil {
 			id = a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID)
 		}
+	case swf.EventTypeTimerFired:
+		if h.TimerFiredEventAttributes != nil {
+			id = a.key(h.TimerFiredEventAttributes.StartedEventID)
+		}
+	case swf.EventTypeTimerCanceled:
+		if h.TimerCanceledEventAttributes != nil {
+			id = a.key(h.TimerCanceledEventAttributes.StartedEventID)
+		}
+
 	}
 	return
 }
@@ -192,4 +235,12 @@ func (a *EventCorrelator) incrementSignalAttempts(h swf.HistoryEvent) {
 
 func (a *EventCorrelator) key(eventID aws.LongValue) string {
 	return strconv.FormatInt(*eventID, 10)
+}
+
+func (a *EventCorrelator) nilSafeEq(sv aws.StringValue, s string) bool {
+	if sv == nil {
+		return false
+	}
+
+	return *sv == s
 }

@@ -213,6 +213,10 @@ func TestTrackPendingActivities(t *testing.T) {
 		{
 			EventType: S("TimerFired"),
 			EventID:   I(14),
+			TimerFiredEventAttributes: &swf.TimerFiredEventAttributes{
+				StartedEventID: I(12),
+				TimerID:        S("FOO"),
+			},
 		},
 		{
 			EventType: S("MarkerRecorded"),
@@ -220,6 +224,13 @@ func TestTrackPendingActivities(t *testing.T) {
 			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
 				MarkerName: S(StateMarker),
 				Details:    recordMarker.RecordMarkerDecisionAttributes.Details,
+			},
+		},
+		{
+			EventType: S(swf.EventTypeTimerStarted),
+			EventID:   I(12),
+			TimerStartedEventAttributes: &swf.TimerStartedEventAttributes{
+				TimerID: S("foo"),
 			},
 		},
 	}
@@ -397,5 +408,67 @@ func TestSignalTracking(t *testing.T) {
 
 	if c.AttemptsForSignal(info) != 0 {
 		t.Fatal("expected zero attempts", c)
+	}
+}
+
+func TestTimerTracking(t *testing.T) {
+	//track signal'->'workflowID => attempts
+	event := func(eventId int, payload interface{}) swf.HistoryEvent {
+		return EventFromPayload(eventId, payload)
+	}
+
+	start := event(1, &swf.SignalExternalWorkflowExecutionInitiatedEventAttributes{
+		SignalName: S("the-signal"),
+		WorkflowID: S("the-workflow"),
+		RunID:      S("the-runid"),
+	})
+
+	timerStart := EventFromPayload(2, &swf.TimerStartedEventAttributes{
+		TimerID: S("the-timer"),
+		Control: S("the-control"),
+	})
+
+	timerFired := EventFromPayload(3, &swf.TimerFiredEventAttributes{
+		StartedEventID: I(2),
+	})
+
+	timerStart2 := EventFromPayload(4, &swf.TimerStartedEventAttributes{
+		TimerID: S("the-timer"),
+		Control: S("the-control"),
+	})
+
+	timerCanceled := EventFromPayload(5, &swf.TimerCanceledEventAttributes{
+		StartedEventID: I(4),
+	})
+
+	c := new(EventCorrelator)
+
+	c.Track(start)
+	c.Track(timerStart)
+	//track happens in FSM after Decider
+	info := c.TimerInfo(timerFired)
+	if info == nil || info.Control != "the-control" || info.TimerID != "the-timer" {
+		t.Fatal(info)
+	}
+
+	c.Track(timerFired)
+	info = c.TimerInfo(timerFired)
+
+	if info != nil {
+		t.Fatal("non nil info %v", info)
+	}
+
+	c.Track(timerStart2)
+	info = c.TimerInfo(timerCanceled)
+
+	if info == nil || info.Control != "the-control" || info.TimerID != "the-timer" {
+		t.Fatal(info)
+	}
+
+	c.Track(timerCanceled)
+	info = c.TimerInfo(timerCanceled)
+
+	if info != nil {
+		t.Fatal("non nil info2 %v", info)
 	}
 }
