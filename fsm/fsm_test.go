@@ -529,7 +529,7 @@ func testFSM() *FSM {
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
 		systemSerializer: JSONStateSerializer{},
-		allowPanics:      false,
+		allowPanics:      true,
 	}
 	return fsm
 }

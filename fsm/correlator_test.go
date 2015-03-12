@@ -213,6 +213,10 @@ func TestTrackPendingActivities(t *testing.T) {
 		{
 			EventType: S("TimerFired"),
 			EventID:   I(14),
+			TimerFiredEventAttributes: &swf.TimerFiredEventAttributes{
+				StartedEventID: I(12),
+				TimerID:        S("FOO"),
+			},
 		},
 		{
 			EventType: S("MarkerRecorded"),
@@ -220,6 +224,13 @@ func TestTrackPendingActivities(t *testing.T) {
 			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
 				MarkerName: S(StateMarker),
 				Details:    recordMarker.RecordMarkerDecisionAttributes.Details,
+			},
+		},
+		{
+			EventType: S(swf.EventTypeTimerStarted),
+			EventID:   I(12),
+			TimerStartedEventAttributes: &swf.TimerStartedEventAttributes{
+				TimerID: S("foo"),
 			},
 		},
 	}

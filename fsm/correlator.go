@@ -65,8 +65,13 @@ func (a *EventCorrelator) Correlate(h swf.HistoryEvent) {
 	}
 
 	if a.nilSafeEq(h.EventType, swf.EventTypeTimerStarted) {
+		control := ""
+		if h.TimerStartedEventAttributes.Control != nil {
+			control = *h.TimerStartedEventAttributes.Control
+		}
+
 		a.Timers[a.key(h.EventID)] = &TimerInfo{
-			Control: *h.TimerStartedEventAttributes.Control,
+			Control: control,
 			TimerID: *h.TimerStartedEventAttributes.TimerID,
 		}
 	}
