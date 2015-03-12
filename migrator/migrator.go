@@ -179,9 +179,11 @@ func (w *WorkflowTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterWorkflow
 
 func (w *WorkflowTypeMigrator) register(rd swf.RegisterWorkflowTypeInput) {
 	err := w.Client.RegisterWorkflowType(&rd)
-	if err != nil {
-		panicWithError(err)
-	}
+    if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeAlreadyExistsFault {
+        return
+    }
+
+    panicWithError(err)
 }
 
 func (w *WorkflowTypeMigrator) isDeprecated(domain aws.StringValue, name aws.StringValue, version aws.StringValue) bool {
