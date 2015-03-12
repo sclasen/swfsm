@@ -99,6 +99,10 @@ func (a *EventCorrelator) RemoveCorrelation(h swf.HistoryEvent) {
 	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
 		a.incrementSignalAttempts(h)
 		delete(a.Signals, a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))
+	case swf.EventTypeTimerFired:
+		delete(a.Timers, a.key(h.TimerFiredEventAttributes.StartedEventID))
+	case swf.EventTypeTimerCanceled:
+		delete(a.Timers, a.key(h.TimerCanceledEventAttributes.StartedEventID))
 	}
 }
 

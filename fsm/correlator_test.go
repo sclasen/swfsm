@@ -400,7 +400,7 @@ func TestSignalTracking(t *testing.T) {
 	}
 }
 
-func TesTimerracking(t *testing.T) {
+func TestTimerTracking(t *testing.T) {
 	//track signal'->'workflowID => attempts
 	event := func(eventId int, payload interface{}) swf.HistoryEvent {
 		return EventFromPayload(eventId, payload)
@@ -458,6 +458,6 @@ func TesTimerracking(t *testing.T) {
 	info = c.TimerInfo(timerCanceled)
 
 	if info != nil {
-		t.Fatal("non nil info %v", info)
+		t.Fatal("non nil info2 %v", info)
 	}
 }
