@@ -1,99 +1,99 @@
 package fsm
+
 import (
-    "testing"
-    "os"
-    "log"
-    "github.com/awslabs/aws-sdk-go/aws"
-    "github.com/awslabs/aws-sdk-go/gen/swf"
-    "github.com/sclasen/swfsm/migrator"
-    "github.com/heroku/dapped/Godeps/_workspace/src/code.google.com/p/go-uuid/uuid"
+	"log"
+	"os"
+	"testing"
+
+	"github.com/awslabs/aws-sdk-go/aws"
+	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/heroku/dapped/Godeps/_workspace/src/code.google.com/p/go-uuid/uuid"
+	"github.com/sclasen/swfsm/migrator"
 )
 
 func TestClient(t *testing.T) {
-    if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-        log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
-        return
-    }
+	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
+		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
+		return
+	}
 
-    creds, _ := aws.EnvCreds()
-    client := swf.New(creds, "us-east-1", nil)
+	creds, _ := aws.EnvCreds()
+	client := swf.New(creds, "us-east-1", nil)
 
+	req := swf.RegisterDomainInput{
+		Name:                                   aws.String("client-test"),
+		Description:                            aws.String("test domain"),
+		WorkflowExecutionRetentionPeriodInDays: aws.String("30"),
+	}
 
-    req := swf.RegisterDomainInput{
-        Name:                                   aws.String("client-test"),
-        Description:                            aws.String("test domain"),
-        WorkflowExecutionRetentionPeriodInDays: aws.String("30"),
-    }
+	d := migrator.DomainMigrator{
+		RegisteredDomains: []swf.RegisterDomainInput{req},
+		Client:            client,
+	}
 
-    d := migrator.DomainMigrator{
-        RegisteredDomains: []swf.RegisterDomainInput{req},
-        Client:            client,
-    }
+	d.Migrate()
 
-    d.Migrate()
+	wreq := swf.RegisterWorkflowTypeInput{
+		Name:        aws.String("client-test"),
+		Description: aws.String("test workflow migration"),
+		Version:     aws.String("1"),
+		Domain:      aws.String("client-test"),
+	}
 
+	w := migrator.WorkflowTypeMigrator{
+		RegisteredWorkflowTypes: []swf.RegisterWorkflowTypeInput{wreq},
+		Client:                  client,
+	}
 
-    wreq := swf.RegisterWorkflowTypeInput{
-        Name:        aws.String("client-test"),
-        Description: aws.String("test workflow migration"),
-        Version:     aws.String("1"),
-        Domain:      aws.String("client-test"),
-    }
+	w.Migrate()
 
-    w := migrator.WorkflowTypeMigrator{
-        RegisteredWorkflowTypes: []swf.RegisterWorkflowTypeInput{wreq},
-        Client:                  client,
-    }
+	fsm := &FSM{
+		Domain:           "client-test",
+		Name:             "test-fsm",
+		DataType:         TestData{},
+		Serializer:       JSONStateSerializer{},
+		systemSerializer: JSONStateSerializer{},
+		allowPanics:      false,
+	}
 
-    w.Migrate()
+	fsm.AddInitialState(&FSMState{Name: "initial",
+		Decider: func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+			if *h.EventType == swf.EventTypeWorkflowExecutionSignaled {
+				d := data.(*TestData)
+				d.States = append(d.States, *h.WorkflowExecutionSignaledEventAttributes.SignalName)
+			}
+			return ctx.Stay(data, ctx.EmptyDecisions())
+		},
+	})
 
-    fsm := &FSM{
-        Domain:           "client-test",
-        Name:             "test-fsm",
-        DataType:         TestData{},
-        Serializer:       JSONStateSerializer{},
-        systemSerializer: JSONStateSerializer{},
-        allowPanics:      false,
-    }
+	fsmClient := NewFSMClient(fsm, client)
 
-    fsm.AddInitialState(&FSMState{Name:"initial",
-        Decider: func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome{
-           if *h.EventType == swf.EventTypeWorkflowExecutionSignaled {
-                d := data.(*TestData)
-                d.States = append(d.States, *h.WorkflowExecutionSignaledEventAttributes.SignalName)
-           }
-           return ctx.Stay(data, ctx.EmptyDecisions())
-        },
-    })
+	workflow := uuid.New()
+	testData := uuid.New()
+	startTemplate := swf.StartWorkflowExecutionInput{
+		WorkflowType:                 &swf.WorkflowType{Name: aws.String("client-test"), Version: aws.String("1")},
+		ExecutionStartToCloseTimeout: aws.String("120"),
+		TaskStartToCloseTimeout:      aws.String("120"),
+		ChildPolicy:                  aws.String("ABANDON"),
+		TaskList:                     &swf.TaskList{Name: aws.String("task-list")},
+	}
+	_, err := fsmClient.Start(startTemplate, workflow, &TestData{States: []string{testData}})
 
-    fsmClient := NewFSMClient(fsm, client)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-    workflow := uuid.New()
-    testData := uuid.New()
-    startTemplate := swf.StartWorkflowExecutionInput{
-        WorkflowType: &swf.WorkflowType{ Name: aws.String("client-test"), Version: aws.String("1")},
-        ExecutionStartToCloseTimeout: aws.String("120"),
-        TaskStartToCloseTimeout: aws.String("120"),
-        ChildPolicy: aws.String("ABANDON"),
-        TaskList: &swf.TaskList{Name:aws.String("task-list")},
-    }
-    _, err := fsmClient.Start(startTemplate, workflow, &TestData{States: []string{testData}})
+	state, data, err := fsmClient.GetState(workflow)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-    if err != nil {
-        t.Fatal(err)
-    }
+	if data.(*TestData).States[0] != testData {
+		t.Fatal(data)
+	}
 
-    state, data, err := fsmClient.GetState(workflow)
-    if err != nil {
-        t.Fatal(err)
-    }
-
-    if data.(*TestData).States[0] != testData {
-        t.Fatal(data)
-    }
-
-    if state != "initial" {
-        t.Fatal("not in initial")
-    }
+	if state != "initial" {
+		t.Fatal("not in initial")
+	}
 
 }
