@@ -254,9 +254,11 @@ func (a *ActivityTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterActivity
 
 func (a *ActivityTypeMigrator) register(rd swf.RegisterActivityTypeInput) {
 	err := a.Client.RegisterActivityType(&rd)
-	if err != nil {
-		panicWithError(err)
+	if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeAlreadyExistsFault {
+		return
 	}
+
+	panicWithError(err)
 }
 
 func (a *ActivityTypeMigrator) isDeprecated(domain aws.StringValue, name aws.StringValue, version aws.StringValue) bool {
