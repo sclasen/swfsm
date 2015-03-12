@@ -15,7 +15,7 @@ const (
 	ErrorTypeUnknownResourceFault                 = "com.amazonaws.swf.base.model#UnknownResourceFault"
 	ErrorTypeWorkflowExecutionAlreadyStartedFault = "com.amazonaws.swf.base.model#WorkflowExecutionAlreadyStartedFault"
 	ErrorTypeDomainAlreadyExistsFault             = "com.amazonaws.swf.base.model#DomainAlreadyExistsFault"
-    ErrorTypeAlreadyExistsFault                   = "com.amazonaws.swf.base.model#TypeAlreadyExistsFault"
+	ErrorTypeAlreadyExistsFault                   = "com.amazonaws.swf.base.model#TypeAlreadyExistsFault"
 	ErrorTypeStreamNotFound                       = "ResourceNotFoundException"
 )
 
