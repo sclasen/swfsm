@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
+	"code.google.com/p/go-uuid/uuid"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
-	"github.com/heroku/dapped/Godeps/_workspace/src/code.google.com/p/go-uuid/uuid"
 	"github.com/sclasen/swfsm/migrator"
 )
 
