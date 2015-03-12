@@ -320,8 +320,8 @@ func (s *StreamMigrator) isCreated(st kinesis.CreateStreamInput) bool {
 
 func (s *StreamMigrator) create(st kinesis.CreateStreamInput) {
 	err := s.Client.CreateStream(&st)
-	if err != nil {
-		panicWithError(err)
+	if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeStreamAlreadyExists {
+		return
 	}
 }
 

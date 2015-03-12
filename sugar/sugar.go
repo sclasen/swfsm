@@ -17,6 +17,7 @@ const (
 	ErrorTypeDomainAlreadyExistsFault             = "com.amazonaws.swf.base.model#DomainAlreadyExistsFault"
 	ErrorTypeAlreadyExistsFault                   = "com.amazonaws.swf.base.model#TypeAlreadyExistsFault"
 	ErrorTypeStreamNotFound                       = "ResourceNotFoundException"
+	ErrorTypeStreamAlreadyExists                  = "ResourceInUseException"
 )
 
 var eventTypes = map[string]func(swf.HistoryEvent) interface{}{
