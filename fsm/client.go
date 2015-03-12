@@ -60,7 +60,7 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 		return "", nil, err
 	}
 
-	if len(open.ExecutionInfos) > 0 {
+	if len(open.ExecutionInfos) == 1 {
 		execution = open.ExecutionInfos[0].Execution
 	} else {
 		closed, err := c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
