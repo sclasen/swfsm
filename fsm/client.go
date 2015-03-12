@@ -63,7 +63,7 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 	if len(open.ExecutionInfos) == 1 {
 		execution = open.ExecutionInfos[0].Execution
 	} else {
-		closed, err := c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+		closed, err := c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
 			Domain:          S(c.f.Domain),
 			MaximumPageSize: aws.Integer(1),
 			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: &aws.UnixTimestamp{time.Unix(0, 0)}},
