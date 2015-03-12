@@ -8,8 +8,8 @@ import (
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	. "github.com/sclasen/swfsm/sugar"
 	//"github.com/awslabs/aws-sdk-go/gen/dynamodb"
+	"fmt"
 	"time"
-    "fmt"
 )
 
 // TypesMigrator is composed of a DomainMigrator, a WorkflowTypeMigrator and an ActivityTypeMigrator.
@@ -101,14 +101,14 @@ func (d *DomainMigrator) isRegisteredNotDeprecated(rd swf.RegisterDomainInput) b
 
 func (d *DomainMigrator) register(rd swf.RegisterDomainInput) {
 	err := d.Client.RegisterDomain(&rd)
-    if err != nil {
-        if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeDomainAlreadyExistsFault {
-            return
-        }
+	if err != nil {
+		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeDomainAlreadyExistsFault {
+			return
+		}
 
-        panicWithError(err)
+		panicWithError(err)
 
-    }
+	}
 }
 
 func (d *DomainMigrator) isDeprecated(domain aws.StringValue) bool {
@@ -355,10 +355,10 @@ func (s *StreamMigrator) awaitActive(stream aws.StringValue, atMostSeconds int) 
 	}
 }
 
-func panicWithError(err error){
-    if ae, ok := err.(aws.APIError); ok {
-        panic(fmt.Sprintf("aws error while migrating type=%s message=%s code=%s request-id=%s", ae.Type, ae.Message, ae.Code, ae.RequestID))
-    }
+func panicWithError(err error) {
+	if ae, ok := err.(aws.APIError); ok {
+		panic(fmt.Sprintf("aws error while migrating type=%s message=%s code=%s request-id=%s", ae.Type, ae.Message, ae.Code, ae.RequestID))
+	}
 
-    panic(err)
+	panic(err)
 }
