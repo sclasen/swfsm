@@ -13,6 +13,10 @@ import (
 )
 
 type FSMClient interface {
+	ListOpenIds() ([]string, string, error)
+	ListNextOpenIds(previousPageToken string) ([]string, string, error)
+	ListClosedIds() ([]string, string, error)
+	ListNextClosedIds(previousPageToken string) ([]string, string, error)
 	GetState(id string) (string, interface{}, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.Run, error)
@@ -38,6 +42,73 @@ func NewFSMClient(f *FSM, c ClientSWFOps) FSMClient {
 type client struct {
 	f *FSM
 	c ClientSWFOps
+}
+
+func (c *client) ListOpenIds() ([]string, string, error) {
+	return c.listIds(func() (*swf.WorkflowExecutionInfos, error) {
+		return c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+			Domain:          S(c.f.Domain),
+			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: &aws.UnixTimestamp{time.Unix(0, 0)}},
+			TypeFilter:      &swf.WorkflowTypeFilter{Name: S(c.f.Name)},
+		})
+	})
+}
+
+func (c *client) ListNextOpenIds(previousPageToken string) ([]string, string, error) {
+	return c.listIds(func() (*swf.WorkflowExecutionInfos, error) {
+		return c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+			Domain:          S(c.f.Domain),
+			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: &aws.UnixTimestamp{time.Unix(0, 0)}},
+			TypeFilter:      &swf.WorkflowTypeFilter{Name: S(c.f.Name)},
+			NextPageToken:   S(previousPageToken),
+		})
+	})
+}
+
+func (c *client) ListClosedIds() ([]string, string, error) {
+	return c.listIds(func() (*swf.WorkflowExecutionInfos, error) {
+		return c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
+			Domain:          S(c.f.Domain),
+			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: &aws.UnixTimestamp{time.Unix(0, 0)}},
+			TypeFilter:      &swf.WorkflowTypeFilter{Name: S(c.f.Name)},
+		})
+	})
+}
+
+func (c *client) ListNextClosedIds(previousPageToken string) ([]string, string, error) {
+	return c.listIds(func() (*swf.WorkflowExecutionInfos, error) {
+		return c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
+			Domain:          S(c.f.Domain),
+			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: &aws.UnixTimestamp{time.Unix(0, 0)}},
+			TypeFilter:      &swf.WorkflowTypeFilter{Name: S(c.f.Name)},
+			NextPageToken:   S(previousPageToken),
+		})
+	})
+}
+
+func (c *client) listIds(executionInfosFunc func() (*swf.WorkflowExecutionInfos, error)) ([]string, string, error) {
+	executionInfos, err := executionInfosFunc()
+
+	if err != nil {
+		if ae, ok := err.(aws.APIError); ok {
+			log.Printf("component=client fn=listIds at=list-infos-func error-type=%s message=%s", ae.Type, ae.Message)
+		} else {
+			log.Printf("component=client fn=listIds at=list-infos-func error=%s", err)
+		}
+		return []string{}, "", err
+	}
+
+	var ids []string
+	for _, info := range executionInfos.ExecutionInfos {
+		ids = append(ids, *info.Execution.WorkflowID)
+	}
+
+	nextPageToken := ""
+	if executionInfos.NextPageToken != nil {
+		nextPageToken = *executionInfos.NextPageToken
+	}
+
+	return ids, nextPageToken, nil
 }
 
 func (c *client) GetState(id string) (string, interface{}, error) {
