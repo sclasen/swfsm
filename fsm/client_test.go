@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 
+	"strings"
+
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
@@ -96,4 +98,42 @@ func TestClient(t *testing.T) {
 		t.Fatal("not in initial")
 	}
 
+}
+
+func TestStringDoesntSerialize(t *testing.T) {
+
+	fsm := &FSM{
+		Domain:           "client-test",
+		Name:             "test-fsm",
+		DataType:         TestData{},
+		Serializer:       JSONStateSerializer{},
+		systemSerializer: JSONStateSerializer{},
+		allowPanics:      false,
+	}
+
+	swf := &swf.SWF{}
+	mock := &MockSWF{
+		t:   t,
+		SWF: swf,
+	}
+
+	fsmClient := NewFSMClient(fsm, mock)
+
+	fsmClient.Signal("wf", "signal", "simple")
+
+}
+
+type MockSWF struct {
+	t *testing.T
+	*swf.SWF
+}
+
+func (m *MockSWF) SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (err error) {
+	if strings.Contains(*req.Input, "\"") {
+		m.t.Fatal("simple string input has quotes")
+	}
+	if *req.Input != "simple" {
+		m.t.Fatal("not simele")
+	}
+	return nil
 }
