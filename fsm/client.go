@@ -98,7 +98,7 @@ func (c *client) listIds(executionInfosFunc func() (*swf.WorkflowExecutionInfos,
 		return []string{}, "", err
 	}
 
-	var ids []string
+	ids := []string{}
 	for _, info := range executionInfos.ExecutionInfos {
 		ids = append(ids, *info.Execution.WorkflowID)
 	}
