@@ -124,11 +124,16 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 func (c *client) Signal(id string, signal string, input interface{}) error {
 	var serializedInput aws.StringValue
 	if input != nil {
-		ser, err := c.f.Serializer.Serialize(input)
-		if err != nil {
-			return errors.Trace(err)
+		switch it := input.(type) {
+		case string:
+			serializedInput = S(it)
+		default:
+			ser, err := c.f.Serializer.Serialize(input)
+			if err != nil {
+				return errors.Trace(err)
+			}
+			serializedInput = S(ser)
 		}
-		serializedInput = S(ser)
 	}
 	return c.c.SignalWorkflowExecution(&swf.SignalWorkflowExecutionInput{
 		Domain:     S(c.f.Domain),
