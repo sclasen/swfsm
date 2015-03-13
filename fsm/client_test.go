@@ -98,6 +98,23 @@ func TestClient(t *testing.T) {
 		t.Fatal("not in initial")
 	}
 
+	ids, _, err := fsmClient.ListOpenIds()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !stringSliceContains(ids, workflow) {
+		t.Fatal(ids)
+	}
+}
+
+func stringSliceContains(haystack []string, needle string) bool {
+	for _, hay := range haystack {
+		if hay == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func TestStringDoesntSerialize(t *testing.T) {
