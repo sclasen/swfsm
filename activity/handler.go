@@ -40,23 +40,23 @@ func (m marshalledFunc) activityHandlerFunc(task *swf.ActivityTask, input interf
 }
 
 func outputValue(v reflect.Value) interface{} {
-    switch v.Kind() {
-        case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Interface, reflect.Slice:
-            if v.IsNil() {
-                return nil
-            } else {
-                return v.Interface()
-            }
-        default:
-            return v.Interface()
-    }
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Interface, reflect.Slice:
+		if v.IsNil() {
+			return nil
+		} else {
+			return v.Interface()
+		}
+	default:
+		return v.Interface()
+	}
 }
 
 func errorValue(v reflect.Value) error {
-    if v.IsNil() {
-        return nil
-    }
-    return v.Interface().(error)
+	if v.IsNil() {
+		return nil
+	}
+	return v.Interface().(error)
 }
 
 func inputType(handler interface{}) reflect.Type {

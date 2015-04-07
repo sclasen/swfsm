@@ -37,8 +37,8 @@ type ActivityWorker struct {
 	ActivityTaskDispatcher ActivityTaskDispatcher
 	// ActivityInterceptor
 	ActivityInterceptor ActivityInterceptor
-    // allow panics in activities rather than recovering and failing the activity, useful for testing
-    AllowPanics bool
+	// allow panics in activities rather than recovering and failing the activity, useful for testing
+	AllowPanics bool
 }
 
 func (a *ActivityWorker) AddHandler(handler *ActivityHandler) {
@@ -73,11 +73,11 @@ func (a *ActivityWorker) Start() {
 }
 
 func (a *ActivityWorker) dispatchTask(activityTask *swf.ActivityTask) {
-    if a.AllowPanics {
-        a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleActivityTask)
-    } else {
-        a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleWithRecovery(a.handleActivityTask))
-    }
+	if a.AllowPanics {
+		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleActivityTask)
+	} else {
+		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleWithRecovery(a.handleActivityTask))
+	}
 }
 
 func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
@@ -97,7 +97,7 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 			deserialized = nil
 		}
 
-        log.Printf("at=handleActivityTask task=%+v input=%+v", activityTask, deserialized)
+		log.Printf("at=handleActivityTask task=%+v input=%+v", activityTask, deserialized)
 		result, err := handler.HandlerFunc(activityTask, deserialized)
 		if err != nil {
 			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
