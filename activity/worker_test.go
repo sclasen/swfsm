@@ -301,7 +301,7 @@ func TestTypedActivityWorker(t *testing.T) {
 		Identity:   "test-activity-worker",
 	}
 
-    //This is where the actual worker config code is
+	//This is where the actual worker config code is
 	var activities Activities
 
 	activities = MockActivities{}
@@ -311,7 +311,7 @@ func TestTypedActivityWorker(t *testing.T) {
 	worker.AddHandler(NewActivityHandler("two", activities.Task2))
 
 	go worker.Start()
-    //yep thats all the worker config code
+	//yep thats all the worker config code
 
 	done := make(chan struct{})
 

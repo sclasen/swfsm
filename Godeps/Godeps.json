@@ -1,0 +1,47 @@
+{
+	"ImportPath": "github.com/sclasen/swfsm",
+	"GoVersion": "go1.4",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/go-uuid/uuid",
+			"Comment": "null-12",
+			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
+		},
+		{
+			"ImportPath": "code.google.com/p/goprotobuf/proto",
+			"Comment": "go.r60-159",
+			"Rev": "26b4b5c8a6ec0e0bc5a8d2807c9f42f7d1bb291a"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/aws",
+			"Rev": "295e08b503c4ee9fbcdc9aa1aa06966a16364e5a"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/endpoints",
+			"Rev": "295e08b503c4ee9fbcdc9aa1aa06966a16364e5a"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/kinesis",
+			"Rev": "295e08b503c4ee9fbcdc9aa1aa06966a16364e5a"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/swf",
+			"Rev": "295e08b503c4ee9fbcdc9aa1aa06966a16364e5a"
+		},
+		{
+			"ImportPath": "github.com/juju/errors",
+			"Rev": "c0df0ec25769267b33906656c01cc066e60dda8e"
+		},
+		{
+			"ImportPath": "github.com/juju/loggo",
+			"Rev": "e7f361cff40a95b186f40b6f4f13fc3f6bee9a43"
+		},
+		{
+			"ImportPath": "github.com/vaughan0/go-ini",
+			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
+		}
+	]
+}
