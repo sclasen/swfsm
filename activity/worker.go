@@ -97,6 +97,7 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 			deserialized = nil
 		}
 
+        log.Printf("at=handleActivityTask task=%+v input=%+v", activityTask, deserialized)
 		result, err := handler.HandlerFunc(activityTask, deserialized)
 		if err != nil {
 			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
