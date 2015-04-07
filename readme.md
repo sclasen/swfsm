@@ -9,6 +9,7 @@ go library that provides a Finite State Machine abstraction and other niceities 
 
 [![Build Status](https://travis-ci.org/sclasen/swfsm.svg?branch=master)](https://travis-ci.org/sclasen/swfsm)
 
+* activity godoc here: http://godoc.org/github.com/sclasen/swfsm/activity
 * fsm godoc here: http://godoc.org/github.com/sclasen/swfsm/fsm
 * poller godoc here: http://godoc.org/github.com/sclasen/swfsm/poller
 * migrator godoc here: http://godoc.org/github.com/sclasen/swfsm/migrator
@@ -31,7 +32,4 @@ Please see the godoc for detailed documentation and examples.
 versions
 --------
 
-Since this is a library, and using Godeps in your library is discouraged by the Godeps folks, it is important to note here
-that the version of aws-sdk-go was build against and tested with is `295e08b503c4ee9fbcdc9aa1aa06966a16364e5a`
-
-There have been subsequent breaking changes merged to master in that library, which we have opened tickets to get fixed. (All the consts were, perhaps inadvertently, removed)
+Please see Godeps/Godeps.json for the version of aws-sdk-go that this lib currently supports.
