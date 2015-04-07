@@ -36,15 +36,27 @@ type marshalledFunc struct {
 
 func (m marshalledFunc) activityHandlerFunc(task *swf.ActivityTask, input interface{}) (interface{}, error) {
 	ret := m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
-	if ret[0].IsNil() && ret[1].IsNil() {
-		return nil, nil
-	} else if ret[0].IsNil() {
-		return nil, ret[1].Interface().(error)
-	} else if ret[1].IsNil() {
-		return ret[0].Interface(), nil
-	} else {
-		return ret[0].Interface(), ret[1].Interface().(error)
-	}
+	return outputValue(ret[0]), errorValue(ret[1])
+}
+
+func outputValue(v reflect.Value) interface{} {
+    switch v.Kind() {
+        case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Interface, reflect.Slice:
+            if v.IsNil() {
+                return nil
+            } else {
+                return v.Interface()
+            }
+        default:
+            return v.Interface()
+    }
+}
+
+func errorValue(v reflect.Value) error {
+    if v.IsNil() {
+        return nil
+    }
+    return v.Interface().(error)
 }
 
 func inputType(handler interface{}) reflect.Type {
