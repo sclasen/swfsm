@@ -37,6 +37,8 @@ type ActivityWorker struct {
 	ActivityTaskDispatcher ActivityTaskDispatcher
 	// ActivityInterceptor
 	ActivityInterceptor ActivityInterceptor
+    // allow panics in activities rather than recovering and failing the activity, useful for testing
+    AllowPanics bool
 }
 
 func (a *ActivityWorker) AddHandler(handler *ActivityHandler) {
@@ -71,7 +73,11 @@ func (a *ActivityWorker) Start() {
 }
 
 func (a *ActivityWorker) dispatchTask(activityTask *swf.ActivityTask) {
-	a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleWithRecovery(a.handleActivityTask))
+    if a.AllowPanics {
+        a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleActivityTask)
+    } else {
+        a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleWithRecovery(a.handleActivityTask))
+    }
 }
 
 func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
