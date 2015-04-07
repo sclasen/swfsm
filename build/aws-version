@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+REV=$1
+
+mkdir -p $GOPATH/github.com/github.com/awslabs
+cd  $GOPATH/github.com/github.com/awslabs
+git clone https://github.com/awslabs/aws-sdk-go
+cd $GOPATH/github.com/github.com/awslabs/aws-sdk-go
+git checkout $REV
+make

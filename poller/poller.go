@@ -16,7 +16,7 @@ type DecisionOps interface {
 }
 
 type ActivityOps interface {
-    PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error)
+	PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error)
 }
 
 // NewDecisionTaskPoller returns a DecisionTaskPoller whick can be used to poll the given task list.

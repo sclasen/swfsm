@@ -37,9 +37,8 @@ ready: fmt imports tidy
 
 dependencies:
 	go get code.google.com/p/goprotobuf/proto
-	go get github.com/awslabs/aws-sdk-go/aws
-	go get github.com/awslabs/aws-sdk-go/gen/kinesis
-	go get github.com/awslabs/aws-sdk-go/gen/swf
+	./build/aws-version 295e08b503c4ee9fbcdc9aa1aa06966a16364e5a
 	go get github.com/juju/errors
 	go get code.google.com/p/go-uuid/uuid
 	go get github.com/juju/errors
+

@@ -2,12 +2,13 @@ package activity
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"github.com/juju/errors"
 	"github.com/sclasen/swfsm/fsm"
 	"github.com/sclasen/swfsm/poller"
 	. "github.com/sclasen/swfsm/sugar"
-	"log"
 )
 
 type SWFOps interface {
@@ -54,13 +55,13 @@ func (a *ActivityWorker) Init() {
 		a.ActivityInterceptor = &FuncInterceptor{}
 	}
 
-    if a.ActivityTaskDispatcher == nil {
-        a.ActivityTaskDispatcher = &CallingGoroutineDispatcher{}
-    }
+	if a.ActivityTaskDispatcher == nil {
+		a.ActivityTaskDispatcher = &CallingGoroutineDispatcher{}
+	}
 
-    if a.ShutdownManager == nil {
-        a.ShutdownManager = poller.NewShutdownManager()
-    }
+	if a.ShutdownManager == nil {
+		a.ShutdownManager = poller.NewShutdownManager()
+	}
 }
 
 func (a *ActivityWorker) Start() {
@@ -120,7 +121,6 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 	}
 }
 
-
 func (h *ActivityWorker) fail(resp *swf.ActivityTask, err error) {
 	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=fail error=%s ", *resp.WorkflowExecution.WorkflowID, *resp.ActivityType.Name, *resp.ActivityID, err.Error())
 	failErr := h.SWF.RespondActivityTaskFailed(&swf.RespondActivityTaskFailedInput{
@@ -163,5 +163,3 @@ func (h *ActivityWorker) handleWithRecovery(handler func(*swf.ActivityTask)) fun
 
 	}
 }
-
-
