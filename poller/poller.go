@@ -11,13 +11,16 @@ import (
 )
 
 // SWFOps is the subset of the swf.SWF api used bu pollers
-type SWFOps interface {
+type DecisionOps interface {
 	PollForDecisionTask(req *swf.PollForDecisionTaskInput) (resp *swf.DecisionTask, err error)
-	PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error)
+}
+
+type ActivityOps interface {
+    PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error)
 }
 
 // NewDecisionTaskPoller returns a DecisionTaskPoller whick can be used to poll the given task list.
-func NewDecisionTaskPoller(dwc SWFOps, domain string, identity string, taskList string) *DecisionTaskPoller {
+func NewDecisionTaskPoller(dwc DecisionOps, domain string, identity string, taskList string) *DecisionTaskPoller {
 	return &DecisionTaskPoller{
 		client:   dwc,
 		Domain:   domain,
@@ -28,7 +31,7 @@ func NewDecisionTaskPoller(dwc SWFOps, domain string, identity string, taskList 
 
 // DecisionTaskPoller polls a given task list in a domain for decision tasks.
 type DecisionTaskPoller struct {
-	client   SWFOps
+	client   DecisionOps
 	Identity string
 	Domain   string
 	TaskList string
@@ -93,7 +96,7 @@ func (p *DecisionTaskPoller) logTaskLatency(resp *swf.DecisionTask) {
 }
 
 // NewActivityTaskPoller returns an ActivityTaskPoller.
-func NewActivityTaskPoller(awc SWFOps, domain string, identity string, taskList string) *ActivityTaskPoller {
+func NewActivityTaskPoller(awc ActivityOps, domain string, identity string, taskList string) *ActivityTaskPoller {
 	return &ActivityTaskPoller{
 		client:   awc,
 		Domain:   domain,
@@ -104,7 +107,7 @@ func NewActivityTaskPoller(awc SWFOps, domain string, identity string, taskList 
 
 // ActivityTaskPoller polls a given task list in a domain for activity tasks, and sends tasks on its Tasks channel.
 type ActivityTaskPoller struct {
-	client   SWFOps
+	client   ActivityOps
 	Identity string
 	Domain   string
 	TaskList string
