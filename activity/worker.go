@@ -97,7 +97,6 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 			deserialized = nil
 		}
 
-		log.Printf("at=handleActivityTask task=%+v input=%+v", activityTask, deserialized)
 		result, err := handler.HandlerFunc(activityTask, deserialized)
 		if err != nil {
 			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
@@ -122,33 +121,33 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 		}
 	} else {
 		//fail
-		err := errors.NewErr("no handler for activity: %s", activityTask.ActivityType.Name)
+		err := errors.NewErr("no handler for activity: %s", LS(activityTask.ActivityType.Name))
 		a.ActivityInterceptor.AfterTaskFailed(activityTask, &err)
 		a.fail(activityTask, &err)
 	}
 }
 
 func (h *ActivityWorker) fail(resp *swf.ActivityTask, err error) {
-	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=fail error=%s ", *resp.WorkflowExecution.WorkflowID, *resp.ActivityType.Name, *resp.ActivityID, err.Error())
+	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), err.Error())
 	failErr := h.SWF.RespondActivityTaskFailed(&swf.RespondActivityTaskFailedInput{
 		TaskToken: resp.TaskToken,
 		Reason:    S(err.Error()),
 		Details:   S(err.Error()),
 	})
 	if failErr != nil {
-		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=failed-response-fail error=%s ", *resp.WorkflowExecution.WorkflowID, *resp.ActivityType.Name, *resp.ActivityID, failErr.Error())
+		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=failed-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), failErr.Error())
 	}
 }
 
 func (h *ActivityWorker) done(resp *swf.ActivityTask, result string) {
-	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=done", *resp.WorkflowExecution.WorkflowID, *resp.ActivityType.Name, *resp.ActivityID)
+	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=done", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
 
 	completeErr := h.SWF.RespondActivityTaskCompleted(&swf.RespondActivityTaskCompletedInput{
 		TaskToken: resp.TaskToken,
 		Result:    S(result),
 	})
 	if completeErr != nil {
-		log.Printf("workflow-id=%s  activity-id=%s activity-id=%s at=completed-response-fail error=%s ", *resp.WorkflowExecution.WorkflowID, *resp.ActivityType.Name, *resp.ActivityID, completeErr.Error())
+		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=completed-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), completeErr.Error())
 	}
 }
 
