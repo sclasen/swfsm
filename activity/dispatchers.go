@@ -2,7 +2,8 @@ package activity
 
 import "github.com/awslabs/aws-sdk-go/gen/swf"
 
-//ActivityTaskDispatcher is used by the FSM machinery to
+//ActivityTaskDispatcher is used by the ActivityWorker machinery to dispatch the handling of ActivityTasks.
+//Different implementations can provide different concurrency models.
 type ActivityTaskDispatcher interface {
 	DispatchTask(*swf.ActivityTask, func(*swf.ActivityTask))
 }
