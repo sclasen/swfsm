@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"fmt"
+
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
@@ -85,6 +87,7 @@ func (tl *TestListener) AwaitStateFor(workflowID, state string, waitFor time.Dur
 		case <-timer:
 			tl.testAdapter.Fatalf("TestListener: timed out waiting for workflow=%s state=%s", workflowID, state)
 			tl.testAdapter.FailNow()
+			panic(fmt.Sprintf("TestListener: timed out waiting for workflow=%s state=%s", workflowID, state))
 		}
 	}
 }
@@ -108,6 +111,7 @@ func (tl *TestListener) AwaitEventFor(workflowID string, waitFor time.Duration, 
 		case <-timer:
 			tl.testAdapter.Fatalf("TestListener: timed out waiting for workflow=%s event", workflowID)
 			tl.testAdapter.FailNow()
+			panic(fmt.Sprintf("TestListener: timed out waiting for workflow=%s event", workflowID))
 		}
 	}
 }
@@ -131,6 +135,7 @@ func (tl *TestListener) AwaitDecisionFor(workflowID string, waitFor time.Duratio
 		case <-timer:
 			tl.testAdapter.Fatalf("TestListener: timed out waiting for workflow=%s decision", workflowID)
 			tl.testAdapter.FailNow()
+			panic(fmt.Sprintf("TestListener: timed out waiting for workflow=%s decision", workflowID))
 		}
 	}
 }
