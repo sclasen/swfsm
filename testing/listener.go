@@ -161,8 +161,11 @@ func (tl *TestListener) forward() {
 			if c, ok := tl.historyInterest[workflow]; ok {
 				tl.testAdapter.Logf("TestListener: yes historyInterest for workflow %s", workflow)
 				for i := len(do.DecisionTask.Events) - 1; i >= 0; i-- {
-					tl.testAdapter.Logf("TestListener: yes historyInterest for workflow %s %s", workflow, *do.DecisionTask.Events[i].EventType)
-					c <- do.DecisionTask.Events[i]
+					event := do.DecisionTask.Events[i]
+					if *event.EventID > *do.DecisionTask.PreviousStartedEventID {
+						tl.testAdapter.Logf("TestListener: yes historyInterest for workflow %s %s", workflow, *do.DecisionTask.Events[i].EventType)
+						c <- do.DecisionTask.Events[i]
+					}
 				}
 			} else {
 				tl.testAdapter.Logf("TestListener: no historyInterest for workflow %s", workflow)
