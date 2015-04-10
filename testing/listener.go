@@ -19,6 +19,7 @@ func NewTestListener(t TestAdapter, decisionOutcomes chan DecisionOutcome) *Test
 		decisionInterest: make(map[string]chan swf.Decision, 1000),
 		stateInterest:    make(map[string]chan string, 1000),
 		DefaultWait:      10 * time.Second,
+		testAdapter:      t,
 	}
 	tl.Start()
 	return tl
