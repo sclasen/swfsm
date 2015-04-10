@@ -8,7 +8,12 @@ import (
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
-func NewTestListener(t gotesting.TB, decisionOutcomes chan DecisionOutcome) *TestListener {
+type TestAdapter interface {
+	Logf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+}
+
+func NewTestListener(t TestAdapter, decisionOutcomes chan DecisionOutcome) *TestListener {
 	tl := &TestListener{
 		decisionOutcomes: decisionOutcomes,
 		historyInterest:  make(map[string]chan swf.HistoryEvent, 1000),
@@ -131,7 +136,7 @@ func (tl *TestListener) AwaitDecision(workflowID string, predicate func(swf.Deci
 }
 
 func (tl *TestListener) Start() {
-	tl.goTesting.Log("TestListener: Starting")
+	tl.goTesting.Logf("TestListener: Starting")
 	go tl.forward()
 }
 
@@ -146,7 +151,7 @@ func (tl *TestListener) forward() {
 		case do, ok := <-tl.decisionOutcomes:
 			tl.goTesting.Logf("TestListener: ")
 			if !ok {
-				tl.goTesting.Log("TestListener: decisionOutcomes closed!!!!!!!!")
+				tl.goTesting.Logf("TestListener: decisionOutcomes closed!!!!!!!!")
 				return
 			}
 
