@@ -16,8 +16,8 @@ import (
 )
 
 type MockSWF struct {
-	Activity *swf.ActivityTask
-	Failed bool
+	Activity  *swf.ActivityTask
+	Failed    bool
 	Completed *string
 }
 
@@ -343,7 +343,7 @@ func TestTypedActivityWorker(t *testing.T) {
 
 }
 
-func TestStringHandler(t *testing.T){
+func TestStringHandler(t *testing.T) {
 	ops := &MockSWF{}
 	worker := &ActivityWorker{
 		SWF: ops,
@@ -352,15 +352,15 @@ func TestStringHandler(t *testing.T){
 	worker.Init()
 	worker.AllowPanics = true
 
-	handler := func(task *swf.ActivityTask, input string)(string, error){
+	handler := func(task *swf.ActivityTask, input string) (string, error) {
 		return input + "Out", nil
 	}
 
 	worker.AddHandler(NewActivityHandler("activity", handler))
 	worker.handleActivityTask(&swf.ActivityTask{
 		WorkflowExecution: &swf.WorkflowExecution{},
-		ActivityType: &swf.ActivityType{Name:S("activity")},
-		Input: S("theInput"),
+		ActivityType:      &swf.ActivityType{Name: S("activity")},
+		Input:             S("theInput"),
 	})
 
 	if ops.Completed == nil || *ops.Completed != "theInputOut" {
