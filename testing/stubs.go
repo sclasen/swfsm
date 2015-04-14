@@ -10,12 +10,14 @@ import (
 )
 
 const (
-	StubWorkflow = "stub"
-	StubVersion  = "1"
+	StubWorkflow      = "stub"
+	ShortStubWorkflow = "stub"
+	StubVersion       = "1"
 )
 
 var (
-	StubTaskList = &swf.TaskList{Name: S(fmt.Sprintf("%s->%s", StubWorkflow, StubVersion))}
+	StubTaskList      = &swf.TaskList{Name: S(fmt.Sprintf("%s->%s", StubWorkflow, StubVersion))}
+	ShortStubTaskList = &swf.TaskList{Name: S(fmt.Sprintf("%s->%s", ShortStubWorkflow, StubVersion))}
 )
 
 type DecisionOutcome struct {
@@ -26,14 +28,13 @@ type DecisionOutcome struct {
 
 func StubFSM(domain string, client fsm.SWFOps, outcomes chan DecisionOutcome) *fsm.FSM {
 	f := &fsm.FSM{
-		SWF:                 client,
-		DataType:            make(map[string]interface{}),
-		Domain:              domain,
-		Name:                StubWorkflow,
-		Serializer:          fsm.JSONStateSerializer{},
-		TaskList:            *StubTaskList.Name,
-		DecisionInterceptor: TestInterceptor(),
-		ReplicationHandler:  TestReplicator(outcomes),
+		SWF:                client,
+		DataType:           make(map[string]interface{}),
+		Domain:             domain,
+		Name:               StubWorkflow,
+		Serializer:         fsm.JSONStateSerializer{},
+		TaskList:           *StubTaskList.Name,
+		ReplicationHandler: TestReplicator(outcomes),
 	}
 
 	f.AddInitialState(&fsm.FSMState{Name: "Initial", Decider: StubState()})
@@ -47,17 +48,56 @@ func StubState() fsm.Decider {
 	}
 }
 
+func ShortStubFSM(domain string, client fsm.SWFOps, outcomes chan DecisionOutcome) *fsm.FSM {
+	f := &fsm.FSM{
+		SWF:                client,
+		DataType:           make(map[string]interface{}),
+		Domain:             domain,
+		Name:               ShortStubWorkflow,
+		Serializer:         fsm.JSONStateSerializer{},
+		TaskList:           *StubTaskList.Name,
+		ReplicationHandler: TestReplicator(outcomes),
+	}
+
+	f.AddInitialState(&fsm.FSMState{Name: "Initial", Decider: ShortStubState()})
+	return f
+}
+
+func ShortStubState() fsm.Decider {
+	return func(ctx *fsm.FSMContext, h swf.HistoryEvent, data interface{}) fsm.Outcome {
+		log.Printf("at=short-stub-event event=%+v", PrettyHistoryEvent(h))
+		return ctx.CompleteWorkflow(data)
+	}
+}
+
 //intercept any attempts to start a workflow and launch the stub workflow instead.
-func TestInterceptor(stubbedWorkflows ...string) *fsm.FuncInterceptor {
+func TestInterceptor(stubbedWorkflows, stubbedShortWorkflows []string) *fsm.FuncInterceptor {
+	stubbed := make(map[string]struct{})
+	stubbedShort := make(map[string]struct{})
+	v := struct{}{}
+	for _, s := range stubbedWorkflows {
+		stubbed[s] = v
+	}
+	for _, s := range stubbedShortWorkflows {
+		stubbedShort[s] = v
+	}
 	return &fsm.FuncInterceptor{
 		AfterDecisionFn: func(decision *swf.DecisionTask, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
 			for _, d := range outcome.Decisions {
 				switch *d.DecisionType {
 				case swf.DecisionTypeStartChildWorkflowExecution:
-					d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name = S(StubWorkflow)
-					d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Version = S(StubVersion)
-					d.StartChildWorkflowExecutionDecisionAttributes.ExecutionStartToCloseTimeout = S("360")
-					d.StartChildWorkflowExecutionDecisionAttributes.TaskList = StubTaskList
+					if _, ok := stubbed[*d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name]; ok {
+						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name = S(StubWorkflow)
+						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Version = S(StubVersion)
+						d.StartChildWorkflowExecutionDecisionAttributes.ExecutionStartToCloseTimeout = S("360")
+						d.StartChildWorkflowExecutionDecisionAttributes.TaskList = StubTaskList
+					}
+					if _, ok := stubbedShort[*d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name]; ok {
+						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name = S(ShortStubWorkflow)
+						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Version = S(StubVersion)
+						d.StartChildWorkflowExecutionDecisionAttributes.ExecutionStartToCloseTimeout = S("360")
+						d.StartChildWorkflowExecutionDecisionAttributes.TaskList = ShortStubTaskList
+					}
 				}
 			}
 		},
