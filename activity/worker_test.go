@@ -17,21 +17,25 @@ import (
 
 type MockSWF struct {
 	Activity *swf.ActivityTask
+	Failed bool
+	Completed *string
 }
 
-func (MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error) {
+func (*MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error) {
 	return nil, nil
 }
-func (MockSWF) RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceledInput) (err error) {
+func (*MockSWF) RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceledInput) (err error) {
 	return nil
 }
-func (MockSWF) RespondActivityTaskCompleted(req *swf.RespondActivityTaskCompletedInput) (err error) {
+func (m *MockSWF) RespondActivityTaskCompleted(req *swf.RespondActivityTaskCompletedInput) (err error) {
+	m.Completed = req.Result
 	return nil
 }
-func (MockSWF) RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedInput) (err error) {
+func (m *MockSWF) RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedInput) (err error) {
+	m.Failed = true
 	return nil
 }
-func (m MockSWF) PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error) {
+func (m *MockSWF) PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error) {
 	return m.Activity, nil
 }
 
@@ -335,6 +339,32 @@ func TestTypedActivityWorker(t *testing.T) {
 	case <-done:
 	case <-time.After(1 * time.Minute):
 		t.Fatal("One Minute Elapsed, not done with workflow")
+	}
+
+}
+
+func TestStringHandler(t *testing.T){
+	ops := &MockSWF{}
+	worker := &ActivityWorker{
+		SWF: ops,
+	}
+
+	worker.Init()
+	worker.AllowPanics = true
+
+	handler := func(task *swf.ActivityTask, input string)(string, error){
+		return input + "Out", nil
+	}
+
+	worker.AddHandler(NewActivityHandler("activity", handler))
+	worker.handleActivityTask(&swf.ActivityTask{
+		WorkflowExecution: &swf.WorkflowExecution{},
+		ActivityType: &swf.ActivityType{Name:S("activity")},
+		Input: S("theInput"),
+	})
+
+	if ops.Completed == nil || *ops.Completed != "theInputOut" {
+		t.Fatal("Not Completed", ops.Completed)
 	}
 
 }

@@ -32,7 +32,7 @@ func TestInterceptors(t *testing.T) {
 
 	worker := &ActivityWorker{
 		ActivityInterceptor: interceptor,
-		SWF:                 MockSWF{},
+		SWF:                 &MockSWF{},
 	}
 
 	handler := &ActivityHandler{
