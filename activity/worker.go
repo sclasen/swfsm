@@ -86,13 +86,19 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 	if handler != nil {
 		var deserialized interface{}
 		if activityTask.Input != nil {
-			deserialized = handler.ZeroInput()
-			err := a.Serializer.Deserialize(*activityTask.Input, deserialized)
-			if err != nil {
-				a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
-				a.fail(activityTask, err)
-				return
+			switch handler.Input.(type) {
+			case string:
+				deserialized = *activityTask.Input
+			default:
+				deserialized = handler.ZeroInput()
+				err := a.Serializer.Deserialize(*activityTask.Input, deserialized)
+				if err != nil {
+					a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
+					a.fail(activityTask, errors.Annotate(err, "deserialize"))
+					return
+				}
 			}
+
 		} else {
 			deserialized = nil
 		}
@@ -100,7 +106,7 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 		result, err := handler.HandlerFunc(activityTask, deserialized)
 		if err != nil {
 			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
-			a.fail(activityTask, err)
+			a.fail(activityTask, errors.Annotate(err, "handler"))
 		} else {
 			if result == nil {
 				a.ActivityInterceptor.AfterTaskComplete(activityTask, "")
@@ -112,7 +118,7 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 				default:
 					serialized, err := a.Serializer.Serialize(result)
 					if err != nil {
-						a.fail(activityTask, err)
+						a.fail(activityTask, errors.Annotate(err, "serialize"))
 					} else {
 						a.done(activityTask, serialized)
 					}

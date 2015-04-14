@@ -18,11 +18,15 @@ type ActivityHandler struct {
 func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
 	input := inputType(handler)
 	output := outputType(handler)
+	newType := input
+	if input.Kind() == reflect.Ptr {
+		newType = input.Elem()
+	}
 	typeCheck(handler, []string{"*swf.ActivityTask", input.String()}, []string{output, "error"})
 	return &ActivityHandler{
 		Activity:    activity,
 		HandlerFunc: marshalledFunc{reflect.ValueOf(handler)}.activityHandlerFunc,
-		Input:       reflect.New(input.Elem()).Elem().Interface(),
+		Input:       reflect.New(newType).Elem().Interface(),
 	}
 }
 
