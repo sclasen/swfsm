@@ -6,6 +6,9 @@ import (
 
 	"time"
 
+	"io"
+	"strings"
+
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"github.com/juju/errors"
@@ -112,29 +115,9 @@ func (c *client) listIds(executionInfosFunc func() (*swf.WorkflowExecutionInfos,
 }
 
 func (c *client) GetState(id string) (string, interface{}, error) {
-	var execution *swf.WorkflowExecution
-	open, err := c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
-		Domain:          S(c.f.Domain),
-		MaximumPageSize: aws.Integer(1),
-		StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: &aws.UnixTimestamp{time.Unix(0, 0)}},
-		ExecutionFilter: &swf.WorkflowExecutionFilter{
-			WorkflowID: S(id),
-		},
-	})
-
-	if err != nil {
-		if ae, ok := err.(aws.APIError); ok {
-			log.Printf("component=client fn=GetState at=list-open error-type=%s message=%s", ae.Type, ae.Message)
-		} else {
-			log.Printf("component=client fn=GetState at=list-open error=%s", err)
-		}
-		return "", nil, err
-	}
-
-	if len(open.ExecutionInfos) == 1 {
-		execution = open.ExecutionInfos[0].Execution
-	} else {
-		closed, err := c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
+	getState := func() (string, interface{}, error) {
+		var execution *swf.WorkflowExecution
+		open, err := c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
 			Domain:          S(c.f.Domain),
 			MaximumPageSize: aws.Integer(1),
 			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: &aws.UnixTimestamp{time.Unix(0, 0)}},
@@ -145,50 +128,84 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 
 		if err != nil {
 			if ae, ok := err.(aws.APIError); ok {
-				log.Printf("component=client fn=GetState at=list-closed error-type=%s message=%s", ae.Type, ae.Message)
+				log.Printf("component=client fn=GetState at=list-open error-type=%s message=%s", ae.Type, ae.Message)
 			} else {
-				log.Printf("component=client fn=GetState at=list-closed error=%s", err)
+				log.Printf("component=client fn=GetState at=list-open error=%s", err)
 			}
 			return "", nil, err
 		}
 
-		if len(closed.ExecutionInfos) > 0 {
-			execution = closed.ExecutionInfos[0].Execution
+		if len(open.ExecutionInfos) == 1 {
+			execution = open.ExecutionInfos[0].Execution
 		} else {
-			return "", nil, errors.Trace(fmt.Errorf("workflow not found for id %s", id))
+			closed, err := c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
+				Domain:          S(c.f.Domain),
+				MaximumPageSize: aws.Integer(1),
+				StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: &aws.UnixTimestamp{time.Unix(0, 0)}},
+				ExecutionFilter: &swf.WorkflowExecutionFilter{
+					WorkflowID: S(id),
+				},
+			})
+
+			if err != nil {
+				if ae, ok := err.(aws.APIError); ok {
+					log.Printf("component=client fn=GetState at=list-closed error-type=%s message=%s", ae.Type, ae.Message)
+				} else {
+					log.Printf("component=client fn=GetState at=list-closed error=%s", err)
+				}
+				return "", nil, err
+			}
+
+			if len(closed.ExecutionInfos) > 0 {
+				execution = closed.ExecutionInfos[0].Execution
+			} else {
+				return "", nil, errors.Trace(fmt.Errorf("workflow not found for id %s", id))
+			}
+		}
+
+		history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
+			Domain:       S(c.f.Domain),
+			Execution:    execution,
+			ReverseOrder: aws.True(),
+		})
+
+		if err != nil {
+			if ae, ok := err.(aws.APIError); ok {
+				log.Printf("component=client fn=GetState at=get-history error-type=%s message=%s", ae.Type, ae.Message)
+			} else {
+				log.Printf("component=client fn=GetState at=get-history error=%s", err)
+			}
+			return "", nil, err
+		}
+
+		serialized, err := c.f.findSerializedState(history.Events)
+
+		if err != nil {
+			log.Printf("component=client fn=GetState at=find-serialized-state error=%s", err)
+			return "", nil, err
+		}
+
+		data := c.f.zeroStateData()
+		err = c.f.Serializer.Deserialize(serialized.StateData, data)
+		if err != nil {
+			log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%s", err)
+			return "", nil, err
+		}
+
+		return serialized.StateName, data, nil
+	}
+
+	var err error
+	for i := 0; i < 5; i++ {
+		state, data, err := getState()
+		if err != nil && strings.HasSuffix(err.Error(), io.EOF.Error()) {
+			continue
+		} else {
+			return state, data, err
 		}
 	}
 
-	history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
-		Domain:       S(c.f.Domain),
-		Execution:    execution,
-		ReverseOrder: aws.True(),
-	})
-
-	if err != nil {
-		if ae, ok := err.(aws.APIError); ok {
-			log.Printf("component=client fn=GetState at=get-history error-type=%s message=%s", ae.Type, ae.Message)
-		} else {
-			log.Printf("component=client fn=GetState at=get-history error=%s", err)
-		}
-		return "", nil, err
-	}
-
-	serialized, err := c.f.findSerializedState(history.Events)
-
-	if err != nil {
-		log.Printf("component=client fn=GetState at=find-serialized-state error=%s", err)
-		return "", nil, err
-	}
-
-	data := c.f.zeroStateData()
-	err = c.f.Serializer.Deserialize(serialized.StateData, data)
-	if err != nil {
-		log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%s", err)
-		return "", nil, err
-	}
-
-	return serialized.StateName, data, nil
+	return "", nil, err
 
 }
 

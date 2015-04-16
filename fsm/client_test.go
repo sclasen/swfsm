@@ -86,6 +86,7 @@ func TestClient(t *testing.T) {
 	}
 
 	state, data, err := fsmClient.GetState(workflow)
+	t.Log(state, data, err)
 	if err != nil {
 		t.Fatal(err)
 	}
