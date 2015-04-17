@@ -51,7 +51,7 @@ func TestClient(t *testing.T) {
 
 	fsm := &FSM{
 		Domain:           "client-test",
-		Name:             "test-fsm",
+		Name:             "client-test",
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
 		systemSerializer: JSONStateSerializer{},
