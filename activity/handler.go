@@ -34,23 +34,6 @@ func (a *ActivityHandler) ZeroInput() interface{} {
 	return reflect.New(reflect.TypeOf(a.Input)).Interface()
 }
 
-type LongActivityHandlerFunc func(activityTask *swf.ActivityTask, coordinator *LongActivityCoordinator, input interface{})
-
-type LongActivityHandler struct {
-	Activity    string
-	HandlerFunc LongActivityHandlerFunc
-	Input       interface{}
-}
-
-type LongActivityCoordinator struct {
-	Cancel    chan struct{}
-	CancelAck chan struct{}
-	Fail      chan error
-	FailAck   chan struct{}
-	Done      chan interface{}
-	DoneAck   chan struct{}
-}
-
 type marshalledFunc struct {
 	v reflect.Value
 }
