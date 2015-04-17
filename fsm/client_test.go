@@ -51,7 +51,7 @@ func TestClient(t *testing.T) {
 
 	fsm := &FSM{
 		Domain:           "client-test",
-		Name:             "test-fsm",
+		Name:             "client-test",
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
 		systemSerializer: JSONStateSerializer{},
@@ -86,7 +86,6 @@ func TestClient(t *testing.T) {
 	}
 
 	state, data, err := fsmClient.GetState(workflow)
-	t.Log(state, data, err)
 	if err != nil {
 		t.Fatal(err)
 	}
