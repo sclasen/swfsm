@@ -10,7 +10,7 @@ import (
 	. "github.com/sclasen/swfsm/sugar"
 )
 
-// SWFOps is the subset of the swf.SWF api used bu pollers
+// SWFOps is the subset of the swf.SWF api used by pollers
 type DecisionOps interface {
 	PollForDecisionTask(req *swf.PollForDecisionTaskInput) (resp *swf.DecisionTask, err error)
 }

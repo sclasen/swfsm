@@ -98,6 +98,8 @@ func TestInterceptor(stubbedWorkflows, stubbedShortWorkflows []string) *fsm.Func
 						d.StartChildWorkflowExecutionDecisionAttributes.ExecutionStartToCloseTimeout = S("360")
 						d.StartChildWorkflowExecutionDecisionAttributes.TaskList = ShortStubTaskList
 					}
+				case swf.DecisionTypeScheduleActivityTask:
+					d.ScheduleActivityTaskDecisionAttributes.StartToCloseTimeout = S("1")
 				}
 			}
 		},
