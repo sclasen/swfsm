@@ -7,6 +7,9 @@ import (
 	"fmt"
 
 	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/sclasen/swfsm/Godeps/_workspace/src/code.google.com/p/go-uuid/uuid"
+	"github.com/sclasen/swfsm/fsm"
+	"github.com/sclasen/swfsm/activity"
 )
 
 type TestAdapter interface {
@@ -15,15 +18,37 @@ type TestAdapter interface {
 	FailNow()
 }
 
-func NewTestListener(t TestAdapter, decisionOutcomes chan DecisionOutcome) *TestListener {
+type TestConfig struct{
+	Testing TestAdapter
+	FSMs []*fsm.FSM
+	Workers []*activity.ActivityWorker
+	StubbedWorkflows []string
+	ShortStubbedWorkflows []string
+}
+
+func NewTestListener(t TestConfig) *TestListener {
+
 	tl := &TestListener{
-		decisionOutcomes: decisionOutcomes,
+		decisionOutcomes: make(chan DecisionOutcome, 1000),
 		historyInterest:  make(map[string]chan swf.HistoryEvent, 1000),
 		decisionInterest: make(map[string]chan swf.Decision, 1000),
 		stateInterest:    make(map[string]chan string, 1000),
 		DefaultWait:      10 * time.Second,
-		testAdapter:      t,
+		testAdapter:      t.Testing,
+		TestID:           uuid.New(),
 	}
+
+	for _, f := range t.FSMs {
+		f.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
+		f.DecisionInterceptor = TestInterceptor(tl.TestID, t.StubbedWorkflows, t.ShortStubbedWorkflows)
+		f.TaskList = tl.TestID
+	}
+
+	for _, w := range t.Workers {
+		w.TaskList = w.TaskList + tl.TestID
+		w.AllowPanics = true
+	}
+
 	tl.Start()
 	return tl
 }
@@ -38,6 +63,7 @@ type TestListener struct {
 	stateLock        sync.Mutex
 	DefaultWait      time.Duration
 	testAdapter      TestAdapter
+	TestID           string
 }
 
 func (tl *TestListener) RegisterHistoryInterest(workflowID string) chan swf.HistoryEvent {
