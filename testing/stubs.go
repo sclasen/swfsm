@@ -99,11 +99,7 @@ func TestInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []st
 						d.StartChildWorkflowExecutionDecisionAttributes.TaskList = ShortStubTaskList
 					}
 				case swf.DecisionTypeScheduleActivityTask:
-				    log.Printf("%+v", d.ScheduleActivityTaskDecisionAttributes)
-				    log.Printf("%+v", d.ScheduleActivityTaskDecisionAttributes.TaskList.Name)
-					d.ScheduleActivityTaskDecisionAttributes.TaskList.Name = S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testID)
-				    log.Printf("%+v", d.ScheduleActivityTaskDecisionAttributes.TaskList.Name)
-
+					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testID)}
 				}
 			}
 		},
