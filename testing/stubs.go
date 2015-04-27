@@ -71,7 +71,7 @@ func ShortStubState() fsm.Decider {
 }
 
 //intercept any attempts to start a workflow and launch the stub workflow instead.
-func TestInterceptor(stubbedWorkflows, stubbedShortWorkflows []string) *fsm.FuncInterceptor {
+func TestInterceptor(activityTaskList string, stubbedWorkflows, stubbedShortWorkflows []string) *fsm.FuncInterceptor {
 	stubbed := make(map[string]struct{})
 	stubbedShort := make(map[string]struct{})
 	v := struct{}{}
@@ -100,6 +100,7 @@ func TestInterceptor(stubbedWorkflows, stubbedShortWorkflows []string) *fsm.Func
 					}
 				case swf.DecisionTypeScheduleActivityTask:
 					d.ScheduleActivityTaskDecisionAttributes.StartToCloseTimeout = S("1")
+					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(activityTaskList)}
 				}
 			}
 		},
