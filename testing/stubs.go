@@ -26,15 +26,14 @@ type DecisionOutcome struct {
 	Decisions    []swf.Decision
 }
 
-func StubFSM(domain string, client fsm.SWFOps, outcomes chan DecisionOutcome) *fsm.FSM {
+func StubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 	f := &fsm.FSM{
-		SWF:                client,
-		DataType:           make(map[string]interface{}),
-		Domain:             domain,
-		Name:               StubWorkflow,
-		Serializer:         fsm.JSONStateSerializer{},
-		TaskList:           *StubTaskList.Name,
-		ReplicationHandler: TestReplicator(outcomes),
+		SWF:        client,
+		DataType:   make(map[string]interface{}),
+		Domain:     domain,
+		Name:       StubWorkflow,
+		Serializer: fsm.JSONStateSerializer{},
+		TaskList:   *StubTaskList.Name,
 	}
 
 	f.AddInitialState(&fsm.FSMState{Name: "Initial", Decider: StubState()})
@@ -48,15 +47,14 @@ func StubState() fsm.Decider {
 	}
 }
 
-func ShortStubFSM(domain string, client fsm.SWFOps, outcomes chan DecisionOutcome) *fsm.FSM {
+func ShortStubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 	f := &fsm.FSM{
-		SWF:                client,
-		DataType:           make(map[string]interface{}),
-		Domain:             domain,
-		Name:               ShortStubWorkflow,
-		Serializer:         fsm.JSONStateSerializer{},
-		TaskList:           *StubTaskList.Name,
-		ReplicationHandler: TestReplicator(outcomes),
+		SWF:        client,
+		DataType:   make(map[string]interface{}),
+		Domain:     domain,
+		Name:       ShortStubWorkflow,
+		Serializer: fsm.JSONStateSerializer{},
+		TaskList:   *StubTaskList.Name,
 	}
 
 	f.AddInitialState(&fsm.FSMState{Name: "Initial", Decider: ShortStubState()})
@@ -71,7 +69,7 @@ func ShortStubState() fsm.Decider {
 }
 
 //intercept any attempts to start a workflow and launch the stub workflow instead.
-func TestInterceptor(stubbedWorkflows, stubbedShortWorkflows []string) *fsm.FuncInterceptor {
+func TestInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []string) *fsm.FuncInterceptor {
 	stubbed := make(map[string]struct{})
 	stubbedShort := make(map[string]struct{})
 	v := struct{}{}
@@ -98,6 +96,8 @@ func TestInterceptor(stubbedWorkflows, stubbedShortWorkflows []string) *fsm.Func
 						d.StartChildWorkflowExecutionDecisionAttributes.ExecutionStartToCloseTimeout = S("360")
 						d.StartChildWorkflowExecutionDecisionAttributes.TaskList = ShortStubTaskList
 					}
+				case swf.DecisionTypeScheduleActivityTask:
+					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testID)}
 				}
 			}
 		},
