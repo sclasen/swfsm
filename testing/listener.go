@@ -8,8 +8,8 @@ import (
 
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"github.com/sclasen/swfsm/Godeps/_workspace/src/code.google.com/p/go-uuid/uuid"
-	"github.com/sclasen/swfsm/fsm"
 	"github.com/sclasen/swfsm/activity"
+	"github.com/sclasen/swfsm/fsm"
 )
 
 type TestAdapter interface {
@@ -18,11 +18,12 @@ type TestAdapter interface {
 	FailNow()
 }
 
-type TestConfig struct{
-	Testing TestAdapter
-	FSMs []*fsm.FSM
-	Workers []*activity.ActivityWorker
-	StubbedWorkflows []string
+type TestConfig struct {
+	Testing               TestAdapter
+	FSM                   *fsm.FSM
+	StubFSM               *fsm.FSM
+	Workers               []*activity.ActivityWorker
+	StubbedWorkflows      []string
 	ShortStubbedWorkflows []string
 }
 
@@ -38,10 +39,12 @@ func NewTestListener(t TestConfig) *TestListener {
 		TestID:           uuid.New(),
 	}
 
-	for _, f := range t.FSMs {
-		f.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
-		f.DecisionInterceptor = TestInterceptor(tl.TestID, t.StubbedWorkflows, t.ShortStubbedWorkflows)
-		f.TaskList = tl.TestID
+	t.FSM.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
+	t.FSM.DecisionInterceptor = TestInterceptor(tl.TestID, t.StubbedWorkflows, t.ShortStubbedWorkflows)
+	t.FSM.TaskList = tl.TestID
+
+	if t.StubFSM != nil {
+		t.StubFSM.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
 	}
 
 	for _, w := range t.Workers {

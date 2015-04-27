@@ -28,12 +28,12 @@ type DecisionOutcome struct {
 
 func StubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 	f := &fsm.FSM{
-		SWF:                client,
-		DataType:           make(map[string]interface{}),
-		Domain:             domain,
-		Name:               StubWorkflow,
-		Serializer:         fsm.JSONStateSerializer{},
-		TaskList:           *StubTaskList.Name,
+		SWF:        client,
+		DataType:   make(map[string]interface{}),
+		Domain:     domain,
+		Name:       StubWorkflow,
+		Serializer: fsm.JSONStateSerializer{},
+		TaskList:   *StubTaskList.Name,
 	}
 
 	f.AddInitialState(&fsm.FSMState{Name: "Initial", Decider: StubState()})
@@ -49,12 +49,12 @@ func StubState() fsm.Decider {
 
 func ShortStubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 	f := &fsm.FSM{
-		SWF:                client,
-		DataType:           make(map[string]interface{}),
-		Domain:             domain,
-		Name:               ShortStubWorkflow,
-		Serializer:         fsm.JSONStateSerializer{},
-		TaskList:           *StubTaskList.Name,
+		SWF:        client,
+		DataType:   make(map[string]interface{}),
+		Domain:     domain,
+		Name:       ShortStubWorkflow,
+		Serializer: fsm.JSONStateSerializer{},
+		TaskList:   *StubTaskList.Name,
 	}
 
 	f.AddInitialState(&fsm.FSMState{Name: "Initial", Decider: ShortStubState()})
