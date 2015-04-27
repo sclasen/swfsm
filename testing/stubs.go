@@ -26,7 +26,7 @@ type DecisionOutcome struct {
 	Decisions    []swf.Decision
 }
 
-func StubFSM(domain string, client fsm.SWFOps, outcomes chan DecisionOutcome) *fsm.FSM {
+func StubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 	f := &fsm.FSM{
 		SWF:                client,
 		DataType:           make(map[string]interface{}),
@@ -34,7 +34,6 @@ func StubFSM(domain string, client fsm.SWFOps, outcomes chan DecisionOutcome) *f
 		Name:               StubWorkflow,
 		Serializer:         fsm.JSONStateSerializer{},
 		TaskList:           *StubTaskList.Name,
-		ReplicationHandler: TestReplicator(outcomes),
 	}
 
 	f.AddInitialState(&fsm.FSMState{Name: "Initial", Decider: StubState()})
@@ -48,7 +47,7 @@ func StubState() fsm.Decider {
 	}
 }
 
-func ShortStubFSM(domain string, client fsm.SWFOps, outcomes chan DecisionOutcome) *fsm.FSM {
+func ShortStubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 	f := &fsm.FSM{
 		SWF:                client,
 		DataType:           make(map[string]interface{}),
@@ -56,7 +55,6 @@ func ShortStubFSM(domain string, client fsm.SWFOps, outcomes chan DecisionOutcom
 		Name:               ShortStubWorkflow,
 		Serializer:         fsm.JSONStateSerializer{},
 		TaskList:           *StubTaskList.Name,
-		ReplicationHandler: TestReplicator(outcomes),
 	}
 
 	f.AddInitialState(&fsm.FSMState{Name: "Initial", Decider: ShortStubState()})
