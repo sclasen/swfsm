@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/awslabs/aws-sdk-go/gen/swf"
-	"github.com/sclasen/swfsm/Godeps/_workspace/src/code.google.com/p/go-uuid/uuid"
+	"code.google.com/p/go-uuid/uuid"
 	"github.com/sclasen/swfsm/activity"
 	"github.com/sclasen/swfsm/fsm"
 )
