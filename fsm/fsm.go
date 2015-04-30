@@ -392,10 +392,24 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 					return context, final, serializedState, notRescued
 				}
 			}
-			//NOTE this call is handled in fsmContext.Decide. The double call causes nil panics
-			//eventCorrelator.Track(e)
+
 			curr := outcome.State
+
 			f.mergeOutcomes(outcome, anOutcome)
+
+			if curr != outcome.State {
+				//We are transitioning so merge in the entry decisions for the next state
+				nextState, ok := f.states[outcome.State]
+				if ok {
+					if nextState.EntryDecisions != nil {
+						anOutcome.Decisions = nextState.EntryDecisions(context, e, outcome.Data)
+						f.clog(context, "action=tick at=transition state=%s next-state=%s entry-decisions=%d", curr, outcome.State, len(anOutcome.Decisions))
+						f.mergeOutcomes(outcome, anOutcome)
+					}
+
+				}
+			}
+
 			f.clog(context, "action=tick at=decided-event state=%s next-state=%s decisions=%d", curr, outcome.State, len(anOutcome.Decisions))
 		} else {
 			f.FSMErrorReporter.ErrorMissingFSMState(decisionTask, *outcome)
@@ -610,7 +624,7 @@ func (f *FSM) findLastEvents(prevStarted int64, events []swf.HistoryEvent) []swf
 		switch *event.EventType {
 		case swf.EventTypeDecisionTaskCompleted, swf.EventTypeDecisionTaskScheduled,
 			swf.EventTypeDecisionTaskStarted:
-			//no-op, dont even process these?
+		//no-op, dont even process these?
 		case swf.EventTypeMarkerRecorded:
 			if !f.isStateMarker(event) && !f.isCorrelatorMarker(event) {
 				lastEvents = append(lastEvents, event)

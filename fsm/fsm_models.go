@@ -53,6 +53,8 @@ type FSMState struct {
 	Name string
 	// Decider decides an Outcome given the current state, data, and an event.
 	Decider Decider
+	// Returns the Decisions that the State expects to have made (running activities)
+	EntryDecisions MultiDecisionFunc
 }
 
 //DecisionErrorHandler is the error handling contract for panics that occur in Deciders.
