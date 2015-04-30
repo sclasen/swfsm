@@ -223,7 +223,7 @@ func testContextWithActivity(scheduledEventId int, event *swf.ActivityTaskSchedu
 		correlator := &EventCorrelator{}
 		correlator.Track(s.EventFromPayload(scheduledEventId, event))
 		ctx := deciderTestContext()
-		ctx.eventCorrelator = correlator
+		ctx.EventCorrelator = correlator
 		return ctx
 	}
 }

@@ -311,7 +311,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		}
 		return nil, nil, nil, errors.Trace(err)
 	}
-	context.eventCorrelator = eventCorrelator
+	context.EventCorrelator = eventCorrelator
 
 	f.clog(context, "action=tick at=find-serialized-state state=%s", serializedState.StateName)
 
@@ -431,7 +431,7 @@ func (f *FSM) Tick(decisionTask *swf.DecisionTask) (*FSMContext, []swf.Decision,
 		outcome.Data = after.Data
 	}
 
-	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, context.eventCorrelator, nil)
+	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, context.EventCorrelator, nil)
 	if err != nil {
 		f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
 		if f.allowPanics {
