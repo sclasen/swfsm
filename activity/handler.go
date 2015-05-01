@@ -26,7 +26,7 @@ type LongRunningActivityHandler struct {
 type HandleCoordinatedActivity func(*LongRunningActivityCoordinator, *swf.ActivityTask, interface{})
 
 func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
-	input := inputType(handler)
+	input := inputType(handler, 1)
 	output := outputType(handler)
 	newType := input
 	if input.Kind() == reflect.Ptr {
@@ -41,7 +41,7 @@ func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
 }
 
 func NewLongRunningActivityHandler(activity string, handler interface{}) *LongRunningActivityHandler {
-	input := inputType(handler)
+	input := inputType(handler, 1)
 	newType := input
 	if input.Kind() == reflect.Ptr {
 		newType = input.Elem()
@@ -55,7 +55,7 @@ func NewLongRunningActivityHandler(activity string, handler interface{}) *LongRu
 }
 
 func NewHandleCoordinatedActivity(handler interface{}) HandleCoordinatedActivity {
-	input := inputType(handler)
+	input := inputType(handler, 2)
 
 	typeCheck(handler, []string{"*activity.LongRunningActivityCoordinator", "*swf.ActivityTask", input.String()}, []string{})
 
@@ -107,12 +107,12 @@ func errorValue(v reflect.Value) error {
 	return v.Interface().(error)
 }
 
-func inputType(handler interface{}) reflect.Type {
+func inputType(handler interface{}, idx int) reflect.Type {
 	t := reflect.TypeOf(handler)
 	if reflect.Func != t.Kind() {
 		panic(fmt.Sprintf("kind was %v, not Func", t.Kind()))
 	}
-	return t.In(1)
+	return t.In(idx)
 }
 
 func outputType(handler interface{}) string {
