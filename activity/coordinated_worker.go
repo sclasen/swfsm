@@ -27,7 +27,7 @@ type LongRunningActivityCoordinator struct {
 // * your HandleCoordinatedActivityHandler is responsible for responding to messages on ToCancelActivity, by stopping, acking the cancel to swf, and sending on ToAckCancel
 // * if your HandleCoordinatedActivityHandler wishes to stop heartbeats, send on ToStopHeartbeating and recieve on ToAckStopHeartbeating.
 
-func NewCoordinatedActivityHandler(swfOps SWFOps, heartbeatInterval time.Duration, heartbeatErrorThreshold int, handler HandleCoordinatedActivity) LongRunningActivityHandlerFunc {
+func (w *ActivityWorker)AddCoordinatedHandler(heartbeatInterval time.Duration, heartbeatErrorThreshold int, handler *CoordinatedActivityHandler)  {
 	coordinator := &LongRunningActivityCoordinator{
 		HeartbeatInterval:     heartbeatInterval,
 		HeartbeatErrors:       make(chan error, heartbeatErrorThreshold),
@@ -37,12 +37,12 @@ func NewCoordinatedActivityHandler(swfOps SWFOps, heartbeatInterval time.Duratio
 		ToAckStopHeartbeating: make(chan struct{}),
 	}
 
-	return func(activityTask *swf.ActivityTask, input interface{}) {
-		go handler(coordinator, activityTask, input)
+	handlerFunc :=  func(activityTask *swf.ActivityTask, input interface{}) {
+		go handler.HandlerFunc(coordinator, activityTask, input)
 		for {
 			select {
 			case <-time.After(heartbeatInterval):
-				status, err := swfOps.RecordActivityTaskHeartbeat(&swf.RecordActivityTaskHeartbeatInput{
+				status, err := w.SWF.RecordActivityTaskHeartbeat(&swf.RecordActivityTaskHeartbeatInput{
 					TaskToken: activityTask.TaskToken,
 				})
 				if err != nil {
@@ -65,4 +65,12 @@ func NewCoordinatedActivityHandler(swfOps SWFOps, heartbeatInterval time.Duratio
 			}
 		}
 	}
+
+	l := &LongRunningActivityHandler{
+		Activity: handler.Activity,
+		HandlerFunc: handlerFunc,
+        Input: handler.Input,
+	}
+
+	w.AddLongRunningHandler(l)
 }
