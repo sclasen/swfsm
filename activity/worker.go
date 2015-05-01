@@ -138,11 +138,11 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 	} else if longHandler != nil {
 		var deserialized interface{}
 		if activityTask.Input != nil {
-			switch handler.Input.(type) {
+			switch longHandler.Input.(type) {
 			case string:
 				deserialized = *activityTask.Input
 			default:
-				deserialized = handler.ZeroInput()
+				deserialized = longHandler.ZeroInput()
 				err := a.Serializer.Deserialize(*activityTask.Input, deserialized)
 				if err != nil {
 					a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
