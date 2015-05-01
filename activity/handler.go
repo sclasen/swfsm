@@ -15,6 +15,15 @@ type ActivityHandler struct {
 	Input       interface{}
 }
 
+type LongRunningActivityHandlerFunc func(activityTask *swf.ActivityTask, input interface{})
+
+type LongRunningActivityHandler struct {
+	Activity    string
+	HandlerFunc LongRunningActivityHandlerFunc
+	Input       interface{}
+	TaskList    *swf.TaskList
+}
+
 func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
 	input := inputType(handler)
 	output := outputType(handler)
@@ -30,7 +39,25 @@ func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
 	}
 }
 
+func NewLongRunningActivityHandler(activity string, handler interface{}) *LongRunningActivityHandler {
+	input := inputType(handler)
+	newType := input
+	if input.Kind() == reflect.Ptr {
+		newType = input.Elem()
+	}
+	typeCheck(handler, []string{"*swf.ActivityTask", input.String()}, []string{})
+	return &LongRunningActivityHandler{
+		Activity:    activity,
+		HandlerFunc: marshalledFunc{reflect.ValueOf(handler)}.longRunningActivityHandlerFunc,
+		Input:       reflect.New(newType).Elem().Interface(),
+	}
+}
+
 func (a *ActivityHandler) ZeroInput() interface{} {
+	return reflect.New(reflect.TypeOf(a.Input)).Interface()
+}
+
+func (a *LongRunningActivityHandler) ZeroInput() interface{} {
 	return reflect.New(reflect.TypeOf(a.Input)).Interface()
 }
 
@@ -41,6 +68,10 @@ type marshalledFunc struct {
 func (m marshalledFunc) activityHandlerFunc(task *swf.ActivityTask, input interface{}) (interface{}, error) {
 	ret := m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
 	return outputValue(ret[0]), errorValue(ret[1])
+}
+
+func (m marshalledFunc) longRunningActivityHandlerFunc(task *swf.ActivityTask, input interface{}) {
+	m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
 }
 
 func outputValue(v reflect.Value) interface{} {
