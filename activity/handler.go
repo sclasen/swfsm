@@ -57,7 +57,7 @@ func NewLongRunningActivityHandler(activity string, handler interface{}) *LongRu
 func NewHandleCoordinatedActivity(handler interface{}) HandleCoordinatedActivity {
 	input := inputType(handler)
 
-	typeCheck(handler, []string{"*swf.LongRunningActivityCoordinator", "*swf.ActivityTask", input.String()}, []string{})
+	typeCheck(handler, []string{"*activity.LongRunningActivityCoordinator", "*swf.ActivityTask", input.String()}, []string{})
 
 	return marshalledFunc{reflect.ValueOf(handler)}.handleCoordinatedActivity
 
