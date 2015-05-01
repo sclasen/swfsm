@@ -23,6 +23,8 @@ type LongRunningActivityHandler struct {
 	Input       interface{}
 }
 
+type HandleCoordinatedActivity func(*LongRunningActivityCoordinator, *swf.ActivityTask, interface{})
+
 func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
 	input := inputType(handler)
 	output := outputType(handler)
@@ -52,6 +54,14 @@ func NewLongRunningActivityHandler(activity string, handler interface{}) *LongRu
 	}
 }
 
+func NewHandleCoordinatedActivity(handler interface{}) HandleCoordinatedActivity {
+	input := inputType(handler)
+
+	typeCheck(handler, []string{"*swf.LongRunningActivityCoordinator", "*swf.ActivityTask", input.String()}, []string{})
+
+	return marshalledFunc{reflect.ValueOf(handler)}.handleCoordinatedActivity
+
+}
 func (a *ActivityHandler) ZeroInput() interface{} {
 	return reflect.New(reflect.TypeOf(a.Input)).Interface()
 }
@@ -71,6 +81,10 @@ func (m marshalledFunc) activityHandlerFunc(task *swf.ActivityTask, input interf
 
 func (m marshalledFunc) longRunningActivityHandlerFunc(task *swf.ActivityTask, input interface{}) {
 	m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
+}
+
+func (m marshalledFunc) handleCoordinatedActivity(coordinator *LongRunningActivityCoordinator, task *swf.ActivityTask, input interface{}) {
+	m.v.Call([]reflect.Value{reflect.ValueOf(coordinator), reflect.ValueOf(task), reflect.ValueOf(input)})
 }
 
 func outputValue(v reflect.Value) interface{} {

@@ -18,8 +18,6 @@ type LongRunningActivityCoordinator struct {
 	HeartbeatErrors       chan error
 }
 
-type HandleCoordinatedActivity func(*LongRunningActivityCoordinator, *swf.ActivityTask, interface{})
-
 //NewCoordinatedActivityHandler creates a LongRunningActivityFunc that will build a LongRunningActivityCoordinator and execute your HandleCoordinatedActivity
 //
 // * heartbeats the activity at the given interval
