@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"time"
+
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
@@ -26,9 +28,19 @@ type LongRunningActivityHandler struct {
 type CoordinatedActivityHandlerFunc func(*LongRunningActivityCoordinator, *swf.ActivityTask, interface{})
 
 type CoordinatedActivityHandler struct {
-	Activity string
+	Activity    string
 	HandlerFunc CoordinatedActivityHandlerFunc
-	Input interface{}
+	Input       interface{}
+}
+
+//LongRunningActivityFunc that creates all the coordination channels, starts heartbeating, and calls into
+type LongRunningActivityCoordinator struct {
+	HeartbeatInterval     time.Duration
+	ToCancelActivity      chan struct{}
+	ToAckCancelActivity   chan struct{}
+	ToStopHeartbeating    chan struct{}
+	ToAckStopHeartbeating chan struct{}
+	HeartbeatErrors       chan error
 }
 
 func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
@@ -53,7 +65,7 @@ func NewLongRunningActivityHandler(activity string, handler interface{}) *LongRu
 		newType = input.Elem()
 	}
 
-	typeCheck(handler, []string{"*swf.ActivityTask", input.String() }, []string{})
+	typeCheck(handler, []string{"*swf.ActivityTask", input.String()}, []string{})
 	return &LongRunningActivityHandler{
 		Activity:    activity,
 		HandlerFunc: marshalledFunc{reflect.ValueOf(handler)}.longRunningActivityHandlerFunc,
@@ -71,9 +83,9 @@ func NewCoordinatedActivityHandler(activity string, handler interface{}) *Coordi
 	typeCheck(handler, []string{"*activity.LongRunningActivityCoordinator", "*swf.ActivityTask", input.String()}, []string{})
 
 	return &CoordinatedActivityHandler{
-		Activity: activity,
+		Activity:    activity,
 		HandlerFunc: marshalledFunc{reflect.ValueOf(handler)}.handleCoordinatedActivity,
-		Input: reflect.New(newType).Elem().Interface(),
+		Input:       reflect.New(newType).Elem().Interface(),
 	}
 
 }

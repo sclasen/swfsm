@@ -3,10 +3,10 @@ package activity
 import (
 	"testing"
 
+	"time"
 
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	. "github.com/sclasen/swfsm/sugar"
-	"time"
 )
 
 func TestNewLongRunningActivityHandler(t *testing.T) {
@@ -18,17 +18,14 @@ func TestNewLongRunningActivityHandler(t *testing.T) {
 
 	handler := NewCoordinatedActivityHandler("activity", hc)
 
-
-	worker := ActivityWorker{
-
-	}
-	worker.AddCoordinatedHandler(10 * time.Second, 100, handler)
-    worker.Init()
-	input, _ := worker.Serializer.Serialize(&TestInput{Name:"Foo"})
+	worker := ActivityWorker{}
+	worker.AddCoordinatedHandler(10*time.Second, 100, handler)
+	worker.Init()
+	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 	worker.handleActivityTask(&swf.ActivityTask{
-		TaskToken: S("token"),
-        WorkflowExecution: &swf.WorkflowExecution{},
-        ActivityType: &swf.ActivityType{
+		TaskToken:         S("token"),
+		WorkflowExecution: &swf.WorkflowExecution{},
+		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
 		Input: S(input),

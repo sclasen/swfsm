@@ -8,16 +8,6 @@ import (
 	. "github.com/sclasen/swfsm/sugar"
 )
 
-//LongRunningActivityFunc that creates all the coordination channels, starts heartbeating, and calls into
-type LongRunningActivityCoordinator struct {
-	HeartbeatInterval     time.Duration
-	ToCancelActivity      chan struct{}
-	ToAckCancelActivity   chan struct{}
-	ToStopHeartbeating    chan struct{}
-	ToAckStopHeartbeating chan struct{}
-	HeartbeatErrors       chan error
-}
-
 //NewCoordinatedActivityHandler creates a LongRunningActivityFunc that will build a LongRunningActivityCoordinator and execute your HandleCoordinatedActivity
 //
 // * heartbeats the activity at the given interval
@@ -27,7 +17,7 @@ type LongRunningActivityCoordinator struct {
 // * your HandleCoordinatedActivityHandler is responsible for responding to messages on ToCancelActivity, by stopping, acking the cancel to swf, and sending on ToAckCancel
 // * if your HandleCoordinatedActivityHandler wishes to stop heartbeats, send on ToStopHeartbeating and recieve on ToAckStopHeartbeating.
 
-func (w *ActivityWorker)AddCoordinatedHandler(heartbeatInterval time.Duration, heartbeatErrorThreshold int, handler *CoordinatedActivityHandler)  {
+func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, heartbeatErrorThreshold int, handler *CoordinatedActivityHandler) {
 	coordinator := &LongRunningActivityCoordinator{
 		HeartbeatInterval:     heartbeatInterval,
 		HeartbeatErrors:       make(chan error, heartbeatErrorThreshold),
@@ -37,7 +27,7 @@ func (w *ActivityWorker)AddCoordinatedHandler(heartbeatInterval time.Duration, h
 		ToAckStopHeartbeating: make(chan struct{}),
 	}
 
-	handlerFunc :=  func(activityTask *swf.ActivityTask, input interface{}) {
+	handlerFunc := func(activityTask *swf.ActivityTask, input interface{}) {
 		go handler.HandlerFunc(coordinator, activityTask, input)
 		for {
 			select {
@@ -67,9 +57,9 @@ func (w *ActivityWorker)AddCoordinatedHandler(heartbeatInterval time.Duration, h
 	}
 
 	l := &LongRunningActivityHandler{
-		Activity: handler.Activity,
+		Activity:    handler.Activity,
 		HandlerFunc: handlerFunc,
-        Input: handler.Input,
+		Input:       handler.Input,
 	}
 
 	w.AddLongRunningHandler(l)
