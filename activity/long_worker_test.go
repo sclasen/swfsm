@@ -8,5 +8,5 @@ import (
 
 func TestNewLongRunningActivityHandler(t *testing.T) {
 	handler := func(c *LongRunningActivityCoordinator, t *swf.ActivityTask, d *TestInput) {}
-	NewHandleCoordinatedActivity(handler)
+	NewCoordinatedLongRunningActivityHandler("activity", handler)
 }
