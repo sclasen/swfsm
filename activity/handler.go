@@ -21,7 +21,6 @@ type LongRunningActivityHandler struct {
 	Activity    string
 	HandlerFunc LongRunningActivityHandlerFunc
 	Input       interface{}
-	TaskList    *swf.TaskList
 }
 
 func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
