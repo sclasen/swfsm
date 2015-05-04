@@ -40,6 +40,8 @@ type LongRunningActivityCoordinator struct {
 	ToAckCancelActivity   chan struct{}
 	ToStopHeartbeating    chan struct{}
 	ToAckStopHeartbeating chan struct{}
+	ToStopActivity        chan struct{}
+	ToAckStopActivity     chan struct{}
 	HeartbeatErrors       chan error
 }
 
