@@ -30,7 +30,8 @@ type ActivityWorker struct {
 	// Client used to make SWF api requests.
 	SWF SWFOps
 	// Type Info for handled activities
-	handlers map[string]*ActivityHandler
+	handlers            map[string]*ActivityHandler
+	longRunningHandlers map[string]*LongRunningActivityHandler
 	// ShutdownManager
 	ShutdownManager *poller.ShutdownManager
 	// ActivityTaskDispatcher
@@ -46,6 +47,13 @@ func (a *ActivityWorker) AddHandler(handler *ActivityHandler) {
 		a.handlers = map[string]*ActivityHandler{}
 	}
 	a.handlers[handler.Activity] = handler
+}
+
+func (a *ActivityWorker) AddLongRunningHandler(handler *LongRunningActivityHandler) {
+	if a.longRunningHandlers == nil {
+		a.longRunningHandlers = map[string]*LongRunningActivityHandler{}
+	}
+	a.longRunningHandlers[handler.Activity] = handler
 }
 
 func (a *ActivityWorker) Init() {
@@ -83,6 +91,8 @@ func (a *ActivityWorker) dispatchTask(activityTask *swf.ActivityTask) {
 func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 	a.ActivityInterceptor.BeforeTask(activityTask)
 	handler := a.handlers[*activityTask.ActivityType.Name]
+	longHandler := a.longRunningHandlers[*activityTask.ActivityType.Name]
+
 	if handler != nil {
 		var deserialized interface{}
 		if activityTask.Input != nil {
@@ -125,6 +135,29 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 				}
 			}
 		}
+	} else if longHandler != nil {
+		var deserialized interface{}
+		if activityTask.Input != nil {
+			switch longHandler.Input.(type) {
+			case string:
+				deserialized = *activityTask.Input
+			default:
+				deserialized = longHandler.ZeroInput()
+				err := a.Serializer.Deserialize(*activityTask.Input, deserialized)
+				if err != nil {
+					a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
+					a.fail(activityTask, errors.Annotate(err, "deserialize"))
+					return
+				}
+			}
+
+		} else {
+			deserialized = nil
+		}
+		//todo is this all we do here? no interceptor invocation/done/fail
+		//handler func must do it all
+		longHandler.HandlerFunc(activityTask, deserialized)
+
 	} else {
 		//fail
 		err := errors.NewErr("no handler for activity: %s", LS(activityTask.ActivityType.Name))

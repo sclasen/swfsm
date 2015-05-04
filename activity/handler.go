@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"time"
+
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 )
 
@@ -15,8 +17,36 @@ type ActivityHandler struct {
 	Input       interface{}
 }
 
+type LongRunningActivityHandlerFunc func(activityTask *swf.ActivityTask, input interface{})
+
+type LongRunningActivityHandler struct {
+	Activity    string
+	HandlerFunc LongRunningActivityHandlerFunc
+	Input       interface{}
+}
+
+type CoordinatedActivityHandlerFunc func(*LongRunningActivityCoordinator, *swf.ActivityTask, interface{})
+
+type CoordinatedActivityHandler struct {
+	Activity    string
+	HandlerFunc CoordinatedActivityHandlerFunc
+	Input       interface{}
+}
+
+//LongRunningActivityFunc that creates all the coordination channels, starts heartbeating, and calls into
+type LongRunningActivityCoordinator struct {
+	HeartbeatInterval     time.Duration
+	ToCancelActivity      chan struct{}
+	ToAckCancelActivity   chan struct{}
+	ToStopHeartbeating    chan struct{}
+	ToAckStopHeartbeating chan struct{}
+	ToStopActivity        chan struct{}
+	ToAckStopActivity     chan struct{}
+	HeartbeatErrors       chan error
+}
+
 func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
-	input := inputType(handler)
+	input := inputType(handler, 1)
 	output := outputType(handler)
 	newType := input
 	if input.Kind() == reflect.Ptr {
@@ -30,7 +60,43 @@ func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
 	}
 }
 
+func NewLongRunningActivityHandler(activity string, handler interface{}) *LongRunningActivityHandler {
+	input := inputType(handler, 1)
+	newType := input
+	if input.Kind() == reflect.Ptr {
+		newType = input.Elem()
+	}
+
+	typeCheck(handler, []string{"*swf.ActivityTask", input.String()}, []string{})
+	return &LongRunningActivityHandler{
+		Activity:    activity,
+		HandlerFunc: marshalledFunc{reflect.ValueOf(handler)}.longRunningActivityHandlerFunc,
+		Input:       reflect.New(newType).Elem().Interface(),
+	}
+}
+
+func NewCoordinatedActivityHandler(activity string, handler interface{}) *CoordinatedActivityHandler {
+	input := inputType(handler, 2)
+	newType := input
+	if input.Kind() == reflect.Ptr {
+		newType = input.Elem()
+	}
+
+	typeCheck(handler, []string{"*activity.LongRunningActivityCoordinator", "*swf.ActivityTask", input.String()}, []string{})
+
+	return &CoordinatedActivityHandler{
+		Activity:    activity,
+		HandlerFunc: marshalledFunc{reflect.ValueOf(handler)}.handleCoordinatedActivity,
+		Input:       reflect.New(newType).Elem().Interface(),
+	}
+
+}
+
 func (a *ActivityHandler) ZeroInput() interface{} {
+	return reflect.New(reflect.TypeOf(a.Input)).Interface()
+}
+
+func (a *LongRunningActivityHandler) ZeroInput() interface{} {
 	return reflect.New(reflect.TypeOf(a.Input)).Interface()
 }
 
@@ -41,6 +107,14 @@ type marshalledFunc struct {
 func (m marshalledFunc) activityHandlerFunc(task *swf.ActivityTask, input interface{}) (interface{}, error) {
 	ret := m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
 	return outputValue(ret[0]), errorValue(ret[1])
+}
+
+func (m marshalledFunc) longRunningActivityHandlerFunc(task *swf.ActivityTask, input interface{}) {
+	m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
+}
+
+func (m marshalledFunc) handleCoordinatedActivity(coordinator *LongRunningActivityCoordinator, task *swf.ActivityTask, input interface{}) {
+	m.v.Call([]reflect.Value{reflect.ValueOf(coordinator), reflect.ValueOf(task), reflect.ValueOf(input)})
 }
 
 func outputValue(v reflect.Value) interface{} {
@@ -63,12 +137,12 @@ func errorValue(v reflect.Value) error {
 	return v.Interface().(error)
 }
 
-func inputType(handler interface{}) reflect.Type {
+func inputType(handler interface{}, idx int) reflect.Type {
 	t := reflect.TypeOf(handler)
 	if reflect.Func != t.Kind() {
 		panic(fmt.Sprintf("kind was %v, not Func", t.Kind()))
 	}
-	return t.In(1)
+	return t.In(idx)
 }
 
 func outputType(handler interface{}) string {
