@@ -12,6 +12,7 @@ import (
 	"github.com/sclasen/swfsm/fsm"
 	"github.com/sclasen/swfsm/poller"
 	. "github.com/sclasen/swfsm/sugar"
+	"math"
 )
 
 type SWFOps interface {
@@ -188,12 +189,9 @@ func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
 					err := h.Serializer.Deserialize(*e.MarkerRecordedEventAttributes.Details, correlator)
 					if err == nil {
 						attempts := correlator.ActivityAttempts[*task.ActivityID]
-						sleep := h.MaxBackoffSeconds
-						if attempts < sleep {
-							sleep = attempts
-						}
-						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=retry-backoff attempts=%d sleep=%d ", LS(task.WorkflowExecution.WorkflowID), LS(task.ActivityType.Name), LS(task.ActivityID), attempts, sleep)
-						time.Sleep(time.Duration(sleep) * time.Second)
+						backoff := h.backoff(attempts)
+						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=retry-backoff attempts=%d sleep=%ds ", LS(task.WorkflowExecution.WorkflowID), LS(task.ActivityType.Name), LS(task.ActivityID), attempts, backoff)
+						time.Sleep(time.Duration(backoff) * time.Second)
 					}
 					break
 				}
@@ -209,6 +207,21 @@ func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
 	if failErr != nil {
 		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=failed-response-fail error=%s ", LS(task.WorkflowExecution.WorkflowID), LS(task.ActivityType.Name), LS(task.ActivityID), failErr.Error())
 	}
+}
+
+func (h *ActivityWorker) backoff(attempts int) int {
+	// 0.5, 1, 2, 4, 8...
+	exp := attempts -1
+	if exp > 30 {
+		//int wraps at 31
+		exp = 30
+	}
+	backoff := int(math.Pow(2, float64(exp)))
+	maxBackoff := h.MaxBackoffSeconds
+	if backoff > maxBackoff {
+		backoff = maxBackoff
+	}
+	return backoff
 }
 
 func (h *ActivityWorker) done(resp *swf.ActivityTask, result string) {
