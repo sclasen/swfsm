@@ -192,6 +192,12 @@ func typeCheck(typedFunc interface{}, in []string, out []string) {
 	}
 }
 
+func ToMulti(f DecisionFunc) MultiDecisionFunc {
+	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) []swf.Decision {
+		return []swf.Decision{f(ctx, h, data)}
+	}
+}
+
 // OnStarted builds a composed decider that fires on swf.EventTypeWorkflowExecutionStarted.
 func OnStarted(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {

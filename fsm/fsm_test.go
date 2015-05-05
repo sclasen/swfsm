@@ -523,6 +523,86 @@ func TestCompleteState(t *testing.T) {
 	}
 }
 
+func TestEntryDecisions(t *testing.T) {
+	fsm := testFSM()
+
+	event := swf.HistoryEvent{
+		EventID:   I(1),
+		EventType: S("WorkflowExecutionStarted"),
+		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
+			Input: S(fsm.Serialize(new(TestData))),
+		},
+	}
+
+	entryDecisions := func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) []swf.Decision {
+		t.Logf("IN ENTRY DECISIONS")
+		return []swf.Decision{swf.Decision{
+			DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
+				ActivityID:   S(testActivityInfo.ActivityID),
+				ActivityType: testActivityInfo.ActivityType,
+				TaskList:     &swf.TaskList{Name: S("taskList")},
+				Input:        S(""),
+			},
+		}}
+	}
+
+	fsm.AddInitialState(&FSMState{
+		Name: "InitialState",
+		Decider: func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+			t.Logf("IN INITIAL STATE")
+			return ctx.Goto("SecondState", data, ctx.EmptyDecisions())
+		},
+	})
+
+	fsm.AddState(&FSMState{
+		Name: "SecondState",
+		Decider: func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+			t.Logf("IN SECOND STATE")
+			return ctx.Stay(data, ctx.EmptyDecisions())
+		},
+		EntryDecisions: entryDecisions,
+	})
+
+	fsm.Init()
+
+	_, decisions, state, _ := fsm.Tick(
+		&swf.DecisionTask{
+			Events:                 []swf.HistoryEvent{event},
+			PreviousStartedEventID: L(0),
+			StartedEventID:         L(1),
+
+			TaskToken: S("token"),
+			WorkflowExecution: &swf.WorkflowExecution{
+				WorkflowID: S("fii"),
+				RunID:      S("run"),
+			},
+			WorkflowType: &swf.WorkflowType{
+				Name:    S("foo"),
+				Version: S("1"),
+			},
+		},
+	)
+
+	if len(decisions) != 3 {
+		//2 state markers + 1 EntryDecision
+		t.Fatal("Not one decision", len(decisions))
+	}
+
+	for _, d := range decisions {
+		if *d.DecisionType == swf.DecisionTypeRecordMarker {
+			continue
+		}
+		if *d.DecisionType != swf.DecisionTypeScheduleActivityTask {
+			t.Fatal("not activity")
+		}
+	}
+
+	if state.StateName != "SecondState" {
+		t.Fatal("not SecondState", state.StateName)
+	}
+}
+
 func testFSM() *FSM {
 	fsm := &FSM{
 		Name:             "test-fsm",
