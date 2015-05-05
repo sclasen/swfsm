@@ -19,6 +19,7 @@ type MockSWF struct {
 	Activity  *swf.ActivityTask
 	Failed    bool
 	Completed *string
+	History   *swf.History
 }
 
 func (*MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error) {
@@ -37,6 +38,10 @@ func (m *MockSWF) RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedIn
 }
 func (m *MockSWF) PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error) {
 	return m.Activity, nil
+}
+
+func (m *MockSWF) GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHistoryInput) (resp *swf.History, err error) {
+	return m.History, nil
 }
 
 func ExampleActivityWorker() {
@@ -367,4 +372,55 @@ func TestStringHandler(t *testing.T) {
 		t.Fatal("Not Completed", ops.Completed)
 	}
 
+}
+
+func TestBackoff(t *testing.T) {
+	if os.Getenv("TEST_BACKOFF") != "1" {
+		t.Log("TEST_BACKOFF != 1  skipping test")
+	}
+
+	serializer := fsm.JSONStateSerializer{}
+
+	correlator := new(fsm.EventCorrelator)
+	correlator.ActivityAttempts = make(map[string]int)
+	correlator.ActivityAttempts["the-id"] = 3
+	s, _ := serializer.Serialize(correlator)
+
+	history := &swf.History{
+		Events: []swf.HistoryEvent{
+			{
+				EventType: S(swf.EventTypeMarkerRecorded),
+				MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
+					MarkerName: S(fsm.CorrelatorMarker),
+					Details:    S(s),
+				},
+			},
+		},
+	}
+	ops := &MockSWF{
+		History: history,
+	}
+	worker := &ActivityWorker{
+		SWF:               ops,
+		BackoffOnFailure:  true,
+		MaxBackoffSeconds: 5,
+		Serializer:        fsm.JSONStateSerializer{},
+	}
+
+	failed := make(chan struct{})
+	go func() {
+		worker.fail(&swf.ActivityTask{
+			WorkflowExecution: &swf.WorkflowExecution{},
+			ActivityType:      &swf.ActivityType{Name: S("activity")},
+			ActivityID:        S("the-id"),
+			Input:             S("theInput"),
+		}, errors.New("the error"))
+		failed <- struct{}{}
+	}()
+
+	select {
+	case <-time.After(2 * time.Second):
+	case <-failed:
+		t.Fatal("fail finished before 2 seconds")
+	}
 }

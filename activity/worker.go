@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log"
 
+	"time"
+
+	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/swf"
 	"github.com/juju/errors"
 	"github.com/sclasen/swfsm/fsm"
@@ -17,6 +20,7 @@ type SWFOps interface {
 	RespondActivityTaskCompleted(req *swf.RespondActivityTaskCompletedInput) (err error)
 	RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedInput) (err error)
 	PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error)
+	GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHistoryInput) (resp *swf.History, err error)
 }
 
 type ActivityWorker struct {
@@ -40,6 +44,10 @@ type ActivityWorker struct {
 	ActivityInterceptor ActivityInterceptor
 	// allow panics in activities rather than recovering and failing the activity, useful for testing
 	AllowPanics bool
+	// reads the EventCorrelator and backs off based on what retry # the activity is.
+	BackoffOnFailure bool
+	// maximum backoff sleep on retries that fail.
+	MaxBackoffSeconds int
 }
 
 func (a *ActivityWorker) AddHandler(handler *ActivityHandler) {
@@ -166,15 +174,40 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 	}
 }
 
-func (h *ActivityWorker) fail(resp *swf.ActivityTask, err error) {
-	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), err.Error())
+func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
+	if h.BackoffOnFailure {
+		hist, err := h.SWF.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
+			Domain:       S(h.Domain),
+			Execution:    task.WorkflowExecution,
+			ReverseOrder: aws.True(),
+		})
+		if err == nil {
+			for _, e := range hist.Events {
+				log.Println(PrettyHistoryEvent(e))
+				if *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == fsm.CorrelatorMarker {
+					correlator := new(fsm.EventCorrelator)
+					err := h.Serializer.Deserialize(*e.MarkerRecordedEventAttributes.Details, correlator)
+					if err == nil {
+						attempts := correlator.ActivityAttempts[*task.ActivityID]
+						sleep := h.MaxBackoffSeconds
+						if attempts < sleep {
+							sleep = attempts
+						}
+						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=retry-backoff attempts=%d sleep=%d ", LS(task.WorkflowExecution.WorkflowID), LS(task.ActivityType.Name), LS(task.ActivityID), attempts, sleep)
+						time.Sleep(time.Duration(sleep) * time.Second)
+					}
+				}
+			}
+		}
+	}
+	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=fail error=%s ", LS(task.WorkflowExecution.WorkflowID), LS(task.ActivityType.Name), LS(task.ActivityID), err.Error())
 	failErr := h.SWF.RespondActivityTaskFailed(&swf.RespondActivityTaskFailedInput{
-		TaskToken: resp.TaskToken,
+		TaskToken: task.TaskToken,
 		Reason:    S(err.Error()),
 		Details:   S(err.Error()),
 	})
 	if failErr != nil {
-		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=failed-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), failErr.Error())
+		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=failed-response-fail error=%s ", LS(task.WorkflowExecution.WorkflowID), LS(task.ActivityType.Name), LS(task.ActivityID), failErr.Error())
 	}
 }
 
