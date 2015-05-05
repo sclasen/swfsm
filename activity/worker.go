@@ -183,7 +183,6 @@ func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
 		})
 		if err == nil {
 			for _, e := range hist.Events {
-				log.Println(PrettyHistoryEvent(e))
 				if *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == fsm.CorrelatorMarker {
 					correlator := new(fsm.EventCorrelator)
 					err := h.Serializer.Deserialize(*e.MarkerRecordedEventAttributes.Details, correlator)
@@ -196,6 +195,7 @@ func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
 						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=retry-backoff attempts=%d sleep=%d ", LS(task.WorkflowExecution.WorkflowID), LS(task.ActivityType.Name), LS(task.ActivityID), attempts, sleep)
 						time.Sleep(time.Duration(sleep) * time.Second)
 					}
+					break
 				}
 			}
 		}
