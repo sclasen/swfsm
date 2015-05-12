@@ -294,6 +294,7 @@ func (a *ActivityTypeMigrator) describe(domain aws.StringValue, name aws.StringV
 type StreamMigrator struct {
 	Streams []kinesis.CreateStreamInput
 	Client  KinesisOps
+	Timeout int
 }
 
 // Migrate checks that the desired streams have been created and if they have not, creates them.s
@@ -305,7 +306,7 @@ func (s *StreamMigrator) Migrate() {
 			s.create(st)
 			log.Printf("action=migrate at=create-stream stream=%s status=created", LS(st.StreamName))
 		}
-		s.awaitActive(st.StreamName, 30)
+		s.awaitActive(st.StreamName, s.Timeout)
 	}
 }
 

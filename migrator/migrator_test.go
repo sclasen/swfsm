@@ -161,6 +161,7 @@ func TestMigrateStreams(t *testing.T) {
 			},
 		},
 		Client: client,
+		Timeout: 30,
 	}
 
 	sm.Migrate()
