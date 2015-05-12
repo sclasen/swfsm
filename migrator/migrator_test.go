@@ -160,7 +160,7 @@ func TestMigrateStreams(t *testing.T) {
 				ShardCount: aws.Integer(1),
 			},
 		},
-		Client: client,
+		Client:  client,
 		Timeout: 30,
 	}
 
