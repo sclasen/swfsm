@@ -16,10 +16,11 @@ import (
 )
 
 type MockSWF struct {
-	Activity  *swf.ActivityTask
-	Failed    bool
-	Completed *string
-	History   *swf.History
+	Activity     *swf.ActivityTask
+	Failed       bool
+	Completed    *string
+	CompletedSet bool
+	History      *swf.History
 }
 
 func (*MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error) {
@@ -30,6 +31,7 @@ func (*MockSWF) RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceled
 }
 func (m *MockSWF) RespondActivityTaskCompleted(req *swf.RespondActivityTaskCompletedInput) (err error) {
 	m.Completed = req.Result
+	m.CompletedSet = true
 	return nil
 }
 func (m *MockSWF) RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedInput) (err error) {
@@ -373,11 +375,12 @@ func TestStringHandler(t *testing.T) {
 		Input:             S("theInput"),
 	})
 
-	if ops.Completed == nil || *ops.Completed != "theInputOut" {
+	if !ops.CompletedSet || *ops.Completed != "theInputOut" {
 		t.Fatal("Not Completed", ops.Completed)
 	}
 
 	ops.Completed = nil
+	ops.CompletedSet = false
 
 	worker.handleActivityTask(&swf.ActivityTask{
 		WorkflowExecution: &swf.WorkflowExecution{},
@@ -385,7 +388,7 @@ func TestStringHandler(t *testing.T) {
 		Input:             S("theInput"),
 	})
 
-	if ops.Completed == nil || *ops.Completed != "" {
+	if !ops.CompletedSet || ops.Completed != nil {
 		t.Fatal("Not Completed", ops.Completed)
 	}
 
