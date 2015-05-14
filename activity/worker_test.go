@@ -385,7 +385,7 @@ func TestStringHandler(t *testing.T) {
 		Input:             S("theInput"),
 	})
 
-	if ops.Completed == nil || *ops.Completed != "theInputOut" {
+	if ops.Completed == nil || *ops.Completed != "" {
 		t.Fatal("Not Completed", ops.Completed)
 	}
 

@@ -130,6 +130,7 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 		} else {
 			if result == nil {
 				a.ActivityInterceptor.AfterTaskComplete(activityTask, "")
+				a.done(activityTask, "")
 			} else {
 				a.ActivityInterceptor.AfterTaskComplete(activityTask, result)
 				switch t := result.(type) {
