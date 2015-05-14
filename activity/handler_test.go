@@ -37,10 +37,24 @@ func TestHandler(t *testing.T) {
 		t.Fatal("not handled")
 	}
 
+	nilHandler := NewActivityHandler("activity", NilHandler)
+	ret, err = nilHandler.HandlerFunc(&swf.ActivityTask{}, &TestInput{Name: "testIn"})
+	if err != nil {
+		t.Fatal(ret, err)
+	}
+
+	if ret != nil {
+		t.Fatal(ret)
+	}
+
 }
 
 func Handler(task *swf.ActivityTask, input *TestInput) (*TestOutput, error) {
 	return &TestOutput{Name: input.Name + "Out"}, nil
+}
+
+func NilHandler(task *swf.ActivityTask, input *TestInput) (*TestOutput, error) {
+	return nil, nil
 }
 
 func LongHandler(handled chan struct{}) func(task *swf.ActivityTask, input *TestInput) {
