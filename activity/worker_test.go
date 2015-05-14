@@ -361,7 +361,12 @@ func TestStringHandler(t *testing.T) {
 		return input + "Out", nil
 	}
 
+	nilHandler := func(task *swf.ActivityTask, input string) (*swf.ActivityTask, error) {
+		return nil, nil
+	}
+
 	worker.AddHandler(NewActivityHandler("activity", handler))
+	worker.AddHandler(NewActivityHandler("nilactivity", nilHandler))
 	worker.handleActivityTask(&swf.ActivityTask{
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType:      &swf.ActivityType{Name: S("activity")},
@@ -369,6 +374,18 @@ func TestStringHandler(t *testing.T) {
 	})
 
 	if ops.Completed == nil || *ops.Completed != "theInputOut" {
+		t.Fatal("Not Completed", ops.Completed)
+	}
+
+	ops.Completed = nil
+
+	worker.handleActivityTask(&swf.ActivityTask{
+		WorkflowExecution: &swf.WorkflowExecution{},
+		ActivityType:      &swf.ActivityType{Name: S("nilactivity")},
+		Input:             S("theInput"),
+	})
+
+	if ops.Completed == nil || *ops.Completed != "" {
 		t.Fatal("Not Completed", ops.Completed)
 	}
 
