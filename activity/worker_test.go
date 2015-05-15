@@ -21,10 +21,13 @@ type MockSWF struct {
 	Completed    *string
 	CompletedSet bool
 	History      *swf.History
+	Canceled     bool
 }
 
-func (*MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error) {
-	return nil, nil
+func (m *MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error) {
+	return &swf.ActivityTaskStatus{
+		CancelRequested: &m.Canceled,
+	}, nil
 }
 func (*MockSWF) RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceledInput) (err error) {
 	return nil
