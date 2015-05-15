@@ -23,6 +23,7 @@ type SWFOps interface {
 	RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedInput) (err error)
 	PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error)
 	GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHistoryInput) (resp *swf.History, err error)
+	SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (err error)
 }
 
 type ActivityWorker struct {
@@ -209,6 +210,13 @@ func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
 	if failErr != nil {
 		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=failed-response-fail error=%s ", LS(task.WorkflowExecution.WorkflowID), LS(task.ActivityType.Name), LS(task.ActivityID), failErr.Error())
 	}
+}
+
+func (h *ActivityWorker) signalStart(activityTask *swf.ActivityTask) error {
+	return h.SWF.SignalWorkflowExecution(&swf.SignalWorkflowExecutionInput{
+		WorkflowID: activityTask.WorkflowExecution.WorkflowID,
+		SignalName: S(fsm.ActivityStartedSignal),
+	})
 }
 
 func (h *ActivityWorker) backoff(attempts int) int {
