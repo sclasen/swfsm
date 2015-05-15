@@ -37,7 +37,7 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 			if err != nil {
 				startErr <- err
 			} else {
-                err = w.signalStart(activityTask)
+				err = w.signalStart(activityTask)
 				if err != nil {
 					startErr <- err
 				} else {

@@ -49,10 +49,9 @@ func (m *MockSWF) GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHisto
 	return m.History, nil
 }
 
-func (m *MockSWF) SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (err error){
+func (m *MockSWF) SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (err error) {
 	return nil
 }
-
 
 func ExampleActivityWorker() {
 
