@@ -214,6 +214,7 @@ func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
 
 func (h *ActivityWorker) signalStart(activityTask *swf.ActivityTask) error {
 	return h.SWF.SignalWorkflowExecution(&swf.SignalWorkflowExecutionInput{
+		Domain: S(h.Domain),
 		WorkflowID: activityTask.WorkflowExecution.WorkflowID,
 		SignalName: S(fsm.ActivityStartedSignal),
 	})
