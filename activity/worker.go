@@ -128,21 +128,18 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
 			a.fail(activityTask, errors.Annotate(err, "handler"))
 		} else {
-			if result == nil {
-				a.ActivityInterceptor.AfterTaskComplete(activityTask, "")
-				a.done(activityTask, "")
-			} else {
-				a.ActivityInterceptor.AfterTaskComplete(activityTask, result)
-				switch t := result.(type) {
-				case string:
-					a.done(activityTask, t)
-				default:
-					serialized, err := a.Serializer.Serialize(result)
-					if err != nil {
-						a.fail(activityTask, errors.Annotate(err, "serialize"))
-					} else {
-						a.done(activityTask, serialized)
-					}
+			a.ActivityInterceptor.AfterTaskComplete(activityTask, result)
+			switch t := result.(type) {
+			case string:
+				a.done(activityTask, &t)
+			case nil:
+				a.done(activityTask, nil)
+			default:
+				serialized, err := a.Serializer.Serialize(result)
+				if err != nil {
+					a.fail(activityTask, errors.Annotate(err, "serialize"))
+				} else {
+					a.done(activityTask, &serialized)
 				}
 			}
 		}
@@ -165,8 +162,7 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 		} else {
 			deserialized = nil
 		}
-		//todo is this all we do here? no interceptor invocation/done/fail
-		//handler func must do it all
+
 		longHandler.HandlerFunc(activityTask, deserialized)
 
 	} else {
@@ -226,12 +222,12 @@ func (h *ActivityWorker) backoff(attempts int) int {
 	return backoff
 }
 
-func (h *ActivityWorker) done(resp *swf.ActivityTask, result string) {
+func (h *ActivityWorker) done(resp *swf.ActivityTask, result *string) {
 	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=done", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
 
 	completeErr := h.SWF.RespondActivityTaskCompleted(&swf.RespondActivityTaskCompletedInput{
 		TaskToken: resp.TaskToken,
-		Result:    S(result),
+		Result:    result,
 	})
 	if completeErr != nil {
 		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=completed-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), completeErr.Error())
