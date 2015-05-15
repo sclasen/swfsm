@@ -30,6 +30,8 @@ const (
 	FSMErrorStateDeserialization = "ErrorStateDeserialization"
 	//the FSM encountered an erryor while deserializaing stateData
 	FSMErrorCorrelationDeserialization = "ErrorCorrelationDeserialization"
+	//Signal that kicks the workflow so it will see ActivityTaskStarted events, can be ignored
+	ActivityStartedSignal = "FSM.ActivityStarted"
 )
 
 // Decider decides an Outcome based on an event and the current data for an
