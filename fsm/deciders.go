@@ -204,12 +204,22 @@ func OnStarted(deciders ...Decider) Decider {
 	}
 }
 
-// OnStarted builds a composed decider that fires on swf.EventTypeWorkflowExecutionStarted.
 func OnContinued(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
 		case swf.EventTypeWorkflowExecutionContinuedAsNew:
 			logf(ctx, "at=on-continued")
+			return NewComposedDecider(deciders...)(ctx, h, data)
+		}
+		return ctx.Pass()
+	}
+}
+
+func OnStartedOrContinued(deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeWorkflowExecutionContinuedAsNew, swf.EventTypeWorkflowExecutionStarted:
+			logf(ctx, "at=on-started-or-continued")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}
 		return ctx.Pass()
