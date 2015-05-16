@@ -178,6 +178,11 @@ func (a *EventCorrelator) getID(h swf.HistoryEvent) (id string) {
 		if h.ActivityTaskCanceledEventAttributes != nil {
 			id = a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID)
 		}
+	//might want to get info on started too
+	case swf.EventTypeActivityTaskStarted:
+		if h.ActivityTaskStartedEventAttributes != nil {
+			id = a.key(h.ActivityTaskStartedEventAttributes.ScheduledEventID)
+		}
 	case swf.EventTypeExternalWorkflowExecutionSignaled:
 		if h.ExternalWorkflowExecutionSignaledEventAttributes != nil {
 			id = a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)
