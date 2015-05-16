@@ -29,7 +29,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	}
 
 	t.Log("test complete")
-	worker.AddCoordinatedHandler(1*time.Second, 100, handler)
+	worker.AddCoordinatedHandler(1*time.Second, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 	worker.handleActivityTask(&swf.ActivityTask{
@@ -83,7 +83,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 	}
 
 	t.Log("test complete")
-	worker.AddCoordinatedHandler(1*time.Second, 100, handler)
+	worker.AddCoordinatedHandler(1*time.Second, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 	worker.handleActivityTask(&swf.ActivityTask{

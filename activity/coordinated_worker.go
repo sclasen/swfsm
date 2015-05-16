@@ -15,7 +15,7 @@ const (
 	TaskGone = "Unknown activity"
 )
 
-func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, heartbeatErrorThreshold int, handler *CoordinatedActivityHandler) {
+func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, handler *CoordinatedActivityHandler) {
 
 	ticks := make(chan CoordinatedActivityHandlerTick)
 	startErr := make(chan error)
