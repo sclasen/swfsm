@@ -76,6 +76,10 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-gone", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
 						//wait for the tick to complete before exiting
 						<-ticks
+						err := handler.Cancel(activityTask, input)
+						if err != nil {
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-gone-cancel-err err=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+						}
 						return
 					}
 					log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=heartbeat-error error=%s ", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err.Error())
@@ -85,9 +89,14 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-requested", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
 						//Wait for any tick to finish
 						<-ticks
-						handler.Cancel(activityTask, input)
-						w.canceled(activityTask)
-						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-canceld", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
+						var detail *string
+						err := handler.Cancel(activityTask, input)
+						if err != nil {
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err err=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+							detail = S(err.Error())
+						}
+						w.canceled(activityTask, detail)
+						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-canceled", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
 						return
 					}
 				}

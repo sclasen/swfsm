@@ -247,11 +247,12 @@ func (h *ActivityWorker) done(resp *swf.ActivityTask, result *string) {
 	}
 }
 
-func (h *ActivityWorker) canceled(resp *swf.ActivityTask) {
+func (h *ActivityWorker) canceled(resp *swf.ActivityTask, details *string) {
 	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=cancled", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
 
 	canceledErr := h.SWF.RespondActivityTaskCanceled(&swf.RespondActivityTaskCanceledInput{
 		TaskToken: resp.TaskToken,
+		Details:   details,
 	})
 	if canceledErr != nil {
 		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), canceledErr.Error())
