@@ -215,6 +215,17 @@ func OnContinued(deciders ...Decider) Decider {
 	}
 }
 
+func OnContinueFailed(deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeContinueAsNewWorkflowExecutionFailed:
+			logf(ctx, "at=on-continuefailed")
+			return NewComposedDecider(deciders...)(ctx, h, data)
+		}
+		return ctx.Pass()
+	}
+}
+
 func OnStartedOrContinued(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
