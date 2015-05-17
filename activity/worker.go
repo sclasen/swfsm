@@ -27,7 +27,8 @@ type SWFOps interface {
 }
 
 type ActivityWorker struct {
-	Serializer fsm.StateSerializer
+	Serializer       fsm.StateSerializer
+	systemSerializer fsm.StateSerializer
 	// Domain of the workflow associated with the FSM.
 	Domain string
 	// TaskList that the underlying poller will poll for decision tasks.
@@ -70,6 +71,10 @@ func (a *ActivityWorker) AddLongRunningHandler(handler *LongRunningActivityHandl
 func (a *ActivityWorker) Init() {
 	if a.Serializer == nil {
 		a.Serializer = fsm.JSONStateSerializer{}
+	}
+
+	if a.systemSerializer == nil {
+		a.systemSerializer = fsm.JSONStateSerializer{}
 	}
 
 	if a.ActivityInterceptor == nil {
@@ -212,11 +217,35 @@ func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
 	}
 }
 
-func (h *ActivityWorker) signalStart(activityTask *swf.ActivityTask) error {
+func (h *ActivityWorker) signalStart(activityTask *swf.ActivityTask, data interface{}) error {
+	return h.signal(activityTask, fsm.ActivityStartedSignal, data)
+}
+
+func (h *ActivityWorker) signalUpdate(activityTask *swf.ActivityTask, data interface{}) error {
+	return h.signal(activityTask, fsm.ActivityUpdatedSignal, data)
+}
+
+func (h *ActivityWorker) signal(activityTask *swf.ActivityTask, signal string, data interface{}) error {
+	state := new(fsm.SerializedActivityState)
+	state.ActivityID = *activityTask.ActivityID
+	if data != nil {
+		ser, err := h.Serializer.Serialize(data)
+		if err != nil {
+			return err
+		}
+		state.Input = &ser
+	}
+
+	serializedState, err := h.systemSerializer.Serialize(state)
+	if err != nil {
+		return err
+	}
+
 	return h.SWF.SignalWorkflowExecution(&swf.SignalWorkflowExecutionInput{
 		Domain:     S(h.Domain),
 		WorkflowID: activityTask.WorkflowExecution.WorkflowID,
-		SignalName: S(fsm.ActivityStartedSignal),
+		SignalName: S(signal),
+		Input:      S(serializedState),
 	})
 }
 

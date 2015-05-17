@@ -539,7 +539,7 @@ func testContext(fsm *FSM) *FSMContext {
 		fsm,
 		swf.WorkflowType{Name: S("test-workflow"), Version: S("1")},
 		swf.WorkflowExecution{WorkflowID: S("test-workflow-1"), RunID: S("123123")},
-		&EventCorrelator{},
+		&EventCorrelator{Serializer: JSONStateSerializer{}},
 		"InitialState", &TestData{}, 0,
 	)
 }

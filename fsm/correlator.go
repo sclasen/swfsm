@@ -18,6 +18,7 @@ type EventCorrelator struct {
 	Signals          map[string]*SignalInfo   //schedueledEventId -> info
 	SignalAttempts   map[string]int           //? workflowID + signalName -> attempts
 	Timers           map[string]*TimerInfo    //startedEventID -> info
+	Serializer       StateSerializer
 }
 
 // ActivityInfo holds the ActivityID and ActivityType for an activity
@@ -199,7 +200,18 @@ func (a *EventCorrelator) getID(h swf.HistoryEvent) (id string) {
 		if h.TimerCanceledEventAttributes != nil {
 			id = a.key(h.TimerCanceledEventAttributes.StartedEventID)
 		}
-
+	case swf.EventTypeWorkflowExecutionSignaled:
+		event := h.WorkflowExecutionSignaledEventAttributes
+		if event != nil && event.SignalName != nil && event.Input != nil {
+			switch *event.SignalName {
+			case ActivityStartedSignal, ActivityUpdatedSignal:
+				state := new(SerializedActivityState)
+				a.Serializer.Deserialize(*event.Input, state)
+				id = state.ActivityID
+			default:
+				id = a.key(event.ExternalInitiatedEventID)
+			}
+		}
 	}
 	return
 }

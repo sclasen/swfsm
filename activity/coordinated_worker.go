@@ -33,11 +33,11 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 
 	handlerStartFunc := func(activityTask *swf.ActivityTask, input interface{}) {
 		go func() {
-			err := handler.Start(activityTask, input)
+			update, err := handler.Start(activityTask, input)
 			if err != nil {
 				startErr <- err
 			} else {
-				err = w.signalStart(activityTask)
+				err = w.signalStart(activityTask, update)
 				if err != nil {
 					startErr <- err
 				} else {
@@ -59,6 +59,20 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 			case tick := <-ticks:
 				if tick.Continue {
 					handlerTickFunc(activityTask, input)
+					if tick.Result != nil {
+						//send an activity update when the result is not null, but we are continuing
+						err := w.signalUpdate(activityTask, tick.Result)
+						if err != nil {
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update-error error=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+							w.fail(activityTask, err)
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update-error-fail-task error=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+							handler.Cancel(activityTask, tick.Result)
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update-error-cancel-handler error=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+
+						} else {
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
+						}
+					}
 				} else {
 					if tick.Error != nil {
 						w.fail(activityTask, tick.Error)

@@ -23,7 +23,7 @@ type LongRunningActivityHandler struct {
 	Input       interface{}
 }
 
-type CoordinatedActivityHandlerStartFunc func(*swf.ActivityTask, interface{}) error
+type CoordinatedActivityHandlerStartFunc func(*swf.ActivityTask, interface{}) (interface{}, error)
 
 type CoordinatedActivityHandlerTickFunc func(*swf.ActivityTask, interface{}) (bool, interface{}, error)
 
@@ -76,7 +76,7 @@ func NewCoordinatedActivityHandler(activity string, start interface{}, tick inte
 	}
 	output := outputType(tick, 1)
 
-	typeCheck(start, []string{"*swf.ActivityTask", input.String()}, []string{"error"})
+	typeCheck(start, []string{"*swf.ActivityTask", input.String()}, []string{output, "error"})
 	typeCheck(tick, []string{"*swf.ActivityTask", input.String()}, []string{"bool", output, "error"})
 	typeCheck(cancel, []string{"*swf.ActivityTask", input.String()}, []string{"error"})
 
@@ -111,9 +111,9 @@ func (m marshalledFunc) longRunningActivityHandlerFunc(task *swf.ActivityTask, i
 	m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
 }
 
-func (m marshalledFunc) handleCoordinatedActivityStart(task *swf.ActivityTask, input interface{}) error {
+func (m marshalledFunc) handleCoordinatedActivityStart(task *swf.ActivityTask, input interface{}) (interface{}, error) {
 	ret := m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
-	return errorValue(ret[0])
+	return outputValue(ret[0]), errorValue(ret[1])
 }
 
 func (m marshalledFunc) handleCoordinatedActivityTick(task *swf.ActivityTask, input interface{}) (bool, interface{}, error) {

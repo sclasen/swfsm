@@ -581,12 +581,16 @@ func (f *FSM) findSerializedState(events []swf.HistoryEvent) (*SerializedState, 
 func (f *FSM) findSerializedEventCorrelator(events []swf.HistoryEvent) (*EventCorrelator, error) {
 	for _, event := range events {
 		if f.isCorrelatorMarker(event) {
-			correlator := &EventCorrelator{}
+			correlator := &EventCorrelator{
+				Serializer: f.systemSerializer,
+			}
 			err := f.Serializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, correlator)
 			return correlator, err
 		}
 	}
-	return &EventCorrelator{}, nil
+	return &EventCorrelator{
+		Serializer: f.systemSerializer,
+	}, nil
 }
 
 func (f *FSM) findSerializedErrorState(events []swf.HistoryEvent) (*SerializedErrorState, error) {

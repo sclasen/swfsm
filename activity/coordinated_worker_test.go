@@ -38,7 +38,8 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
-		Input: S(input),
+		ActivityID: S("id"),
+		Input:      S(input),
 	})
 
 	hc.cont = false
@@ -59,7 +60,8 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
-		Input: S(input),
+		ActivityID: S("id"),
+		Input:      S(input),
 	})
 
 	time.Sleep(100 * time.Millisecond)
@@ -92,7 +94,8 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
-		Input: S(input),
+		ActivityID: S("id"),
+		Input:      S(input),
 	})
 
 	hc.cont = false
@@ -113,7 +116,8 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
-		Input: S(input),
+		ActivityID: S("id"),
+		Input:      S(input),
 	})
 
 	time.Sleep(200 * time.Millisecond)
@@ -130,9 +134,9 @@ type TypedCoordinatedTaskHandler struct {
 	canceled bool
 }
 
-func (c *TypedCoordinatedTaskHandler) Begin(a *swf.ActivityTask, d *TestInput) error {
+func (c *TypedCoordinatedTaskHandler) Begin(a *swf.ActivityTask, d *TestInput) (*TestOutput, error) {
 	c.t.Log("START")
-	return nil
+	return nil, nil
 }
 
 func (c *TypedCoordinatedTaskHandler) Work(a *swf.ActivityTask, d *TestInput) (bool, *TestOutput, error) {
@@ -156,9 +160,9 @@ type TestCoordinatedTaskHandler struct {
 	canceled bool
 }
 
-func (c *TestCoordinatedTaskHandler) Start(a *swf.ActivityTask, d interface{}) error {
+func (c *TestCoordinatedTaskHandler) Start(a *swf.ActivityTask, d interface{}) (interface{}, error) {
 	c.t.Log("START")
-	return nil
+	return nil, nil
 }
 
 func (c *TestCoordinatedTaskHandler) Tick(a *swf.ActivityTask, d interface{}) (bool, interface{}, error) {
