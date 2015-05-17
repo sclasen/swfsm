@@ -61,10 +61,6 @@ func (t *TypesMigrator) Migrate() {
 	)
 }
 
-type Migration interface {
-	Migrate()
-}
-
 func ParallelMigrate(migrators ...func()) {
 	fail := make(chan interface{})
 	done := make(chan struct{}, len(migrators))
