@@ -55,9 +55,9 @@ func (t *TypesMigrator) Migrate() {
 
 	t.DomainMigrator.Migrate()
 	ParallelMigrate(
-		t.WorkflowTypeMigrator,
-		t.ActivityTypeMigrator,
-		t.StreamMigrator,
+		t.WorkflowTypeMigrator.Migrate,
+		t.ActivityTypeMigrator.Migrate,
+		t.StreamMigrator.Migrate,
 	)
 }
 
@@ -65,7 +65,7 @@ type Migration interface {
 	Migrate()
 }
 
-func ParallelMigrate(migrators ...Migration) {
+func ParallelMigrate(migrators ...func()) {
 	fail := make(chan interface{})
 	done := make(chan struct{}, len(migrators))
 	for _, m := range migrators {
@@ -76,7 +76,7 @@ func ParallelMigrate(migrators ...Migration) {
 					fail <- r
 				}
 			}()
-			migrator.Migrate()
+			migrator()
 			done <- struct{}{}
 		}()
 	}
