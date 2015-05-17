@@ -525,7 +525,16 @@ func (f *FSM) EventData(event swf.HistoryEvent, eventData interface{}) {
 		case swf.EventTypeChildWorkflowExecutionCompleted:
 			serialized = *event.ChildWorkflowExecutionCompletedEventAttributes.Result
 		case swf.EventTypeWorkflowExecutionSignaled:
-			serialized = *event.WorkflowExecutionSignaledEventAttributes.Input
+			switch *event.WorkflowExecutionSignaledEventAttributes.SignalName {
+			case ActivityStartedSignal, ActivityUpdatedSignal:
+				state := new(SerializedActivityState)
+				f.systemSerializer.Deserialize(*event.WorkflowExecutionSignaledEventAttributes.Input, state)
+				if state.Input != nil {
+					serialized = *state.Input
+				}
+			default:
+				serialized = *event.WorkflowExecutionSignaledEventAttributes.Input
+			}
 		case swf.EventTypeWorkflowExecutionStarted:
 			serialized = *event.WorkflowExecutionStartedEventAttributes.Input
 		case swf.EventTypeWorkflowExecutionContinuedAsNew:
