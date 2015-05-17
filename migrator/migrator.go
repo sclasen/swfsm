@@ -86,7 +86,6 @@ func ParallelMigrate(migrators ...Migration) {
 		case e := <-fail:
 			log.Panicf("migrator failed: %v", e)
 		}
-		<-done
 	}
 }
 
