@@ -52,10 +52,42 @@ func (t *TypesMigrator) Migrate() {
 	if t.StreamMigrator == nil {
 		t.StreamMigrator = new(StreamMigrator)
 	}
+
 	t.DomainMigrator.Migrate()
-	t.WorkflowTypeMigrator.Migrate()
-	t.ActivityTypeMigrator.Migrate()
-	t.StreamMigrator.Migrate()
+	ParallelMigrate(
+		t.WorkflowTypeMigrator,
+		t.ActivityTypeMigrator,
+		t.StreamMigrator,
+	)
+}
+
+type Migration interface {
+	Migrate()
+}
+
+func ParallelMigrate(migrators ...Migration) {
+	fail := make(chan interface{})
+	done := make(chan struct{}, len(migrators))
+	for _, m := range migrators {
+		migrator := m //capture ref for goroutime
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					fail <- r
+				}
+			}()
+			migrator.Migrate()
+			done <- struct{}{}
+		}()
+	}
+	for range migrators {
+		select {
+		case <-done:
+		case e := <-fail:
+			log.Panicf("migrator failed: %v", e)
+		}
+		<-done
+	}
 }
 
 // DomainMigrator will register or deprecate the configured domains as required.
@@ -66,7 +98,7 @@ type DomainMigrator struct {
 }
 
 // Migrate asserts that DeprecatedDomains are deprecated or deprecates them, then asserts that RegisteredDomains are registered or registers them.
-func (d *DomainMigrator) Migrate() {
+func (d *DomainMigrator) Migrate() { //add parallel migrations to all Migrate!
 	for _, dd := range d.DeprecatedDomains {
 		if d.isDeprecated(dd.Name) {
 			log.Printf("action=migrate at=deprecate-domain domain=%s status=previously-deprecated", LS(dd.Name))
