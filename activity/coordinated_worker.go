@@ -54,6 +54,7 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 		for {
 			select {
 			case e := <-startErr:
+				log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=start-error error=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), e)
 				w.fail(activityTask, e)
 				return
 			case tick := <-ticks:
