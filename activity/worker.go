@@ -23,10 +23,12 @@ type SWFOps interface {
 	RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedInput) (err error)
 	PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error)
 	GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHistoryInput) (resp *swf.History, err error)
+	SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (err error)
 }
 
 type ActivityWorker struct {
-	Serializer fsm.StateSerializer
+	Serializer       fsm.StateSerializer
+	systemSerializer fsm.StateSerializer
 	// Domain of the workflow associated with the FSM.
 	Domain string
 	// TaskList that the underlying poller will poll for decision tasks.
@@ -69,6 +71,10 @@ func (a *ActivityWorker) AddLongRunningHandler(handler *LongRunningActivityHandl
 func (a *ActivityWorker) Init() {
 	if a.Serializer == nil {
 		a.Serializer = fsm.JSONStateSerializer{}
+	}
+
+	if a.systemSerializer == nil {
+		a.systemSerializer = fsm.JSONStateSerializer{}
 	}
 
 	if a.ActivityInterceptor == nil {
@@ -128,20 +134,7 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
 			a.fail(activityTask, errors.Annotate(err, "handler"))
 		} else {
-			a.ActivityInterceptor.AfterTaskComplete(activityTask, result)
-			switch t := result.(type) {
-			case string:
-				a.done(activityTask, &t)
-			case nil:
-				a.done(activityTask, nil)
-			default:
-				serialized, err := a.Serializer.Serialize(result)
-				if err != nil {
-					a.fail(activityTask, errors.Annotate(err, "serialize"))
-				} else {
-					a.done(activityTask, &serialized)
-				}
-			}
+			a.result(activityTask, result)
 		}
 	} else if longHandler != nil {
 		var deserialized interface{}
@@ -170,6 +163,23 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 		err := errors.NewErr("no handler for activity: %s", LS(activityTask.ActivityType.Name))
 		a.ActivityInterceptor.AfterTaskFailed(activityTask, &err)
 		a.fail(activityTask, &err)
+	}
+}
+
+func (a *ActivityWorker) result(activityTask *swf.ActivityTask, result interface{}) {
+	a.ActivityInterceptor.AfterTaskComplete(activityTask, result)
+	switch t := result.(type) {
+	case string:
+		a.done(activityTask, &t)
+	case nil:
+		a.done(activityTask, nil)
+	default:
+		serialized, err := a.Serializer.Serialize(result)
+		if err != nil {
+			a.fail(activityTask, errors.Annotate(err, "serialize"))
+		} else {
+			a.done(activityTask, &serialized)
+		}
 	}
 }
 
@@ -207,6 +217,38 @@ func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
 	}
 }
 
+func (h *ActivityWorker) signalStart(activityTask *swf.ActivityTask, data interface{}) error {
+	return h.signal(activityTask, fsm.ActivityStartedSignal, data)
+}
+
+func (h *ActivityWorker) signalUpdate(activityTask *swf.ActivityTask, data interface{}) error {
+	return h.signal(activityTask, fsm.ActivityUpdatedSignal, data)
+}
+
+func (h *ActivityWorker) signal(activityTask *swf.ActivityTask, signal string, data interface{}) error {
+	state := new(fsm.SerializedActivityState)
+	state.ActivityID = *activityTask.ActivityID
+	if data != nil {
+		ser, err := h.Serializer.Serialize(data)
+		if err != nil {
+			return err
+		}
+		state.Input = &ser
+	}
+
+	serializedState, err := h.systemSerializer.Serialize(state)
+	if err != nil {
+		return err
+	}
+
+	return h.SWF.SignalWorkflowExecution(&swf.SignalWorkflowExecutionInput{
+		Domain:     S(h.Domain),
+		WorkflowID: activityTask.WorkflowExecution.WorkflowID,
+		SignalName: S(signal),
+		Input:      S(serializedState),
+	})
+}
+
 func (h *ActivityWorker) backoff(attempts int) int {
 	// 0.5, 1, 2, 4, 8...
 	exp := attempts - 1
@@ -231,6 +273,18 @@ func (h *ActivityWorker) done(resp *swf.ActivityTask, result *string) {
 	})
 	if completeErr != nil {
 		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=completed-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), completeErr.Error())
+	}
+}
+
+func (h *ActivityWorker) canceled(resp *swf.ActivityTask, details *string) {
+	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=cancled", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
+
+	canceledErr := h.SWF.RespondActivityTaskCanceled(&swf.RespondActivityTaskCanceledInput{
+		TaskToken: resp.TaskToken,
+		Details:   details,
+	})
+	if canceledErr != nil {
+		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), canceledErr.Error())
 	}
 }
 

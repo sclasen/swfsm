@@ -525,7 +525,16 @@ func (f *FSM) EventData(event swf.HistoryEvent, eventData interface{}) {
 		case swf.EventTypeChildWorkflowExecutionCompleted:
 			serialized = *event.ChildWorkflowExecutionCompletedEventAttributes.Result
 		case swf.EventTypeWorkflowExecutionSignaled:
-			serialized = *event.WorkflowExecutionSignaledEventAttributes.Input
+			switch *event.WorkflowExecutionSignaledEventAttributes.SignalName {
+			case ActivityStartedSignal, ActivityUpdatedSignal:
+				state := new(SerializedActivityState)
+				f.systemSerializer.Deserialize(*event.WorkflowExecutionSignaledEventAttributes.Input, state)
+				if state.Input != nil {
+					serialized = *state.Input
+				}
+			default:
+				serialized = *event.WorkflowExecutionSignaledEventAttributes.Input
+			}
 		case swf.EventTypeWorkflowExecutionStarted:
 			serialized = *event.WorkflowExecutionStartedEventAttributes.Input
 		case swf.EventTypeWorkflowExecutionContinuedAsNew:
@@ -581,12 +590,16 @@ func (f *FSM) findSerializedState(events []swf.HistoryEvent) (*SerializedState, 
 func (f *FSM) findSerializedEventCorrelator(events []swf.HistoryEvent) (*EventCorrelator, error) {
 	for _, event := range events {
 		if f.isCorrelatorMarker(event) {
-			correlator := &EventCorrelator{}
+			correlator := &EventCorrelator{
+				Serializer: f.systemSerializer,
+			}
 			err := f.Serializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, correlator)
 			return correlator, err
 		}
 	}
-	return &EventCorrelator{}, nil
+	return &EventCorrelator{
+		Serializer: f.systemSerializer,
+	}, nil
 }
 
 func (f *FSM) findSerializedErrorState(events []swf.HistoryEvent) (*SerializedErrorState, error) {

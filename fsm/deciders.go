@@ -204,6 +204,17 @@ func OnStarted(deciders ...Decider) Decider {
 	}
 }
 
+func OnContinueFailed(deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeContinueAsNewWorkflowExecutionFailed:
+			logf(ctx, "at=on-continuefailed")
+			return NewComposedDecider(deciders...)(ctx, h, data)
+		}
+		return ctx.Pass()
+	}
+}
+
 // OnChildStarted builds a composed decider that fires on swf.EventTypeChildWorkflowExecutionStarted.
 func OnChildStarted(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
@@ -349,6 +360,17 @@ func OnActivityFailedTimedOutCanceled(activityName string, deciders ...Decider) 
 		swf.EventTypeActivityTaskTimedOut,
 		swf.EventTypeActivityTaskCanceled,
 	}, deciders...)
+}
+
+func OnWorkflowCancelRequested(deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeWorkflowExecutionCancelRequested:
+			logf(ctx, "at=on-wokrflow-execution-cancel-requested")
+			return NewComposedDecider(deciders...)(ctx, h, data)
+		}
+		return ctx.Pass()
+	}
 }
 
 // AddDecision adds a single decision to a ContinueDecider outcome

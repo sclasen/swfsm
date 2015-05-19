@@ -25,16 +25,20 @@ type TestConfig struct {
 	Workers               []*activity.ActivityWorker
 	StubbedWorkflows      []string
 	ShortStubbedWorkflows []string
+	DefaultWaitTimeout    int
 }
 
 func NewTestListener(t TestConfig) *TestListener {
+	if t.DefaultWaitTimeout == 0 {
+		t.DefaultWaitTimeout = 10
+	}
 
 	tl := &TestListener{
 		decisionOutcomes: make(chan DecisionOutcome, 1000),
 		historyInterest:  make(map[string]chan swf.HistoryEvent, 1000),
 		decisionInterest: make(map[string]chan swf.Decision, 1000),
 		stateInterest:    make(map[string]chan string, 1000),
-		DefaultWait:      10 * time.Second,
+		DefaultWait:      time.Duration(t.DefaultWaitTimeout) * time.Second,
 		testAdapter:      t.Testing,
 		TestID:           uuid.New(),
 	}

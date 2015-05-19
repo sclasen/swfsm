@@ -30,6 +30,10 @@ const (
 	FSMErrorStateDeserialization = "ErrorStateDeserialization"
 	//the FSM encountered an erryor while deserializaing stateData
 	FSMErrorCorrelationDeserialization = "ErrorCorrelationDeserialization"
+	//Signal sent when a Long Lived Worker Start()
+	ActivityStartedSignal = "FSM.ActivityStarted"
+	//Signal send when long Lived worker sends an update from Work()
+	ActivityUpdatedSignal = "FSM.ActivityUpdated"
 )
 
 // Decider decides an Outcome based on an event and the current data for an
@@ -324,4 +328,10 @@ type SerializedErrorState struct {
 	EarliestUnprocessedEventID int64
 	LatestUnprocessedEventID   int64
 	ErrorEvent                 swf.HistoryEvent
+}
+
+//Payload of Signals ActivityStartedSignal and ActivityUpdatedSignal
+type SerializedActivityState struct {
+	ActivityID string
+	Input      *string
 }

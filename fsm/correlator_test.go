@@ -328,6 +328,7 @@ func TestFSMContextActivityTracking(t *testing.T) {
 
 func TestCountActivityAttemtps(t *testing.T) {
 	c := new(EventCorrelator)
+	c.Serializer = JSONStateSerializer{}
 
 	start := func(eventId int) swf.HistoryEvent {
 		return EventFromPayload(eventId, &swf.ActivityTaskScheduledEventAttributes{
@@ -393,6 +394,7 @@ func TestSignalTracking(t *testing.T) {
 	})
 
 	c := new(EventCorrelator)
+	c.Serializer = JSONStateSerializer{}
 
 	c.Track(start)
 	//track happens in FSM after Decider
@@ -442,6 +444,7 @@ func TestTimerTracking(t *testing.T) {
 	})
 
 	c := new(EventCorrelator)
+	c.Serializer = JSONStateSerializer{}
 
 	c.Track(start)
 	c.Track(timerStart)

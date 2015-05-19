@@ -11,65 +11,110 @@ import (
 	. "github.com/sclasen/swfsm/sugar"
 )
 
-//NewCoordinatedActivityHandler creates a LongRunningActivityFunc that will build a LongRunningActivityCoordinator and execute your HandleCoordinatedActivity
-//
-// * heartbeats the activity at the given interval
-// * sends any errors heartbeating into the HeartbeatErrors channel, which is buffered by heartbeatErrorThreshold
-// * if the send to HeartbeatErrors blocks because the buffer is full and not being consumed the task will eventually timeout.
-// * if the heartbeat indicates the task was canceled, send on the ToCancelActivity channel and wait on ToAckCancelActivity channel
-// * your CoordinatedActivityHandler is responsible for responding to messages on ToCancelActivity, by stopping, acking the cancel to swf, and sending on ToAckCancel
-// * if your CoordinatedActivityHandler wishes to stop heartbeats, send on ToStopHeartbeating and recieve on ToAckStopHeartbeating.
-// * your CoordinatedActivityHandler is responsible for responding to messages on ToStopActivity, by stopping, NOT acking the cancel to swf, and sending on ToAckStopActivity.
-// * this happens when heartbeats are attempted after a task is timed out or canceled or completed.
-
 const (
 	TaskGone = "Unknown activity"
 )
 
-func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, heartbeatErrorThreshold int, handler *CoordinatedActivityHandler) {
-	coordinator := &LongRunningActivityCoordinator{
-		HeartbeatInterval:     heartbeatInterval,
-		HeartbeatErrors:       make(chan error, heartbeatErrorThreshold),
-		ToCancelActivity:      make(chan struct{}),
-		ToAckCancelActivity:   make(chan struct{}),
-		ToStopHeartbeating:    make(chan struct{}),
-		ToAckStopHeartbeating: make(chan struct{}),
-		ToStopActivity:        make(chan struct{}),
-		ToAckStopActivity:     make(chan struct{}),
+func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, handler *CoordinatedActivityHandler) {
+
+	ticks := make(chan CoordinatedActivityHandlerTick)
+	startErr := make(chan error)
+
+	handlerTickFunc := func(activityTask *swf.ActivityTask, input interface{}) {
+		go func() {
+			cont, res, err := handler.Tick(activityTask, input)
+			ticks <- CoordinatedActivityHandlerTick{
+				Continue: cont,
+				Result:   res,
+				Error:    err,
+			}
+		}()
 	}
 
+	handlerStartFunc := func(activityTask *swf.ActivityTask, input interface{}) {
+		go func() {
+			update, err := handler.Start(activityTask, input)
+			if err != nil {
+				startErr <- err
+			} else {
+				err = w.signalStart(activityTask, update)
+				if err != nil {
+					startErr <- err
+				} else {
+					handlerTickFunc(activityTask, input)
+				}
+			}
+		}()
+	}
+
+	heartbeats := time.Tick(heartbeatInterval)
+
 	handlerFunc := func(activityTask *swf.ActivityTask, input interface{}) {
-		go handler.HandlerFunc(coordinator, activityTask, input)
+		handlerStartFunc(activityTask, input)
 		for {
 			select {
-			case <-time.After(heartbeatInterval):
+			case e := <-startErr:
+				log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=start-error error=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), e)
+				w.fail(activityTask, e)
+				return
+			case tick := <-ticks:
+				if tick.Continue {
+					handlerTickFunc(activityTask, input)
+					if tick.Result != nil {
+						//send an activity update when the result is not null, but we are continuing
+						err := w.signalUpdate(activityTask, tick.Result)
+						if err != nil {
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update-error error=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+							w.fail(activityTask, err)
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update-error-fail-task error=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+							handler.Cancel(activityTask, tick.Result)
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update-error-cancel-handler error=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+
+						} else {
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
+						}
+					}
+				} else {
+					if tick.Error != nil {
+						w.fail(activityTask, tick.Error)
+					} else {
+						w.result(activityTask, tick.Result)
+					}
+					return
+				}
+			case <-heartbeats:
 				status, err := w.SWF.RecordActivityTaskHeartbeat(&swf.RecordActivityTaskHeartbeatInput{
 					TaskToken: activityTask.TaskToken,
 				})
 				if err != nil {
 					if ae, ok := err.(aws.APIError); ok && ae.Code == ErrorTypeUnknownResourceFault && strings.Contains(ae.Message, TaskGone) {
 						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-gone", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
-						coordinator.ToStopActivity <- struct{}{}
-						<-coordinator.ToAckStopActivity
-						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=stopped-activity-gone", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
+						//wait for the tick to complete before exiting
+						<-ticks
+						err := handler.Cancel(activityTask, input)
+						if err != nil {
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-gone-cancel-err err=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+						}
 						return
 					}
 					log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=heartbeat-error error=%s ", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err.Error())
-					coordinator.HeartbeatErrors <- err
 				} else {
+					log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=heartbeat-recorded", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
 					if *status.CancelRequested {
 						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-requested", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
-						coordinator.ToCancelActivity <- struct{}{}
-						<-coordinator.ToAckCancelActivity
+						//Wait for any tick to finish
+						<-ticks
+						var detail *string
+						err := handler.Cancel(activityTask, input)
+						if err != nil {
+							log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err err=%q", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID), err)
+							detail = S(err.Error())
+						}
+						w.canceled(activityTask, detail)
 						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-canceled", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
 						return
 					}
 				}
-			case <-coordinator.ToStopHeartbeating:
-				log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=stop-heartbeating", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
-				coordinator.ToAckStopHeartbeating <- struct{}{}
-				log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=ack-stop-heartbeating", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
-				return
 			}
 		}
 	}
@@ -81,4 +126,10 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 	}
 
 	w.AddLongRunningHandler(l)
+}
+
+type CoordinatedActivityHandlerTick struct {
+	Continue bool
+	Result   interface{}
+	Error    error
 }

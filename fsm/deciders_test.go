@@ -221,6 +221,7 @@ func TestStay(t *testing.T) {}
 func testContextWithActivity(scheduledEventId int, event *swf.ActivityTaskScheduledEventAttributes) func() *FSMContext {
 	return func() *FSMContext {
 		correlator := &EventCorrelator{}
+		correlator.Serializer = JSONStateSerializer{}
 		correlator.Track(s.EventFromPayload(scheduledEventId, event))
 		ctx := deciderTestContext()
 		ctx.eventCorrelator = correlator
