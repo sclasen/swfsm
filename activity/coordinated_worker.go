@@ -17,39 +17,39 @@ const (
 
 func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, handler *CoordinatedActivityHandler) {
 
-	ticks := make(chan CoordinatedActivityHandlerTick)
-	startErr := make(chan error)
+	handlerFunc := func(ctx *ActivityContext, input interface{}) {
+		ticks := make(chan CoordinatedActivityHandlerTick)
+		startErr := make(chan error)
 
-	handlerTickFunc := func(cxt *ActivityContext, input interface{}) {
-		go func() {
-			cont, res, err := handler.Tick(cxt, input)
-			ticks <- CoordinatedActivityHandlerTick{
-				Continue: cont,
-				Result:   res,
-				Error:    err,
-			}
-		}()
-	}
+		handlerTickFunc := func(cxt *ActivityContext, input interface{}) {
+			go func() {
+				cont, res, err := handler.Tick(cxt, input)
+				ticks <- CoordinatedActivityHandlerTick{
+					Continue: cont,
+					Result:   res,
+					Error:    err,
+				}
+			}()
+		}
 
-	handlerStartFunc := func(ctx *ActivityContext, input interface{}) {
-		go func() {
-			update, err := handler.Start(ctx, input)
-			if err != nil {
-				startErr <- err
-			} else {
-				err = w.signalStart(ctx, update)
+		handlerStartFunc := func(ctx *ActivityContext, input interface{}) {
+			go func() {
+				update, err := handler.Start(ctx, input)
 				if err != nil {
 					startErr <- err
 				} else {
-					handlerTickFunc(ctx, input)
+					err = w.signalStart(ctx, update)
+					if err != nil {
+						startErr <- err
+					} else {
+						handlerTickFunc(ctx, input)
+					}
 				}
-			}
-		}()
-	}
+			}()
+		}
 
-	heartbeats := time.Tick(heartbeatInterval)
+		heartbeats := time.Tick(heartbeatInterval)
 
-	handlerFunc := func(ctx *ActivityContext, input interface{}) {
 		if ctx.Resumed {
 			handlerTickFunc(ctx, input)
 		} else {
