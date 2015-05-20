@@ -26,6 +26,11 @@ type SWFOps interface {
 	SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (err error)
 }
 
+type ActivityContext struct {
+	Task    *swf.ActivityTask
+	Resumed bool
+}
+
 type ActivityWorker struct {
 	Serializer       fsm.StateSerializer
 	systemSerializer fsm.StateSerializer
@@ -93,19 +98,36 @@ func (a *ActivityWorker) Init() {
 func (a *ActivityWorker) Start() {
 	a.Init()
 	poller := poller.NewActivityTaskPoller(a.SWF, a.Domain, a.Identity, a.TaskList)
-	go poller.PollUntilShutdownBy(a.ShutdownManager, fmt.Sprintf("%s-poller", a.Identity), a.dispatchTask)
+	go poller.PollUntilShutdownBy(a.ShutdownManager, fmt.Sprintf("%s-poller", a.Identity), a.Begin)
 }
 
-func (a *ActivityWorker) dispatchTask(activityTask *swf.ActivityTask) {
+func (a *ActivityWorker) Resume(activityTask *swf.ActivityTask) {
+	ctx := &ActivityContext{
+		Task:    activityTask,
+		Resumed: true,
+	}
+	a.dispatchTask(ctx)
+}
+
+func (a *ActivityWorker) Begin(activityTask *swf.ActivityTask) {
+	ctx := &ActivityContext{
+		Task:    activityTask,
+		Resumed: false,
+	}
+	a.dispatchTask(ctx)
+}
+
+func (a *ActivityWorker) dispatchTask(ctx *ActivityContext) {
 	if a.AllowPanics {
-		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleActivityTask)
+		a.ActivityTaskDispatcher.DispatchTask(ctx, a.handleActivityTask)
 	} else {
-		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleWithRecovery(a.handleActivityTask))
+		a.ActivityTaskDispatcher.DispatchTask(ctx, a.handleWithRecovery(a.handleActivityTask))
 	}
 }
 
-func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
-	a.ActivityInterceptor.BeforeTask(activityTask)
+func (a *ActivityWorker) handleActivityTask(ctx *ActivityContext) {
+	activityTask := ctx.Task
+	a.ActivityInterceptor.BeforeTask(ctx)
 	handler := a.handlers[*activityTask.ActivityType.Name]
 	longHandler := a.longRunningHandlers[*activityTask.ActivityType.Name]
 
@@ -119,8 +141,8 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 				deserialized = handler.ZeroInput()
 				err := a.Serializer.Deserialize(*activityTask.Input, deserialized)
 				if err != nil {
-					a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
-					a.fail(activityTask, errors.Annotate(err, "deserialize"))
+					a.ActivityInterceptor.AfterTaskFailed(ctx, err)
+					a.fail(ctx, errors.Annotate(err, "deserialize"))
 					return
 				}
 			}
@@ -129,12 +151,12 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 			deserialized = nil
 		}
 
-		result, err := handler.HandlerFunc(activityTask, deserialized)
+		result, err := handler.HandlerFunc(ctx, deserialized)
 		if err != nil {
-			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
-			a.fail(activityTask, errors.Annotate(err, "handler"))
+			a.ActivityInterceptor.AfterTaskFailed(ctx, err)
+			a.fail(ctx, errors.Annotate(err, "handler"))
 		} else {
-			a.result(activityTask, result)
+			a.result(ctx, result)
 		}
 	} else if longHandler != nil {
 		var deserialized interface{}
@@ -146,8 +168,8 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 				deserialized = longHandler.ZeroInput()
 				err := a.Serializer.Deserialize(*activityTask.Input, deserialized)
 				if err != nil {
-					a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
-					a.fail(activityTask, errors.Annotate(err, "deserialize"))
+					a.ActivityInterceptor.AfterTaskFailed(ctx, err)
+					a.fail(ctx, errors.Annotate(err, "deserialize"))
 					return
 				}
 			}
@@ -156,34 +178,35 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 			deserialized = nil
 		}
 
-		longHandler.HandlerFunc(activityTask, deserialized)
+		longHandler.HandlerFunc(ctx, deserialized)
 
 	} else {
 		//fail
 		err := errors.NewErr("no handler for activity: %s", LS(activityTask.ActivityType.Name))
-		a.ActivityInterceptor.AfterTaskFailed(activityTask, &err)
-		a.fail(activityTask, &err)
+		a.ActivityInterceptor.AfterTaskFailed(ctx, &err)
+		a.fail(ctx, &err)
 	}
 }
 
-func (a *ActivityWorker) result(activityTask *swf.ActivityTask, result interface{}) {
-	a.ActivityInterceptor.AfterTaskComplete(activityTask, result)
+func (a *ActivityWorker) result(ctx *ActivityContext, result interface{}) {
+	a.ActivityInterceptor.AfterTaskComplete(ctx, result)
 	switch t := result.(type) {
 	case string:
-		a.done(activityTask, &t)
+		a.done(ctx, &t)
 	case nil:
-		a.done(activityTask, nil)
+		a.done(ctx, nil)
 	default:
 		serialized, err := a.Serializer.Serialize(result)
 		if err != nil {
-			a.fail(activityTask, errors.Annotate(err, "serialize"))
+			a.fail(ctx, errors.Annotate(err, "serialize"))
 		} else {
-			a.done(activityTask, &serialized)
+			a.done(ctx, &serialized)
 		}
 	}
 }
 
-func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
+func (h *ActivityWorker) fail(ctx *ActivityContext, err error) {
+	task := ctx.Task
 	if h.BackoffOnFailure {
 		hist, err := h.SWF.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
 			Domain:       S(h.Domain),
@@ -217,17 +240,17 @@ func (h *ActivityWorker) fail(task *swf.ActivityTask, err error) {
 	}
 }
 
-func (h *ActivityWorker) signalStart(activityTask *swf.ActivityTask, data interface{}) error {
-	return h.signal(activityTask, fsm.ActivityStartedSignal, data)
+func (h *ActivityWorker) signalStart(ctx *ActivityContext, data interface{}) error {
+	return h.signal(ctx, fsm.ActivityStartedSignal, data)
 }
 
-func (h *ActivityWorker) signalUpdate(activityTask *swf.ActivityTask, data interface{}) error {
-	return h.signal(activityTask, fsm.ActivityUpdatedSignal, data)
+func (h *ActivityWorker) signalUpdate(ctx *ActivityContext, data interface{}) error {
+	return h.signal(ctx, fsm.ActivityUpdatedSignal, data)
 }
 
-func (h *ActivityWorker) signal(activityTask *swf.ActivityTask, signal string, data interface{}) error {
+func (h *ActivityWorker) signal(ctx *ActivityContext, signal string, data interface{}) error {
 	state := new(fsm.SerializedActivityState)
-	state.ActivityID = *activityTask.ActivityID
+	state.ActivityID = *ctx.Task.ActivityID
 	if data != nil {
 		ser, err := h.Serializer.Serialize(data)
 		if err != nil {
@@ -243,7 +266,7 @@ func (h *ActivityWorker) signal(activityTask *swf.ActivityTask, signal string, d
 
 	return h.SWF.SignalWorkflowExecution(&swf.SignalWorkflowExecutionInput{
 		Domain:     S(h.Domain),
-		WorkflowID: activityTask.WorkflowExecution.WorkflowID,
+		WorkflowID: ctx.Task.WorkflowExecution.WorkflowID,
 		SignalName: S(signal),
 		Input:      S(serializedState),
 	})
@@ -264,32 +287,32 @@ func (h *ActivityWorker) backoff(attempts int) int {
 	return backoff
 }
 
-func (h *ActivityWorker) done(resp *swf.ActivityTask, result *string) {
-	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=done", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
+func (h *ActivityWorker) done(ctx *ActivityContext, result *string) {
+	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=done", LS(ctx.Task.WorkflowExecution.WorkflowID), LS(ctx.Task.ActivityType.Name), LS(ctx.Task.ActivityID))
 
 	completeErr := h.SWF.RespondActivityTaskCompleted(&swf.RespondActivityTaskCompletedInput{
-		TaskToken: resp.TaskToken,
+		TaskToken: ctx.Task.TaskToken,
 		Result:    result,
 	})
 	if completeErr != nil {
-		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=completed-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), completeErr.Error())
+		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=completed-response-fail error=%s ", LS(ctx.Task.WorkflowExecution.WorkflowID), LS(ctx.Task.ActivityType.Name), LS(ctx.Task.ActivityID), completeErr.Error())
 	}
 }
 
-func (h *ActivityWorker) canceled(resp *swf.ActivityTask, details *string) {
-	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=cancled", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
+func (h *ActivityWorker) canceled(ctx *ActivityContext, details *string) {
+	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=cancled", LS(ctx.Task.WorkflowExecution.WorkflowID), LS(ctx.Task.ActivityType.Name), LS(ctx.Task.ActivityID))
 
 	canceledErr := h.SWF.RespondActivityTaskCanceled(&swf.RespondActivityTaskCanceledInput{
-		TaskToken: resp.TaskToken,
+		TaskToken: ctx.Task.TaskToken,
 		Details:   details,
 	})
 	if canceledErr != nil {
-		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID), canceledErr.Error())
+		log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled-response-fail error=%s ", LS(ctx.Task.WorkflowExecution.WorkflowID), LS(ctx.Task.ActivityType.Name), LS(ctx.Task.ActivityID), canceledErr.Error())
 	}
 }
 
-func (h *ActivityWorker) handleWithRecovery(handler func(*swf.ActivityTask)) func(*swf.ActivityTask) {
-	return func(resp *swf.ActivityTask) {
+func (h *ActivityWorker) handleWithRecovery(handler func(*ActivityContext)) func(*ActivityContext) {
+	return func(ctx *ActivityContext) {
 		defer func() {
 			var anErr error
 			if r := recover(); r != nil {
@@ -299,10 +322,10 @@ func (h *ActivityWorker) handleWithRecovery(handler func(*swf.ActivityTask)) fun
 					anErr = errors.New("panic in activity with nil error")
 				}
 				log.Printf("component=activity at=error error=activity-panic-recovery msg=%s", r)
-				h.fail(resp, anErr)
+				h.fail(ctx, anErr)
 			}
 		}()
-		handler(resp)
+		handler(ctx)
 
 	}
 }

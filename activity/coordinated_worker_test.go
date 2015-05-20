@@ -32,7 +32,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	worker.AddCoordinatedHandler(1*time.Second, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&ActivityContext{Task: &swf.ActivityTask{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -40,7 +40,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 		},
 		ActivityID: S("id"),
 		Input:      S(input),
-	})
+	}})
 
 	hc.cont = false
 	time.Sleep(100 * time.Millisecond)
@@ -54,7 +54,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	mockSwf.Completed = nil
 	mockSwf.Canceled = true
 
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&ActivityContext{Task: &swf.ActivityTask{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -62,7 +62,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 		},
 		ActivityID: S("id"),
 		Input:      S(input),
-	})
+	}})
 
 	time.Sleep(100 * time.Millisecond)
 	if !hc.canceled {
@@ -88,7 +88,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 	worker.AddCoordinatedHandler(1*time.Second, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&ActivityContext{Task: &swf.ActivityTask{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -96,7 +96,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 		},
 		ActivityID: S("id"),
 		Input:      S(input),
-	})
+	}})
 
 	hc.cont = false
 	time.Sleep(100 * time.Millisecond)
@@ -110,7 +110,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 	mockSwf.Completed = nil
 	mockSwf.Canceled = true
 
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&ActivityContext{Task: &swf.ActivityTask{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -118,7 +118,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 		},
 		ActivityID: S("id"),
 		Input:      S(input),
-	})
+	}})
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -134,12 +134,12 @@ type TypedCoordinatedTaskHandler struct {
 	canceled bool
 }
 
-func (c *TypedCoordinatedTaskHandler) Begin(a *swf.ActivityTask, d *TestInput) (*TestOutput, error) {
+func (c *TypedCoordinatedTaskHandler) Begin(a *ActivityContext, d *TestInput) (*TestOutput, error) {
 	c.t.Log("START")
 	return nil, nil
 }
 
-func (c *TypedCoordinatedTaskHandler) Work(a *swf.ActivityTask, d *TestInput) (bool, *TestOutput, error) {
+func (c *TypedCoordinatedTaskHandler) Work(a *ActivityContext, d *TestInput) (bool, *TestOutput, error) {
 	c.t.Log("TICK")
 	time.Sleep(100 * time.Millisecond)
 	if c.cont {
@@ -148,7 +148,7 @@ func (c *TypedCoordinatedTaskHandler) Work(a *swf.ActivityTask, d *TestInput) (b
 	return false, &TestOutput{Name: "done"}, nil
 }
 
-func (c *TypedCoordinatedTaskHandler) Stop(a *swf.ActivityTask, d *TestInput) error {
+func (c *TypedCoordinatedTaskHandler) Stop(a *ActivityContext, d *TestInput) error {
 	c.t.Log("CANCEL")
 	c.canceled = true
 	return nil
@@ -160,12 +160,12 @@ type TestCoordinatedTaskHandler struct {
 	canceled bool
 }
 
-func (c *TestCoordinatedTaskHandler) Start(a *swf.ActivityTask, d interface{}) (interface{}, error) {
+func (c *TestCoordinatedTaskHandler) Start(a *ActivityContext, d interface{}) (interface{}, error) {
 	c.t.Log("START")
 	return nil, nil
 }
 
-func (c *TestCoordinatedTaskHandler) Tick(a *swf.ActivityTask, d interface{}) (bool, interface{}, error) {
+func (c *TestCoordinatedTaskHandler) Tick(a *ActivityContext, d interface{}) (bool, interface{}, error) {
 	c.t.Log("TICK")
 	time.Sleep(100 * time.Millisecond)
 	if c.cont {
@@ -174,7 +174,7 @@ func (c *TestCoordinatedTaskHandler) Tick(a *swf.ActivityTask, d interface{}) (b
 	return false, &TestOutput{Name: "done"}, nil
 }
 
-func (c *TestCoordinatedTaskHandler) Cancel(a *swf.ActivityTask, d interface{}) error {
+func (c *TestCoordinatedTaskHandler) Cancel(a *ActivityContext, d interface{}) error {
 	c.t.Log("CANCEL")
 	c.canceled = true
 	return nil

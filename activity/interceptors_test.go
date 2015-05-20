@@ -19,13 +19,13 @@ func TestInterceptors(t *testing.T) {
 	}
 
 	interceptor := &FuncInterceptor{
-		BeforeTaskFn: func(decision *swf.ActivityTask) {
+		BeforeTaskFn: func(decision *ActivityContext) {
 			calledBefore = true
 		},
-		AfterTaskCompleteFn: func(decision *swf.ActivityTask, result interface{}) {
+		AfterTaskCompleteFn: func(decision *ActivityContext, result interface{}) {
 			calledComplete = true
 		},
-		AfterTaskFailedFn: func(decision *swf.ActivityTask, err error) {
+		AfterTaskFailedFn: func(decision *ActivityContext, err error) {
 			calledFail = true
 		},
 	}
@@ -37,14 +37,14 @@ func TestInterceptors(t *testing.T) {
 
 	handler := &ActivityHandler{
 		Activity: "test",
-		HandlerFunc: func(activityTask *swf.ActivityTask, input interface{}) (interface{}, error) {
+		HandlerFunc: func(activityTask *ActivityContext, input interface{}) (interface{}, error) {
 			return nil, nil
 		},
 	}
 
 	worker.AddHandler(handler)
 
-	worker.handleActivityTask(task)
+	worker.handleActivityTask(&ActivityContext{Task: task})
 
 	if !calledBefore {
 		t.Fatal("no before")
@@ -60,7 +60,7 @@ func TestInterceptors(t *testing.T) {
 	calledBefore = false
 	calledComplete = false
 
-	worker.handleActivityTask(task)
+	worker.handleActivityTask(&ActivityContext{Task: task})
 
 	if !calledBefore {
 		t.Fatal("no before")

@@ -16,7 +16,7 @@ import (
 )
 
 type MockSWF struct {
-	Activity     *swf.ActivityTask
+	Activity     *ActivityContext
 	Failed       bool
 	Completed    *string
 	CompletedSet bool
@@ -42,7 +42,7 @@ func (m *MockSWF) RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedIn
 	return nil
 }
 func (m *MockSWF) PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error) {
-	return m.Activity, nil
+	return m.Activity.Task, nil
 }
 
 func (m *MockSWF) GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHistoryInput) (resp *swf.History, err error) {
@@ -59,11 +59,11 @@ func ExampleActivityWorker() {
 
 	taskList := "aTaskListSharedBetweenTaskOneAndTwo"
 
-	handleTask1 := func(task *swf.ActivityTask, input interface{}) (interface{}, error) {
+	handleTask1 := func(task *ActivityContext, input interface{}) (interface{}, error) {
 		return input, nil
 	}
 
-	handleTask2 := func(task *swf.ActivityTask, input interface{}) (interface{}, error) {
+	handleTask2 := func(task *ActivityContext, input interface{}) (interface{}, error) {
 		return input, nil
 	}
 
@@ -132,13 +132,13 @@ type Output2 struct {
 //We define the operations our activity worker will handle in an interface
 //Then it is easy to provide a mocked impl
 type Activities interface {
-	Task1(*swf.ActivityTask, *Input1) (*Output1, error)
-	Task2(*swf.ActivityTask, *Input2) (*Output2, error)
+	Task1(*ActivityContext, *Input1) (*Output1, error)
+	Task2(*ActivityContext, *Input2) (*Output2, error)
 }
 
 type MockActivities struct{}
 
-func (m MockActivities) Task1(task *swf.ActivityTask, in *Input1) (*Output1, error) {
+func (m MockActivities) Task1(task *ActivityContext, in *Input1) (*Output1, error) {
 	if rand.Intn(10) < 4 {
 		log.Printf("TASK 1 OK")
 		return &Output1{Data: in.Data}, nil
@@ -147,7 +147,7 @@ func (m MockActivities) Task1(task *swf.ActivityTask, in *Input1) (*Output1, err
 	return nil, errors.New("FAILED")
 }
 
-func (m MockActivities) Task2(task *swf.ActivityTask, in *Input2) (*Output2, error) {
+func (m MockActivities) Task2(task *ActivityContext, in *Input2) (*Output2, error) {
 	if rand.Intn(10) < 4 {
 		log.Printf("TASK 2 OK")
 		return &Output2{Data2: in.Data2}, nil
@@ -366,21 +366,21 @@ func TestStringHandler(t *testing.T) {
 	worker.Init()
 	worker.AllowPanics = true
 
-	handler := func(task *swf.ActivityTask, input string) (string, error) {
+	handler := func(task *ActivityContext, input string) (string, error) {
 		return input + "Out", nil
 	}
 
-	nilHandler := func(task *swf.ActivityTask, input string) (*swf.ActivityTask, error) {
+	nilHandler := func(task *ActivityContext, input string) (*ActivityContext, error) {
 		return nil, nil
 	}
 
 	worker.AddHandler(NewActivityHandler("activity", handler))
 	worker.AddHandler(NewActivityHandler("nilactivity", nilHandler))
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&ActivityContext{Task: &swf.ActivityTask{
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType:      &swf.ActivityType{Name: S("activity")},
 		Input:             S("theInput"),
-	})
+	}})
 
 	if !ops.CompletedSet || *ops.Completed != "theInputOut" {
 		t.Fatal("Not Completed", ops.Completed)
@@ -389,11 +389,11 @@ func TestStringHandler(t *testing.T) {
 	ops.Completed = nil
 	ops.CompletedSet = false
 
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&ActivityContext{Task: &swf.ActivityTask{
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType:      &swf.ActivityType{Name: S("nilactivity")},
 		Input:             S("theInput"),
-	})
+	}})
 
 	if !ops.CompletedSet || ops.Completed != nil {
 		t.Fatal("Not Completed", ops.Completed)
@@ -436,12 +436,12 @@ func TestBackoff(t *testing.T) {
 
 	failed := make(chan struct{})
 	go func() {
-		worker.fail(&swf.ActivityTask{
+		worker.fail(&ActivityContext{Task: &swf.ActivityTask{
 			WorkflowExecution: &swf.WorkflowExecution{},
 			ActivityType:      &swf.ActivityType{Name: S("activity")},
 			ActivityID:        S("the-id"),
 			Input:             S("theInput"),
-		}, errors.New("the error"))
+		}}, errors.New("the error"))
 		failed <- struct{}{}
 	}()
 

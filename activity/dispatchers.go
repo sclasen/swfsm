@@ -1,18 +1,16 @@
 package activity
 
-import "github.com/awslabs/aws-sdk-go/gen/swf"
-
 //ActivityTaskDispatcher is used by the ActivityWorker machinery to dispatch the handling of ActivityTasks.
 //Different implementations can provide different concurrency models.
 type ActivityTaskDispatcher interface {
-	DispatchTask(*swf.ActivityTask, func(*swf.ActivityTask))
+	DispatchTask(*ActivityContext, func(*ActivityContext))
 }
 
 //CallingGoroutineDispatcher is a DecisionTaskDispatcher that runs the decision handler in the polling goroutine
 type CallingGoroutineDispatcher struct{}
 
 //DispatchTask calls the handler in the same goroutine.
-func (*CallingGoroutineDispatcher) DispatchTask(task *swf.ActivityTask, handler func(*swf.ActivityTask)) {
+func (*CallingGoroutineDispatcher) DispatchTask(task *ActivityContext, handler func(*ActivityContext)) {
 	handler(task)
 }
 
@@ -21,7 +19,7 @@ type NewGoroutineDispatcher struct {
 }
 
 //DispatchTask calls the handler in a new  goroutine.
-func (*NewGoroutineDispatcher) DispatchTask(task *swf.ActivityTask, handler func(*swf.ActivityTask)) {
+func (*NewGoroutineDispatcher) DispatchTask(task *ActivityContext, handler func(*ActivityContext)) {
 	go handler(task)
 }
 
@@ -29,20 +27,20 @@ func (*NewGoroutineDispatcher) DispatchTask(task *swf.ActivityTask, handler func
 type BoundedGoroutineDispatcher struct {
 	NumGoroutines int
 	started       bool
-	tasks         chan *swf.ActivityTask
+	tasks         chan *ActivityContext
 }
 
 //DispatchTask calls sends the task on a channel that NumGoroutines goroutines are selecting on.
 //Goroutines recieving a task run it in the same goroutine.
 //note that this is unsynchronized as DispatchTask will only be called by the single poller goroutine.
-func (b *BoundedGoroutineDispatcher) DispatchTask(task *swf.ActivityTask, handler func(*swf.ActivityTask)) {
+func (b *BoundedGoroutineDispatcher) DispatchTask(task *ActivityContext, handler func(*ActivityContext)) {
 
 	if !b.started {
 		if b.NumGoroutines == 0 {
 			//use at least 1
 			b.NumGoroutines = 1
 		}
-		b.tasks = make(chan *swf.ActivityTask)
+		b.tasks = make(chan *ActivityContext)
 		for i := 0; i < b.NumGoroutines; i++ {
 			go func() {
 				for {

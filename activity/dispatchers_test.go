@@ -4,8 +4,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/awslabs/aws-sdk-go/gen/swf"
-
 	"time"
 )
 
@@ -21,11 +19,11 @@ func TestBoundedGoroutineDispatcher(t *testing.T) {
 }
 
 func testDispatcher(dispatcher ActivityTaskDispatcher, t *testing.T) {
-	task := &swf.ActivityTask{}
+	task := &ActivityContext{}
 	tasksHandled := int32(0)
 	totalTasks := int32(1000)
 	done := make(chan struct{}, 1)
-	handler := func(d *swf.ActivityTask) {
+	handler := func(d *ActivityContext) {
 		handled := atomic.AddInt32(&tasksHandled, 1)
 		if handled == totalTasks {
 			done <- struct{}{}
