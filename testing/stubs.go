@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/fsm"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -21,9 +22,9 @@ var (
 )
 
 type DecisionOutcome struct {
-	DecisionTask *swf.DecisionTask
+	DecisionTask *swf.PollForDecisionTaskOutput
 	State        string
-	Decisions    []swf.Decision
+	Decisions    []*swf.Decision
 }
 
 func StubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
@@ -41,7 +42,7 @@ func StubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 }
 
 func StubState() fsm.Decider {
-	return func(ctx *fsm.FSMContext, h swf.HistoryEvent, data interface{}) fsm.Outcome {
+	return func(ctx *fsm.FSMContext, h *swf.HistoryEvent, data interface{}) fsm.Outcome {
 		log.Printf("at=stub-event event=%+v", PrettyHistoryEvent(h))
 		return ctx.Stay(data, ctx.EmptyDecisions())
 	}
@@ -62,7 +63,7 @@ func ShortStubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 }
 
 func ShortStubState() fsm.Decider {
-	return func(ctx *fsm.FSMContext, h swf.HistoryEvent, data interface{}) fsm.Outcome {
+	return func(ctx *fsm.FSMContext, h *swf.HistoryEvent, data interface{}) fsm.Outcome {
 		log.Printf("at=short-stub-event event=%+v", PrettyHistoryEvent(h))
 		return ctx.CompleteWorkflow(data)
 	}
@@ -80,10 +81,10 @@ func TestInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []st
 		stubbedShort[s] = v
 	}
 	return &fsm.FuncInterceptor{
-		AfterDecisionFn: func(decision *swf.DecisionTask, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
 			for _, d := range outcome.Decisions {
 				switch *d.DecisionType {
-				case swf.DecisionTypeStartChildWorkflowExecution:
+				case enums.DecisionTypeStartChildWorkflowExecution:
 					if _, ok := stubbed[*d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name]; ok {
 						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name = S(StubWorkflow)
 						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Version = S(StubVersion)
@@ -96,7 +97,7 @@ func TestInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []st
 						d.StartChildWorkflowExecutionDecisionAttributes.ExecutionStartToCloseTimeout = S("360")
 						d.StartChildWorkflowExecutionDecisionAttributes.TaskList = ShortStubTaskList
 					}
-				case swf.DecisionTypeScheduleActivityTask:
+				case enums.DecisionTypeScheduleActivityTask:
 					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testID)}
 				}
 			}
@@ -105,7 +106,7 @@ func TestInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []st
 }
 
 func TestReplicator(decisionOutcomes chan DecisionOutcome) fsm.ReplicationHandler {
-	return func(ctx *fsm.FSMContext, task *swf.DecisionTask, outcome *swf.RespondDecisionTaskCompletedInput, state *fsm.SerializedState) error {
+	return func(ctx *fsm.FSMContext, task *swf.PollForDecisionTaskOutput, outcome *swf.RespondDecisionTaskCompletedInput, state *fsm.SerializedState) error {
 		decisionOutcomes <- DecisionOutcome{State: state.StateName, DecisionTask: task, Decisions: outcome.Decisions}
 		return nil
 	}
@@ -129,7 +130,7 @@ type StubSWFClient struct {
 	stubbedWorkflows map[string]struct{}
 }
 
-func (s *StubSWFClient) StartWorkflowExecution(req *swf.StartWorkflowExecutionInput) (resp *swf.Run, err error) {
+func (s *StubSWFClient) StartWorkflowExecution(req *swf.StartWorkflowExecutionInput) (resp *swf.StartWorkflowExecutionOutput, err error) {
 	if _, ok := s.stubbedWorkflows[*req.WorkflowType.Name]; ok {
 		req.WorkflowType.Name = S(StubWorkflow)
 		req.WorkflowType.Version = S(StubVersion)

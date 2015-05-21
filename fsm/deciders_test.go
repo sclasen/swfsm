@@ -6,41 +6,42 @@ import (
 	"reflect"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/sclasen/swfsm/enums/swf"
 	s "github.com/sclasen/swfsm/sugar"
 )
 
 func TestTypedFuncs(t *testing.T) {
 	//this will panic when run if the types arent right.
 	typedFuncs := Typed(new(TestingType))
-	typedFuncs.Decider(TestingDecider)(new(FSMContext), swf.HistoryEvent{}, new(TestingType))
-	typedFuncs.DecisionFunc(TestingDecisionFunc)(new(FSMContext), swf.HistoryEvent{}, new(TestingType))
-	typedFuncs.MultiDecisionFunc(TestingMultiDecisionFunc)(new(FSMContext), swf.HistoryEvent{}, new(TestingType))
+	typedFuncs.Decider(TestingDecider)(new(FSMContext), &swf.HistoryEvent{}, new(TestingType))
+	typedFuncs.DecisionFunc(TestingDecisionFunc)(new(FSMContext), &swf.HistoryEvent{}, new(TestingType))
+	typedFuncs.MultiDecisionFunc(TestingMultiDecisionFunc)(new(FSMContext), &swf.HistoryEvent{}, new(TestingType))
 	typedFuncs.PredicateFunc(TestingPredicateFunc)(new(TestingType))
-	typedFuncs.StateFunc(TestingStateFunc)(new(FSMContext), swf.HistoryEvent{}, new(TestingType))
+	typedFuncs.StateFunc(TestingStateFunc)(new(FSMContext), &swf.HistoryEvent{}, new(TestingType))
 }
 
 type TestingType struct {
 	Field string
 }
 
-func TestingDecider(ctx *FSMContext, h swf.HistoryEvent, data *TestingType) Outcome {
+func TestingDecider(ctx *FSMContext, h *swf.HistoryEvent, data *TestingType) Outcome {
 	return ctx.Stay(data, ctx.EmptyDecisions())
 }
 
-func TestingDecisionFunc(ctx *FSMContext, h swf.HistoryEvent, data *TestingType) swf.Decision {
-	return swf.Decision{}
+func TestingDecisionFunc(ctx *FSMContext, h *swf.HistoryEvent, data *TestingType) *swf.Decision {
+	return &swf.Decision{}
 }
 
-func TestingMultiDecisionFunc(ctx *FSMContext, h swf.HistoryEvent, data *TestingType) []swf.Decision {
-	return []swf.Decision{swf.Decision{}}
+func TestingMultiDecisionFunc(ctx *FSMContext, h *swf.HistoryEvent, data *TestingType) []*swf.Decision {
+	return []*swf.Decision{&swf.Decision{}}
 }
 
 func TestingPredicateFunc(data *TestingType) bool {
 	return false
 }
 
-func TestingStateFunc(ctx *FSMContext, h swf.HistoryEvent, data *TestingType) {
+func TestingStateFunc(ctx *FSMContext, h *swf.HistoryEvent, data *TestingType) {
 }
 
 func TestComposedDecider(t *testing.T) {
@@ -49,7 +50,7 @@ func TestComposedDecider(t *testing.T) {
 		typedFuncs.Decider(TestingDecider),
 		DefaultDecider(),
 	)
-	composed(new(FSMContext), swf.HistoryEvent{}, new(TestingType))
+	composed(new(FSMContext), &swf.HistoryEvent{}, new(TestingType))
 }
 
 func ExampleComposedDecider() {
@@ -60,18 +61,18 @@ func ExampleComposedDecider() {
 
 	//for example. reduced boilerplate for the retry of failed activities.
 	//first, you would have one of these typed DecisionFuncs for each activity decision type you create.
-	fooActivityDecision := func(ctx *FSMContext, h swf.HistoryEvent, data *TestingType) swf.Decision {
-		return swf.Decision{
-			DecisionType: aws.String(swf.DecisionTypeScheduleActivityTask),
+	fooActivityDecision := func(ctx *FSMContext, h *swf.HistoryEvent, data *TestingType) *swf.Decision {
+		return &swf.Decision{
+			DecisionType: aws.String(enums.DecisionTypeScheduleActivityTask),
 			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 				ActivityType: &swf.ActivityType{Name: aws.String("foo-activity"), Version: aws.String("1")},
 			},
 		}
 	}
 
-	barActivityDecision := func(ctx *FSMContext, h swf.HistoryEvent, data *TestingType) swf.Decision {
-		return swf.Decision{
-			DecisionType: aws.String(swf.DecisionTypeScheduleActivityTask),
+	barActivityDecision := func(ctx *FSMContext, h *swf.HistoryEvent, data *TestingType) *swf.Decision {
+		return &swf.Decision{
+			DecisionType: aws.String(enums.DecisionTypeScheduleActivityTask),
 			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 				ActivityType: &swf.ActivityType{Name: aws.String("bar-activity"), Version: aws.String("1")},
 			},
@@ -83,14 +84,14 @@ func ExampleComposedDecider() {
 	// func(activityName string, activityFn interface{})
 	// instead of
 	// func(activityName string, activityFn TestingTypeDecisionFunc)
-	type TestingTypeDecisionFunc func(*FSMContext, swf.HistoryEvent, *TestingType) swf.Decision
+	type TestingTypeDecisionFunc func(*FSMContext, *swf.HistoryEvent, *TestingType) *swf.Decision
 
 	//now the retryFailedActivities function, which can be used for all activity funcs like the above.
 	retryFailedActivities := func(activityName string, activityFn TestingTypeDecisionFunc) Decider {
 		typedDecisionFn := typedFuncs.DecisionFunc(activityFn)
-		return func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+		return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 			switch *h.EventType {
-			case swf.EventTypeActivityTaskFailed, swf.EventTypeActivityTaskTimedOut, swf.EventTypeActivityTaskCanceled:
+			case enums.EventTypeActivityTaskFailed, enums.EventTypeActivityTaskTimedOut, enums.EventTypeActivityTaskCanceled:
 				if *ctx.ActivityInfo(h).Name == activityName {
 					decisions := ctx.EmptyDecisions()
 					retry := typedDecisionFn(ctx, h, data)
@@ -111,7 +112,7 @@ func ExampleComposedDecider() {
 		DefaultDecider(),
 	)
 
-	decider(new(FSMContext), swf.HistoryEvent{}, new(TestData))
+	decider(new(FSMContext), &swf.HistoryEvent{}, new(TestData))
 
 }
 
@@ -127,7 +128,7 @@ func TestNestedDeciderComposition(t *testing.T) {
 		State: "start",
 	}
 
-	outcome := composed(ctx, swf.HistoryEvent{}, new(TestingType))
+	outcome := composed(ctx, &swf.HistoryEvent{}, new(TestingType))
 
 	if outcome.State != "ok" {
 		t.Fatal(outcome)
@@ -135,7 +136,7 @@ func TestNestedDeciderComposition(t *testing.T) {
 }
 
 func TestOnStarted(t *testing.T) {
-	decider := func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+	decider := func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		return ctx.Goto("some-state", data, ctx.EmptyDecisions())
 	}
 
@@ -144,7 +145,7 @@ func TestOnStarted(t *testing.T) {
 	for _, et := range s.SWFHistoryEventTypes() {
 		ctx := deciderTestContext()
 		switch et {
-		case swf.EventTypeWorkflowExecutionStarted:
+		case enums.EventTypeWorkflowExecutionStarted:
 			event := s.EventFromPayload(129, &swf.WorkflowExecutionStartedEventAttributes{})
 			data := new(TestData)
 			outcome := composedDecider(ctx, event, data)
@@ -153,7 +154,7 @@ func TestOnStarted(t *testing.T) {
 				t.Fatal("Outcomes not equal", outcome, expected)
 			}
 		default:
-			event := swf.HistoryEvent{
+			event := &swf.HistoryEvent{
 				EventType: s.S(et),
 			}
 			if composedDecider(ctx, event, new(TestData)).State != "" {
@@ -164,7 +165,7 @@ func TestOnStarted(t *testing.T) {
 }
 
 func TestOnChildStarted(t *testing.T) {
-	decider := func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+	decider := func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		return ctx.Goto("some-state", data, ctx.EmptyDecisions())
 	}
 
@@ -173,7 +174,7 @@ func TestOnChildStarted(t *testing.T) {
 	for _, et := range s.SWFHistoryEventTypes() {
 		ctx := deciderTestContext()
 		switch et {
-		case swf.EventTypeChildWorkflowExecutionStarted:
+		case enums.EventTypeChildWorkflowExecutionStarted:
 			event := s.EventFromPayload(129, &swf.ChildWorkflowExecutionStartedEventAttributes{})
 			data := new(TestData)
 			outcome := composedDecider(ctx, event, data)
@@ -182,7 +183,7 @@ func TestOnChildStarted(t *testing.T) {
 				t.Fatal("Outcomes not equal", outcome, expected)
 			}
 		default:
-			event := swf.HistoryEvent{
+			event := &swf.HistoryEvent{
 				EventType: s.S(et),
 			}
 			if composedDecider(ctx, event, new(TestData)).State != "" {
