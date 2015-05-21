@@ -3,7 +3,7 @@ package activity
 import (
 	"testing"
 
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -12,20 +12,20 @@ func TestInterceptors(t *testing.T) {
 	calledBefore := false
 	calledComplete := false
 
-	task := &swf.ActivityTask{
+	task := &swf.PollForActivityTaskOutput{
 		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
 		ActivityID:        S("ID"),
 		WorkflowExecution: &swf.WorkflowExecution{WorkflowID: S("ID"), RunID: S("run")},
 	}
 
 	interceptor := &FuncInterceptor{
-		BeforeTaskFn: func(decision *swf.ActivityTask) {
+		BeforeTaskFn: func(decision *swf.PollForActivityTaskOutput) {
 			calledBefore = true
 		},
-		AfterTaskCompleteFn: func(decision *swf.ActivityTask, result interface{}) {
+		AfterTaskCompleteFn: func(decision *swf.PollForActivityTaskOutput, result interface{}) {
 			calledComplete = true
 		},
-		AfterTaskFailedFn: func(decision *swf.ActivityTask, err error) {
+		AfterTaskFailedFn: func(decision *swf.PollForActivityTaskOutput, err error) {
 			calledFail = true
 		},
 	}
@@ -37,7 +37,7 @@ func TestInterceptors(t *testing.T) {
 
 	handler := &ActivityHandler{
 		Activity: "test",
-		HandlerFunc: func(activityTask *swf.ActivityTask, input interface{}) (interface{}, error) {
+		HandlerFunc: func(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 			return nil, nil
 		},
 	}

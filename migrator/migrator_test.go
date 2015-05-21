@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/kinesis"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/aws/credentials"
+	"github.com/awslabs/aws-sdk-go/service/kinesis"
+	"github.com/awslabs/aws-sdk-go/service/swf"
 )
 
 var testDomain = fmt.Sprintf("test-domain-%d", time.Now().UnixNano())
@@ -20,8 +21,11 @@ func TestMigrateDomains(t *testing.T) {
 		return
 	}
 
-	creds, _ := aws.EnvCreds()
-	client := swf.New(creds, "us-east-1", nil)
+	config := &aws.Config{
+		Credentials: credentials.NewEnvCredentials(),
+		Region:      "us-east-1",
+	}
+	client := swf.New(config)
 
 	domain := fmt.Sprintf("test-domain-%d", time.Now().UnixNano()) //dont use the testDomain since we deprecate this one
 
@@ -59,8 +63,11 @@ func TestMigrateWorkflowTypes(t *testing.T) {
 		return
 	}
 	createDomain()
-	creds, _ := aws.EnvCreds()
-	client := swf.New(creds, "us-east-1", nil)
+	config := &aws.Config{
+		Credentials: credentials.NewEnvCredentials(),
+		Region:      "us-east-1",
+	}
+	client := swf.New(config)
 
 	workflow := fmt.Sprintf("test-workflow-%d", time.Now().UnixNano())
 	version := fmt.Sprintf("test-workflow-version-%d", time.Now().UnixNano())
@@ -105,9 +112,11 @@ func TestMigrateActivityTypes(t *testing.T) {
 		return
 	}
 	createDomain()
-	creds, _ := aws.EnvCreds()
-	client := swf.New(creds, "us-east-1", nil)
-
+	config := &aws.Config{
+		Credentials: credentials.NewEnvCredentials(),
+		Region:      "us-east-1",
+	}
+	client := swf.New(config)
 	activity := fmt.Sprintf("test-activity-%d", time.Now().UnixNano())
 	version := fmt.Sprintf("test-activity-version-%d", time.Now().UnixNano())
 
@@ -150,14 +159,17 @@ func TestMigrateStreams(t *testing.T) {
 		return
 	}
 
-	creds, _ := aws.EnvCreds()
-	client := kinesis.New(creds, "us-east-1", nil)
+	config := &aws.Config{
+		Credentials: credentials.NewEnvCredentials(),
+		Region:      "us-east-1",
+	}
+	client := kinesis.New(config)
 
 	sm := StreamMigrator{
 		Streams: []kinesis.CreateStreamInput{
 			kinesis.CreateStreamInput{
 				StreamName: aws.String(testDomain),
-				ShardCount: aws.Integer(1),
+				ShardCount: aws.Long(1),
 			},
 		},
 		Client:  client,
@@ -170,8 +182,11 @@ func TestMigrateStreams(t *testing.T) {
 }
 
 func createDomain() {
-	creds, _ := aws.EnvCreds()
-	client := swf.New(creds, "us-east-1", nil)
+	config := &aws.Config{
+		Credentials: credentials.NewEnvCredentials(),
+		Region:      "us-east-1",
+	}
+	client := swf.New(config)
 	req := swf.RegisterDomainInput{
 		Name:                                   aws.String(testDomain),
 		Description:                            aws.String("test domain"),

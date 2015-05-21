@@ -6,8 +6,8 @@ import (
 
 	"strings"
 
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/aws/awserr"
+	"github.com/awslabs/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -20,7 +20,7 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 	ticks := make(chan CoordinatedActivityHandlerTick)
 	startErr := make(chan error)
 
-	handlerTickFunc := func(activityTask *swf.ActivityTask, input interface{}) {
+	handlerTickFunc := func(activityTask *swf.PollForActivityTaskOutput, input interface{}) {
 		go func() {
 			cont, res, err := handler.Tick(activityTask, input)
 			ticks <- CoordinatedActivityHandlerTick{
@@ -31,7 +31,7 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 		}()
 	}
 
-	handlerStartFunc := func(activityTask *swf.ActivityTask, input interface{}) {
+	handlerStartFunc := func(activityTask *swf.PollForActivityTaskOutput, input interface{}) {
 		go func() {
 			update, err := handler.Start(activityTask, input)
 			if err != nil {
@@ -49,7 +49,7 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 
 	heartbeats := time.Tick(heartbeatInterval)
 
-	handlerFunc := func(activityTask *swf.ActivityTask, input interface{}) {
+	handlerFunc := func(activityTask *swf.PollForActivityTaskOutput, input interface{}) {
 		handlerStartFunc(activityTask, input)
 		for {
 			select {
@@ -87,7 +87,7 @@ func (w *ActivityWorker) AddCoordinatedHandler(heartbeatInterval time.Duration, 
 					TaskToken: activityTask.TaskToken,
 				})
 				if err != nil {
-					if ae, ok := err.(aws.APIError); ok && ae.Code == ErrorTypeUnknownResourceFault && strings.Contains(ae.Message, TaskGone) {
+					if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeUnknownResourceFault && strings.Contains(ae.Message(), TaskGone) {
 						log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-gone", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
 						//wait for the tick to complete before exiting
 						<-ticks

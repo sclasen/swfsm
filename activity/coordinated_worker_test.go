@@ -5,7 +5,7 @@ import (
 
 	"time"
 
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -32,7 +32,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	worker.AddCoordinatedHandler(1*time.Second, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -54,7 +54,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	mockSwf.Completed = nil
 	mockSwf.Canceled = true
 
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -88,7 +88,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 	worker.AddCoordinatedHandler(1*time.Second, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -110,7 +110,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 	mockSwf.Completed = nil
 	mockSwf.Canceled = true
 
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -134,12 +134,12 @@ type TypedCoordinatedTaskHandler struct {
 	canceled bool
 }
 
-func (c *TypedCoordinatedTaskHandler) Begin(a *swf.ActivityTask, d *TestInput) (*TestOutput, error) {
+func (c *TypedCoordinatedTaskHandler) Begin(a *swf.PollForActivityTaskOutput, d *TestInput) (*TestOutput, error) {
 	c.t.Log("START")
 	return nil, nil
 }
 
-func (c *TypedCoordinatedTaskHandler) Work(a *swf.ActivityTask, d *TestInput) (bool, *TestOutput, error) {
+func (c *TypedCoordinatedTaskHandler) Work(a *swf.PollForActivityTaskOutput, d *TestInput) (bool, *TestOutput, error) {
 	c.t.Log("TICK")
 	time.Sleep(100 * time.Millisecond)
 	if c.cont {
@@ -148,7 +148,7 @@ func (c *TypedCoordinatedTaskHandler) Work(a *swf.ActivityTask, d *TestInput) (b
 	return false, &TestOutput{Name: "done"}, nil
 }
 
-func (c *TypedCoordinatedTaskHandler) Stop(a *swf.ActivityTask, d *TestInput) error {
+func (c *TypedCoordinatedTaskHandler) Stop(a *swf.PollForActivityTaskOutput, d *TestInput) error {
 	c.t.Log("CANCEL")
 	c.canceled = true
 	return nil
@@ -160,12 +160,12 @@ type TestCoordinatedTaskHandler struct {
 	canceled bool
 }
 
-func (c *TestCoordinatedTaskHandler) Start(a *swf.ActivityTask, d interface{}) (interface{}, error) {
+func (c *TestCoordinatedTaskHandler) Start(a *swf.PollForActivityTaskOutput, d interface{}) (interface{}, error) {
 	c.t.Log("START")
 	return nil, nil
 }
 
-func (c *TestCoordinatedTaskHandler) Tick(a *swf.ActivityTask, d interface{}) (bool, interface{}, error) {
+func (c *TestCoordinatedTaskHandler) Tick(a *swf.PollForActivityTaskOutput, d interface{}) (bool, interface{}, error) {
 	c.t.Log("TICK")
 	time.Sleep(100 * time.Millisecond)
 	if c.cont {
@@ -174,7 +174,7 @@ func (c *TestCoordinatedTaskHandler) Tick(a *swf.ActivityTask, d interface{}) (b
 	return false, &TestOutput{Name: "done"}, nil
 }
 
-func (c *TestCoordinatedTaskHandler) Cancel(a *swf.ActivityTask, d interface{}) error {
+func (c *TestCoordinatedTaskHandler) Cancel(a *swf.PollForActivityTaskOutput, d interface{}) error {
 	c.t.Log("CANCEL")
 	c.canceled = true
 	return nil
