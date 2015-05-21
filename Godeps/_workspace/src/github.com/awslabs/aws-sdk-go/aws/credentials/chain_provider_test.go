@@ -1,10 +1,9 @@
 package credentials
 
 import (
-	"testing"
-
 	"github.com/awslabs/aws-sdk-go/internal/apierr"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestChainProviderGet(t *testing.T) {

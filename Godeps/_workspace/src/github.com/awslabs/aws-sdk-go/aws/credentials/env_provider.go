@@ -1,9 +1,8 @@
 package credentials
 
 import (
-	"os"
-
 	"github.com/awslabs/aws-sdk-go/internal/apierr"
+	"os"
 )
 
 var (

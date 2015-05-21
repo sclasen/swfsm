@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"time"
-
 	"github.com/awslabs/aws-sdk-go/aws"
 
 	"github.com/awslabs/aws-sdk-go/aws/awserr"

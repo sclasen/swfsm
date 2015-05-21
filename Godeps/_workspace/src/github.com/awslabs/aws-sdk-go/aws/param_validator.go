@@ -2,10 +2,9 @@ package aws
 
 import (
 	"fmt"
+	"github.com/awslabs/aws-sdk-go/internal/apierr"
 	"reflect"
 	"strings"
-
-	"github.com/awslabs/aws-sdk-go/internal/apierr"
 )
 
 // ValidateParameters is a request handler to validate the input parameters.
