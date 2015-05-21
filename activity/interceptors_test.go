@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -14,23 +14,23 @@ func TestInterceptors(t *testing.T) {
 	calledComplete := false
 	calledCanceled := false
 
-	task := &swf.ActivityTask{
+	task := &swf.PollForActivityTaskOutput{
 		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
 		ActivityID:        S("ID"),
 		WorkflowExecution: &swf.WorkflowExecution{WorkflowID: S("ID"), RunID: S("run")},
 	}
 
 	interceptor := &FuncInterceptor{
-		BeforeTaskFn: func(decision *swf.ActivityTask) {
+		BeforeTaskFn: func(decision *swf.PollForActivityTaskOutput) {
 			calledBefore = true
 		},
-		AfterTaskCompleteFn: func(decision *swf.ActivityTask, result interface{}) {
+		AfterTaskCompleteFn: func(decision *swf.PollForActivityTaskOutput, result interface{}) {
 			calledComplete = true
 		},
-		AfterTaskFailedFn: func(decision *swf.ActivityTask, err error) {
+		AfterTaskFailedFn: func(decision *swf.PollForActivityTaskOutput, err error) {
 			calledFail = true
 		},
-		AfterTaskCanceledFn: func(decision *swf.ActivityTask, details string) {
+		AfterTaskCanceledFn: func(decision *swf.PollForActivityTaskOutput, details string) {
 			calledCanceled = true
 		},
 	}
@@ -42,7 +42,7 @@ func TestInterceptors(t *testing.T) {
 
 	handler := &ActivityHandler{
 		Activity: "test",
-		HandlerFunc: func(activityTask *swf.ActivityTask, input interface{}) (interface{}, error) {
+		HandlerFunc: func(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 			return nil, nil
 		},
 	}
@@ -85,23 +85,23 @@ func TestFailedInterceptor(t *testing.T) {
 		calledCanceled = false
 		failMessage    string
 	)
-	task := &swf.ActivityTask{
+	task := &swf.PollForActivityTaskOutput{
 		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
 		ActivityID:        S("ID"),
 		WorkflowExecution: &swf.WorkflowExecution{WorkflowID: S("ID"), RunID: S("run")},
 	}
 	interceptor := &FuncInterceptor{
-		BeforeTaskFn: func(decision *swf.ActivityTask) {
+		BeforeTaskFn: func(decision *swf.PollForActivityTaskOutput) {
 			calledBefore = true
 		},
-		AfterTaskCompleteFn: func(decision *swf.ActivityTask, result interface{}) {
+		AfterTaskCompleteFn: func(decision *swf.PollForActivityTaskOutput, result interface{}) {
 			calledComplete = true
 		},
-		AfterTaskFailedFn: func(decision *swf.ActivityTask, err error) {
+		AfterTaskFailedFn: func(decision *swf.PollForActivityTaskOutput, err error) {
 			calledFail = true
 			failMessage = err.Error()
 		},
-		AfterTaskCanceledFn: func(decision *swf.ActivityTask, details string) {
+		AfterTaskCanceledFn: func(decision *swf.PollForActivityTaskOutput, details string) {
 			calledCanceled = true
 		},
 	}
@@ -111,7 +111,7 @@ func TestFailedInterceptor(t *testing.T) {
 	}
 	handler := &ActivityHandler{
 		Activity: "test",
-		HandlerFunc: func(activityTask *swf.ActivityTask, input interface{}) (interface{}, error) {
+		HandlerFunc: func(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 			return nil, errors.New("fail")
 		},
 	}
@@ -138,22 +138,22 @@ func TestCanceledInterceptor(t *testing.T) {
 		calledCanceled = false
 		details        string
 	)
-	task := &swf.ActivityTask{
+	task := &swf.PollForActivityTaskOutput{
 		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
 		ActivityID:        S("ID"),
 		WorkflowExecution: &swf.WorkflowExecution{WorkflowID: S("ID"), RunID: S("run")},
 	}
 	interceptor := &FuncInterceptor{
-		BeforeTaskFn: func(decision *swf.ActivityTask) {
+		BeforeTaskFn: func(decision *swf.PollForActivityTaskOutput) {
 			calledBefore = true
 		},
-		AfterTaskCompleteFn: func(decision *swf.ActivityTask, result interface{}) {
+		AfterTaskCompleteFn: func(decision *swf.PollForActivityTaskOutput, result interface{}) {
 			calledComplete = true
 		},
-		AfterTaskFailedFn: func(decision *swf.ActivityTask, err error) {
+		AfterTaskFailedFn: func(decision *swf.PollForActivityTaskOutput, err error) {
 			calledFail = true
 		},
-		AfterTaskCanceledFn: func(decision *swf.ActivityTask, det string) {
+		AfterTaskCanceledFn: func(decision *swf.PollForActivityTaskOutput, det string) {
 			calledCanceled = true
 			details = det
 		},
@@ -164,7 +164,7 @@ func TestCanceledInterceptor(t *testing.T) {
 	}
 	handler := &ActivityHandler{
 		Activity: "test",
-		HandlerFunc: func(activityTask *swf.ActivityTask, input interface{}) (interface{}, error) {
+		HandlerFunc: func(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 			return nil, ActivityTaskCanceledError{details: "details"}
 		},
 	}

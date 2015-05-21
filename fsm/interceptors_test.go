@@ -3,7 +3,8 @@ package fsm
 import (
 	"testing"
 
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -13,15 +14,15 @@ func TestInterceptors(t *testing.T) {
 	calledBeforeCtx := false
 
 	interceptor := &FuncInterceptor{
-		BeforeTaskFn: func(decision *swf.DecisionTask) {
+		BeforeTaskFn: func(decision *swf.PollForDecisionTaskOutput) {
 			calledBefore = true
 		},
-		BeforeDecisionFn: func(decision *swf.DecisionTask, ctx *FSMContext, outcome *Outcome) {
+		BeforeDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
 			outcome.Decisions = append(outcome.Decisions, ctx.CompleteWorkflowDecision(&TestData{}))
 			outcome.Decisions = append(outcome.Decisions, ctx.CompleteWorkflowDecision(&TestData{}))
 			calledBeforeCtx = true
 		},
-		AfterDecisionFn: func(decision *swf.DecisionTask, ctx *FSMContext, outcome *Outcome) {
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
 			if countCompletes(outcome.Decisions) != 2 {
 				t.Fatal("not 2 completes in after")
 			}
@@ -41,18 +42,18 @@ func TestInterceptors(t *testing.T) {
 		systemSerializer:    JSONStateSerializer{},
 	}
 
-	fsm.AddInitialState(&FSMState{Name: "initial", Decider: func(ctx *FSMContext, e swf.HistoryEvent, d interface{}) Outcome {
-		return Outcome{State: "initial", Data: d, Decisions: []swf.Decision{}}
+	fsm.AddInitialState(&FSMState{Name: "initial", Decider: func(ctx *FSMContext, e *swf.HistoryEvent, d interface{}) Outcome {
+		return Outcome{State: "initial", Data: d, Decisions: []*swf.Decision{}}
 	}})
 
-	decisionTask := new(swf.DecisionTask)
+	decisionTask := new(swf.PollForDecisionTaskOutput)
 	decisionTask.WorkflowExecution = new(swf.WorkflowExecution)
 	decisionTask.WorkflowType = &swf.WorkflowType{Name: S("test"), Version: S("1")}
 	decisionTask.WorkflowExecution.RunID = S("run")
 	decisionTask.WorkflowExecution.WorkflowID = S("wf")
 	decisionTask.PreviousStartedEventID = I(5)
 	decisionTask.StartedEventID = I(15)
-	decisionTask.Events = []swf.HistoryEvent{
+	decisionTask.Events = []*swf.HistoryEvent{
 		{
 			EventID:   I(10),
 			EventType: S("WorkflowExecutionStarted"),
@@ -81,28 +82,28 @@ func TestInterceptors(t *testing.T) {
 	}
 }
 
-func dedupeCompletes(in []swf.Decision) []swf.Decision {
-	out := []swf.Decision{}
+func dedupeCompletes(in []*swf.Decision) []*swf.Decision {
+	out := []*swf.Decision{}
 	complete := false
 	for i := len(in) - 1; i >= 0; i-- {
 		d := in[i]
-		if *d.DecisionType == swf.DecisionTypeCompleteWorkflowExecution {
+		if *d.DecisionType == enums.DecisionTypeCompleteWorkflowExecution {
 			if !complete {
 				complete = true
-				out = append([]swf.Decision{d}, out...)
+				out = append([]*swf.Decision{d}, out...)
 			}
 		} else {
-			out = append([]swf.Decision{d}, out...)
+			out = append([]*swf.Decision{d}, out...)
 		}
 	}
 	println(len(out))
 	return out
 }
 
-func countCompletes(in []swf.Decision) int {
+func countCompletes(in []*swf.Decision) int {
 	count := 0
 	for _, d := range in {
-		if *d.DecisionType == swf.DecisionTypeCompleteWorkflowExecution {
+		if *d.DecisionType == enums.DecisionTypeCompleteWorkflowExecution {
 			count++
 		}
 	}

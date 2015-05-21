@@ -6,8 +6,8 @@ import (
 
 	"strings"
 
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/aws/awserr"
+	"github.com/awslabs/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -45,7 +45,7 @@ type coordinatedActivityAdapter struct {
 	handler           *CoordinatedActivityHandler
 }
 
-func (c *coordinatedActivityAdapter) heartbeat(activityTask *swf.ActivityTask, stop <-chan struct{}, cancelActivity chan error) {
+func (c *coordinatedActivityAdapter) heartbeat(activityTask *swf.PollForActivityTaskOutput, stop <-chan struct{}, cancelActivity chan error) {
 	heartbeats := time.NewTicker(c.heartbeatInterval)
 	defer heartbeats.Stop()
 	for {
@@ -54,7 +54,7 @@ func (c *coordinatedActivityAdapter) heartbeat(activityTask *swf.ActivityTask, s
 			if status, err := c.worker.SWF.RecordActivityTaskHeartbeat(&swf.RecordActivityTaskHeartbeatInput{
 				TaskToken: activityTask.TaskToken,
 			}); err != nil {
-				if ae, ok := err.(aws.APIError); ok && ae.Code == ErrorTypeUnknownResourceFault && strings.Contains(ae.Message, TaskGone) {
+				if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeUnknownResourceFault && strings.Contains(ae.Message(), TaskGone) {
 					log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-gone", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
 					cancelActivity <- nil
 					return
@@ -74,7 +74,7 @@ func (c *coordinatedActivityAdapter) heartbeat(activityTask *swf.ActivityTask, s
 	}
 }
 
-func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.ActivityTask, input interface{}) (interface{}, error) {
+func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 	update, err := c.handler.Start(activityTask, input)
 	if err != nil {
 		return nil, err

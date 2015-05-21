@@ -9,7 +9,9 @@ import (
 
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/aws/credentials"
+	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/migrator"
 )
 
@@ -19,8 +21,11 @@ func TestClient(t *testing.T) {
 		return
 	}
 
-	creds, _ := aws.EnvCreds()
-	client := swf.New(creds, "us-east-1", nil)
+	config := &aws.Config{
+		Credentials: credentials.NewEnvCredentials(),
+		Region:      "us-east-1",
+	}
+	client := swf.New(config)
 
 	req := swf.RegisterDomainInput{
 		Name:                                   aws.String("client-test"),
@@ -59,8 +64,8 @@ func TestClient(t *testing.T) {
 	}
 
 	fsm.AddInitialState(&FSMState{Name: "initial",
-		Decider: func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
-			if *h.EventType == swf.EventTypeWorkflowExecutionSignaled {
+		Decider: func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+			if *h.EventType == enums.EventTypeWorkflowExecutionSignaled {
 				d := data.(*TestData)
 				d.States = append(d.States, *h.WorkflowExecutionSignaledEventAttributes.SignalName)
 			}
@@ -145,12 +150,12 @@ type MockSWF struct {
 	*swf.SWF
 }
 
-func (m *MockSWF) SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (err error) {
+func (m *MockSWF) SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (*swf.SignalWorkflowExecutionOutput, error) {
 	if strings.Contains(*req.Input, "\"") {
 		m.t.Fatal("simple string input has quotes")
 	}
 	if *req.Input != "simple" {
 		m.t.Fatal("not simele")
 	}
-	return nil
+	return nil, nil
 }

@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"code.google.com/p/go-uuid/uuid"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/activity"
 	"github.com/sclasen/swfsm/fsm"
 )
@@ -35,8 +35,8 @@ func NewTestListener(t TestConfig) *TestListener {
 
 	tl := &TestListener{
 		decisionOutcomes: make(chan DecisionOutcome, 1000),
-		historyInterest:  make(map[string]chan swf.HistoryEvent, 1000),
-		decisionInterest: make(map[string]chan swf.Decision, 1000),
+		historyInterest:  make(map[string]chan *swf.HistoryEvent, 1000),
+		decisionInterest: make(map[string]chan *swf.Decision, 1000),
 		stateInterest:    make(map[string]chan string, 1000),
 		DefaultWait:      time.Duration(t.DefaultWaitTimeout) * time.Second,
 		testAdapter:      t.Testing,
@@ -62,9 +62,9 @@ func NewTestListener(t TestConfig) *TestListener {
 
 type TestListener struct {
 	decisionOutcomes chan DecisionOutcome
-	historyInterest  map[string]chan swf.HistoryEvent
+	historyInterest  map[string]chan *swf.HistoryEvent
 	historyLock      sync.Mutex
-	decisionInterest map[string]chan swf.Decision
+	decisionInterest map[string]chan *swf.Decision
 	decisionLock     sync.Mutex
 	stateInterest    map[string]chan string
 	stateLock        sync.Mutex
@@ -73,23 +73,23 @@ type TestListener struct {
 	TestID           string
 }
 
-func (tl *TestListener) RegisterHistoryInterest(workflowID string) chan swf.HistoryEvent {
+func (tl *TestListener) RegisterHistoryInterest(workflowID string) chan *swf.HistoryEvent {
 	defer tl.historyLock.Unlock()
 	tl.historyLock.Lock()
 	historyChan, ok := tl.historyInterest[workflowID]
 	if !ok {
-		historyChan = make(chan swf.HistoryEvent, 1000)
+		historyChan = make(chan *swf.HistoryEvent, 1000)
 		tl.historyInterest[workflowID] = historyChan
 	}
 	return historyChan
 }
 
-func (tl *TestListener) RegisterDecisionInterest(workflowID string) chan swf.Decision {
+func (tl *TestListener) RegisterDecisionInterest(workflowID string) chan *swf.Decision {
 	defer tl.decisionLock.Unlock()
 	tl.decisionLock.Lock()
 	decisionChan, ok := tl.decisionInterest[workflowID]
 	if !ok {
-		decisionChan = make(chan swf.Decision, 1000)
+		decisionChan = make(chan *swf.Decision, 1000)
 		tl.decisionInterest[workflowID] = decisionChan
 	}
 	return decisionChan
@@ -129,7 +129,7 @@ func (tl *TestListener) AwaitState(workflowID, state string) {
 	tl.AwaitStateFor(workflowID, state, tl.DefaultWait)
 }
 
-func (tl *TestListener) AwaitEventFor(workflowID string, waitFor time.Duration, predicate func(swf.HistoryEvent) bool) {
+func (tl *TestListener) AwaitEventFor(workflowID string, waitFor time.Duration, predicate func(*swf.HistoryEvent) bool) {
 	ch := tl.RegisterHistoryInterest(workflowID)
 	timer := time.After(waitFor)
 	for {
@@ -149,11 +149,11 @@ func (tl *TestListener) AwaitEventFor(workflowID string, waitFor time.Duration, 
 	}
 }
 
-func (tl *TestListener) AwaitEvent(workflowID string, predicate func(swf.HistoryEvent) bool) {
+func (tl *TestListener) AwaitEvent(workflowID string, predicate func(*swf.HistoryEvent) bool) {
 	tl.AwaitEventFor(workflowID, tl.DefaultWait, predicate)
 }
 
-func (tl *TestListener) AwaitDecisionFor(workflowID string, waitFor time.Duration, predicate func(swf.Decision) bool) {
+func (tl *TestListener) AwaitDecisionFor(workflowID string, waitFor time.Duration, predicate func(*swf.Decision) bool) {
 	ch := tl.RegisterDecisionInterest(workflowID)
 	timer := time.After(waitFor)
 	for {
@@ -173,7 +173,7 @@ func (tl *TestListener) AwaitDecisionFor(workflowID string, waitFor time.Duratio
 	}
 }
 
-func (tl *TestListener) AwaitDecision(workflowID string, predicate func(swf.Decision) bool) {
+func (tl *TestListener) AwaitDecision(workflowID string, predicate func(*swf.Decision) bool) {
 	tl.AwaitDecisionFor(workflowID, tl.DefaultWait, predicate)
 }
 

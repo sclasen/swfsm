@@ -5,18 +5,18 @@ import (
 	"time"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
 // SWFOps is the subset of the swf.SWF api used by pollers
 type DecisionOps interface {
-	PollForDecisionTask(req *swf.PollForDecisionTaskInput) (resp *swf.DecisionTask, err error)
+	PollForDecisionTask(req *swf.PollForDecisionTaskInput) (resp *swf.PollForDecisionTaskOutput, err error)
 }
 
 type ActivityOps interface {
-	PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error)
+	PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.PollForActivityTaskOutput, err error)
 }
 
 // NewDecisionTaskPoller returns a DecisionTaskPoller whick can be used to poll the given task list.
@@ -39,11 +39,11 @@ type DecisionTaskPoller struct {
 
 // Poll polls the task list for a task. If there is no task available, nil is
 // returned. If an error is encountered, no task is returned.
-func (p *DecisionTaskPoller) Poll() (*swf.DecisionTask, error) {
+func (p *DecisionTaskPoller) Poll() (*swf.PollForDecisionTaskOutput, error) {
 	resp, err := p.client.PollForDecisionTask(&swf.PollForDecisionTaskInput{
 		Domain:       aws.String(p.Domain),
 		Identity:     aws.String(p.Identity),
-		ReverseOrder: aws.True(),
+		ReverseOrder: aws.Boolean(true),
 		TaskList:     &swf.TaskList{Name: aws.String(p.TaskList)},
 	})
 	if err != nil {
@@ -61,7 +61,7 @@ func (p *DecisionTaskPoller) Poll() (*swf.DecisionTask, error) {
 
 // PollUntilShutdownBy will poll until signaled to shutdown by the PollerShutdownManager. this func blocks, so run it in a goroutine if necessary.
 // The implementation calls Poll() and invokes the callback whenever a valid PollForDecisionTaskResponse is received.
-func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerName string, onTask func(*swf.DecisionTask)) {
+func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerName string, onTask func(*swf.PollForDecisionTaskOutput)) {
 	stop := make(chan bool, 1)
 	stopAck := make(chan bool, 1)
 	mgr.Register(pollerName, stop, stopAck)
@@ -86,10 +86,10 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 	}
 }
 
-func (p *DecisionTaskPoller) logTaskLatency(resp *swf.DecisionTask) {
+func (p *DecisionTaskPoller) logTaskLatency(resp *swf.PollForDecisionTaskOutput) {
 	for _, e := range resp.Events {
 		if e.EventID == resp.StartedEventID {
-			elapsed := time.Since(e.EventTimestamp.Time)
+			elapsed := time.Since(*e.EventTimestamp)
 			log.Printf("component=DecisionTaskPoller at=decision-task-latency latency=%s workflow=%s", elapsed, LS(resp.WorkflowType.Name))
 		}
 	}
@@ -115,7 +115,7 @@ type ActivityTaskPoller struct {
 
 // Poll polls the task list for a task. If there is no task, nil is returned.
 // If an error is encountered, no task is returned.
-func (p *ActivityTaskPoller) Poll() (*swf.ActivityTask, error) {
+func (p *ActivityTaskPoller) Poll() (*swf.PollForActivityTaskOutput, error) {
 	resp, err := p.client.PollForActivityTask(&swf.PollForActivityTaskInput{
 		Domain:   aws.String(p.Domain),
 		Identity: aws.String(p.Identity),
@@ -135,7 +135,7 @@ func (p *ActivityTaskPoller) Poll() (*swf.ActivityTask, error) {
 
 // PollUntilShutdownBy will poll until signaled to shutdown by the ShutdownManager. this func blocks, so run it in a goroutine if necessary.
 // The implementation calls Poll() and invokes the callback whenever a valid PollForActivityTaskResponse is received.
-func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerName string, onTask func(*swf.ActivityTask)) {
+func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerName string, onTask func(*swf.PollForActivityTaskOutput)) {
 	stop := make(chan bool, 1)
 	stopAck := make(chan bool, 1)
 	mgr.Register(pollerName, stop, stopAck)

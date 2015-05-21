@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/awslabs/aws-sdk-go/gen/kinesis"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/kinesis"
+	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -30,8 +31,8 @@ func (c *MockClient) PutRecord(req *kinesis.PutRecordInput) (*kinesis.PutRecordO
 	}, nil
 }
 
-func (c *MockClient) RespondDecisionTaskCompleted(req *swf.RespondDecisionTaskCompletedInput) (err error) {
-	return nil
+func (c *MockClient) RespondDecisionTaskCompleted(req *swf.RespondDecisionTaskCompletedInput) (*swf.RespondDecisionTaskCompletedOutput, error) {
+	return nil, nil
 }
 
 func TestKinesisReplication(t *testing.T) {
@@ -46,8 +47,8 @@ func TestKinesisReplication(t *testing.T) {
 	fsm.ReplicationHandler = rep.Handler
 	fsm.AddInitialState(&FSMState{
 		Name: "initial",
-		Decider: func(f *FSMContext, h swf.HistoryEvent, d interface{}) Outcome {
-			if *h.EventType == swf.EventTypeWorkflowExecutionStarted {
+		Decider: func(f *FSMContext, h *swf.HistoryEvent, d interface{}) Outcome {
+			if *h.EventType == enums.EventTypeWorkflowExecutionStarted {
 				return f.Goto("done", d, f.EmptyDecisions())
 			}
 			t.Fatal("unexpected")
@@ -56,15 +57,15 @@ func TestKinesisReplication(t *testing.T) {
 	})
 	fsm.AddState(&FSMState{
 		Name: "done",
-		Decider: func(f *FSMContext, h swf.HistoryEvent, d interface{}) Outcome {
+		Decider: func(f *FSMContext, h *swf.HistoryEvent, d interface{}) Outcome {
 			go fsm.ShutdownManager.StopPollers()
 			return f.Stay(d, f.EmptyDecisions())
 		},
 	})
-	events := []swf.HistoryEvent{
-		swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
-		swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
-		swf.HistoryEvent{
+	events := []*swf.HistoryEvent{
+		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
+		&swf.HistoryEvent{
 			EventID:   I(1),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
