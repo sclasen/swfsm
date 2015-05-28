@@ -1,7 +1,7 @@
 GO_PACKAGES := $(shell go list ./... | sed 's_github.com/sclasen/swfsm_._')
 
 
-all: build
+all: ready test
 
 travis: tidy test
 
