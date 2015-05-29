@@ -16,12 +16,13 @@ import (
 )
 
 type MockSWF struct {
-	Activity     *swf.ActivityTask
-	Failed       bool
-	Completed    *string
-	CompletedSet bool
-	History      *swf.History
-	Canceled     bool
+	Activity        *swf.ActivityTask
+	Failed          bool
+	Completed       *string
+	CompletedSet    bool
+	History         *swf.History
+	Canceled        bool
+	CancelResponded bool
 }
 
 func (m *MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error) {
@@ -29,7 +30,8 @@ func (m *MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbe
 		CancelRequested: &m.Canceled,
 	}, nil
 }
-func (*MockSWF) RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceledInput) (err error) {
+func (m *MockSWF) RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceledInput) (err error) {
+	m.CancelResponded = true
 	return nil
 }
 func (m *MockSWF) RespondActivityTaskCompleted(req *swf.RespondActivityTaskCompletedInput) (err error) {

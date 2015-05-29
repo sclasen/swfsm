@@ -16,6 +16,22 @@ import (
 	. "github.com/sclasen/swfsm/sugar"
 )
 
+type ActivityTaskCanceledError struct {
+	details string
+}
+
+func (e ActivityTaskCanceledError) Error() string {
+	return "AcvitityTask canceled: " + e.details
+}
+
+func (e ActivityTaskCanceledError) Details() *string {
+	if e.details == "" {
+		return nil
+	}
+	dup := e.details
+	return &dup
+}
+
 type SWFOps interface {
 	RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error)
 	RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceledInput) (err error)
@@ -131,8 +147,13 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 
 		result, err := handler.HandlerFunc(activityTask, deserialized)
 		if err != nil {
-			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
-			a.fail(activityTask, errors.Annotate(err, "handler"))
+			if e, ok := err.(ActivityTaskCanceledError); ok {
+				a.ActivityInterceptor.AfterTaskCanceled(activityTask, e.details)
+				a.canceled(activityTask, e.Details())
+			} else {
+				a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
+				a.fail(activityTask, errors.Annotate(err, "handler"))
+			}
 		} else {
 			a.result(activityTask, result)
 		}
@@ -277,7 +298,7 @@ func (h *ActivityWorker) done(resp *swf.ActivityTask, result *string) {
 }
 
 func (h *ActivityWorker) canceled(resp *swf.ActivityTask, details *string) {
-	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=cancled", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
+	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
 
 	canceledErr := h.SWF.RespondActivityTaskCanceled(&swf.RespondActivityTaskCanceledInput{
 		TaskToken: resp.TaskToken,
