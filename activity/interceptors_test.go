@@ -1,6 +1,7 @@
 package activity
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/awslabs/aws-sdk-go/gen/swf"
@@ -11,6 +12,7 @@ func TestInterceptors(t *testing.T) {
 	calledFail := false
 	calledBefore := false
 	calledComplete := false
+	calledCanceled := false
 
 	task := &swf.ActivityTask{
 		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
@@ -27,6 +29,9 @@ func TestInterceptors(t *testing.T) {
 		},
 		AfterTaskFailedFn: func(decision *swf.ActivityTask, err error) {
 			calledFail = true
+		},
+		AfterTaskCanceledFn: func(decision *swf.ActivityTask, details string) {
+			calledCanceled = true
 		},
 	}
 
@@ -68,6 +73,112 @@ func TestInterceptors(t *testing.T) {
 
 	if !calledFail {
 		t.Fatal("no after fail")
+	}
+
+}
+
+func TestFailedInterceptor(t *testing.T) {
+	var (
+		calledFail     = false
+		calledBefore   = false
+		calledComplete = false
+		calledCanceled = false
+		failMessage    string
+	)
+	task := &swf.ActivityTask{
+		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
+		ActivityID:        S("ID"),
+		WorkflowExecution: &swf.WorkflowExecution{WorkflowID: S("ID"), RunID: S("run")},
+	}
+	interceptor := &FuncInterceptor{
+		BeforeTaskFn: func(decision *swf.ActivityTask) {
+			calledBefore = true
+		},
+		AfterTaskCompleteFn: func(decision *swf.ActivityTask, result interface{}) {
+			calledComplete = true
+		},
+		AfterTaskFailedFn: func(decision *swf.ActivityTask, err error) {
+			calledFail = true
+			failMessage = err.Error()
+		},
+		AfterTaskCanceledFn: func(decision *swf.ActivityTask, details string) {
+			calledCanceled = true
+		},
+	}
+	worker := &ActivityWorker{
+		ActivityInterceptor: interceptor,
+		SWF:                 &MockSWF{},
+	}
+	handler := &ActivityHandler{
+		Activity: "test",
+		HandlerFunc: func(activityTask *swf.ActivityTask, input interface{}) (interface{}, error) {
+			return nil, errors.New("fail")
+		},
+	}
+
+	worker.AddHandler(handler)
+	worker.handleActivityTask(task)
+	if !calledBefore {
+		t.Fatal("no before")
+	}
+	if !calledFail {
+		t.Fatal("no after fail")
+	}
+	if failMessage != "fail" {
+		t.Fatal("wong error message")
+	}
+
+}
+
+func TestCanceledInterceptor(t *testing.T) {
+	var (
+		calledFail     = false
+		calledBefore   = false
+		calledComplete = false
+		calledCanceled = false
+		details        string
+	)
+	task := &swf.ActivityTask{
+		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
+		ActivityID:        S("ID"),
+		WorkflowExecution: &swf.WorkflowExecution{WorkflowID: S("ID"), RunID: S("run")},
+	}
+	interceptor := &FuncInterceptor{
+		BeforeTaskFn: func(decision *swf.ActivityTask) {
+			calledBefore = true
+		},
+		AfterTaskCompleteFn: func(decision *swf.ActivityTask, result interface{}) {
+			calledComplete = true
+		},
+		AfterTaskFailedFn: func(decision *swf.ActivityTask, err error) {
+			calledFail = true
+		},
+		AfterTaskCanceledFn: func(decision *swf.ActivityTask, det string) {
+			calledCanceled = true
+			details = det
+		},
+	}
+	worker := &ActivityWorker{
+		ActivityInterceptor: interceptor,
+		SWF:                 &MockSWF{},
+	}
+	handler := &ActivityHandler{
+		Activity: "test",
+		HandlerFunc: func(activityTask *swf.ActivityTask, input interface{}) (interface{}, error) {
+			return nil, ActivityTaskCanceledError{details: "details"}
+		},
+	}
+
+	worker.AddHandler(handler)
+	worker.handleActivityTask(task)
+	if !calledBefore {
+		t.Fatal("no before")
+	}
+	if !calledCanceled {
+		t.Fatal("no after canceled")
+	}
+	if details != "details" {
+		t.Fatalf("wong task canceled details. Got: %q", details)
 	}
 
 }

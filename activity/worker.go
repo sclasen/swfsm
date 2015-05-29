@@ -16,6 +16,22 @@ import (
 	. "github.com/sclasen/swfsm/sugar"
 )
 
+type ActivityTaskCanceledError struct {
+	details string
+}
+
+func (e ActivityTaskCanceledError) Error() string {
+	return "AcvitityTask canceled: " + e.details
+}
+
+func (e ActivityTaskCanceledError) Details() *string {
+	if e.details == "" {
+		return nil
+	}
+	dup := e.details
+	return &dup
+}
+
 type SWFOps interface {
 	RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error)
 	RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceledInput) (err error)
@@ -38,8 +54,7 @@ type ActivityWorker struct {
 	// Client used to make SWF api requests.
 	SWF SWFOps
 	// Type Info for handled activities
-	handlers            map[string]*ActivityHandler
-	longRunningHandlers map[string]*LongRunningActivityHandler
+	handlers map[string]*ActivityHandler
 	// ShutdownManager
 	ShutdownManager *poller.ShutdownManager
 	// ActivityTaskDispatcher
@@ -59,13 +74,6 @@ func (a *ActivityWorker) AddHandler(handler *ActivityHandler) {
 		a.handlers = map[string]*ActivityHandler{}
 	}
 	a.handlers[handler.Activity] = handler
-}
-
-func (a *ActivityWorker) AddLongRunningHandler(handler *LongRunningActivityHandler) {
-	if a.longRunningHandlers == nil {
-		a.longRunningHandlers = map[string]*LongRunningActivityHandler{}
-	}
-	a.longRunningHandlers[handler.Activity] = handler
 }
 
 func (a *ActivityWorker) Init() {
@@ -107,62 +115,44 @@ func (a *ActivityWorker) dispatchTask(activityTask *swf.ActivityTask) {
 func (a *ActivityWorker) handleActivityTask(activityTask *swf.ActivityTask) {
 	a.ActivityInterceptor.BeforeTask(activityTask)
 	handler := a.handlers[*activityTask.ActivityType.Name]
-	longHandler := a.longRunningHandlers[*activityTask.ActivityType.Name]
 
-	if handler != nil {
-		var deserialized interface{}
-		if activityTask.Input != nil {
-			switch handler.Input.(type) {
-			case string:
-				deserialized = *activityTask.Input
-			default:
-				deserialized = handler.ZeroInput()
-				err := a.Serializer.Deserialize(*activityTask.Input, deserialized)
-				if err != nil {
-					a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
-					a.fail(activityTask, errors.Annotate(err, "deserialize"))
-					return
-				}
-			}
-
-		} else {
-			deserialized = nil
-		}
-
-		result, err := handler.HandlerFunc(activityTask, deserialized)
-		if err != nil {
-			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
-			a.fail(activityTask, errors.Annotate(err, "handler"))
-		} else {
-			a.result(activityTask, result)
-		}
-	} else if longHandler != nil {
-		var deserialized interface{}
-		if activityTask.Input != nil {
-			switch longHandler.Input.(type) {
-			case string:
-				deserialized = *activityTask.Input
-			default:
-				deserialized = longHandler.ZeroInput()
-				err := a.Serializer.Deserialize(*activityTask.Input, deserialized)
-				if err != nil {
-					a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
-					a.fail(activityTask, errors.Annotate(err, "deserialize"))
-					return
-				}
-			}
-
-		} else {
-			deserialized = nil
-		}
-
-		longHandler.HandlerFunc(activityTask, deserialized)
-
-	} else {
-		//fail
+	if handler == nil {
 		err := errors.NewErr("no handler for activity: %s", LS(activityTask.ActivityType.Name))
 		a.ActivityInterceptor.AfterTaskFailed(activityTask, &err)
 		a.fail(activityTask, &err)
+		return
+	}
+
+	var deserialized interface{}
+	if activityTask.Input != nil {
+		switch handler.Input.(type) {
+		case string:
+			deserialized = *activityTask.Input
+		default:
+			deserialized = handler.ZeroInput()
+			err := a.Serializer.Deserialize(*activityTask.Input, deserialized)
+			if err != nil {
+				a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
+				a.fail(activityTask, errors.Annotate(err, "deserialize"))
+				return
+			}
+		}
+
+	} else {
+		deserialized = nil
+	}
+
+	result, err := handler.HandlerFunc(activityTask, deserialized)
+	if err != nil {
+		if e, ok := err.(ActivityTaskCanceledError); ok {
+			a.ActivityInterceptor.AfterTaskCanceled(activityTask, e.details)
+			a.canceled(activityTask, e.Details())
+		} else {
+			a.ActivityInterceptor.AfterTaskFailed(activityTask, err)
+			a.fail(activityTask, errors.Annotate(err, "handler"))
+		}
+	} else {
+		a.result(activityTask, result)
 	}
 }
 
@@ -277,7 +267,7 @@ func (h *ActivityWorker) done(resp *swf.ActivityTask, result *string) {
 }
 
 func (h *ActivityWorker) canceled(resp *swf.ActivityTask, details *string) {
-	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=cancled", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
+	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
 
 	canceledErr := h.SWF.RespondActivityTaskCanceled(&swf.RespondActivityTaskCanceledInput{
 		TaskToken: resp.TaskToken,

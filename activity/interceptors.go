@@ -6,16 +6,18 @@ import (
 
 //ActivityInterceptor allows manipulation of the decision task and the outcome at key points in the task lifecycle.
 type ActivityInterceptor interface {
-	BeforeTask(decision *swf.ActivityTask)
-	AfterTaskComplete(decision *swf.ActivityTask, result interface{})
-	AfterTaskFailed(decision *swf.ActivityTask, err error)
+	BeforeTask(*swf.ActivityTask)
+	AfterTaskComplete(t *swf.ActivityTask, result interface{})
+	AfterTaskFailed(t *swf.ActivityTask, err error)
+	AfterTaskCanceled(t *swf.ActivityTask, details string)
 }
 
 //FuncInterceptor is a ActivityInterceptor that you can set handler funcs on. if any are unset, they are no-ops.
 type FuncInterceptor struct {
-	BeforeTaskFn        func(decision *swf.ActivityTask)
-	AfterTaskCompleteFn func(decision *swf.ActivityTask, result interface{})
-	AfterTaskFailedFn   func(decision *swf.ActivityTask, err error)
+	BeforeTaskFn        func(*swf.ActivityTask)
+	AfterTaskCompleteFn func(t *swf.ActivityTask, result interface{})
+	AfterTaskFailedFn   func(t *swf.ActivityTask, err error)
+	AfterTaskCanceledFn func(t *swf.ActivityTask, details string)
 }
 
 //BeforeTask runs the BeforeTaskFn if not nil
@@ -36,5 +38,12 @@ func (i *FuncInterceptor) AfterTaskComplete(activity *swf.ActivityTask, result i
 func (i *FuncInterceptor) AfterTaskFailed(activity *swf.ActivityTask, err error) {
 	if i.AfterTaskFailedFn != nil {
 		i.AfterTaskFailedFn(activity, err)
+	}
+}
+
+//AfterTaskCanceled runs the AfterTaskCanceledFn if not nil
+func (i *FuncInterceptor) AfterTaskCanceled(activity *swf.ActivityTask, details string) {
+	if i.AfterTaskCanceledFn != nil {
+		i.AfterTaskCanceledFn(activity, details)
 	}
 }
