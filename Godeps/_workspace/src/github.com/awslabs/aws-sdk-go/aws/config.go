@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/awslabs/aws-sdk-go/aws/credentials"
 )
@@ -17,7 +18,7 @@ var DefaultChainCredentials = credentials.NewChainCredentials(
 	[]credentials.Provider{
 		&credentials.EnvProvider{},
 		&credentials.SharedCredentialsProvider{Filename: "", Profile: ""},
-		&credentials.EC2RoleProvider{},
+		&credentials.EC2RoleProvider{ExpiryWindow: 5 * time.Minute},
 	})
 
 // The default number of retries for a service. The value of -1 indicates that
@@ -83,6 +84,10 @@ func (c Config) Copy() Config {
 // example bool attributes cannot be cleared using Merge, and must be explicitly
 // set on the Config structure.
 func (c Config) Merge(newcfg *Config) *Config {
+	if newcfg == nil {
+		return &c
+	}
+
 	cfg := Config{}
 
 	if newcfg != nil && newcfg.Credentials != nil {
