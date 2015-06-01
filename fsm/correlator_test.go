@@ -7,7 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -16,12 +17,12 @@ func TestTrackPendingActivities(t *testing.T) {
 
 	fsm.AddInitialState(&FSMState{
 		Name: "start",
-		Decider: func(f *FSMContext, lastEvent swf.HistoryEvent, data interface{}) Outcome {
+		Decider: func(f *FSMContext, lastEvent *swf.HistoryEvent, data interface{}) Outcome {
 			testData := data.(*TestData)
 			testData.States = append(testData.States, "start")
 			serialized := f.Serialize(testData)
-			decision := swf.Decision{
-				DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+			decision := &swf.Decision{
+				DecisionType: S(enums.DecisionTypeScheduleActivityTask),
 				ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 					ActivityID:   S(testActivityInfo.ActivityID),
 					ActivityType: testActivityInfo.ActivityType,
@@ -29,18 +30,18 @@ func TestTrackPendingActivities(t *testing.T) {
 					Input:        S(serialized),
 				},
 			}
-			return f.Goto("working", testData, []swf.Decision{decision})
+			return f.Goto("working", testData, []*swf.Decision{decision})
 		},
 	})
 
 	// Deciders should be able to retrieve info about the pending activity
 	fsm.AddState(&FSMState{
 		Name: "working",
-		Decider: typedFuncs.Decider(func(f *FSMContext, lastEvent swf.HistoryEvent, testData *TestData) Outcome {
+		Decider: typedFuncs.Decider(func(f *FSMContext, lastEvent *swf.HistoryEvent, testData *TestData) Outcome {
 			testData.States = append(testData.States, "working")
 			serialized := f.Serialize(testData)
 			var decisions = f.EmptyDecisions()
-			if *lastEvent.EventType == swf.EventTypeActivityTaskCompleted {
+			if *lastEvent.EventType == enums.EventTypeActivityTaskCompleted {
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
 				log.Printf("----->>>>> %+v %+v", trackedActivityInfo, testActivityInfo)
 				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
@@ -49,15 +50,15 @@ func TestTrackPendingActivities(t *testing.T) {
 					)
 				}
 				timeoutSeconds := "5" //swf uses stringy numbers in many places
-				decision := swf.Decision{
-					DecisionType: S(swf.DecisionTypeStartTimer),
+				decision := &swf.Decision{
+					DecisionType: S(enums.DecisionTypeStartTimer),
 					StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
 						StartToFireTimeout: S(timeoutSeconds),
 						TimerID:            S("timeToComplete"),
 					},
 				}
-				return f.Goto("done", testData, []swf.Decision{decision})
-			} else if *lastEvent.EventType == swf.EventTypeActivityTaskFailed {
+				return f.Goto("done", testData, []*swf.Decision{decision})
+			} else if *lastEvent.EventType == enums.EventTypeActivityTaskFailed {
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
 				log.Printf("----->>>>> %+v %+v %+v", trackedActivityInfo, testActivityInfo, f.ActivitiesInfo())
 				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
@@ -65,8 +66,8 @@ func TestTrackPendingActivities(t *testing.T) {
 						testActivityInfo, trackedActivityInfo,
 					)
 				}
-				decision := swf.Decision{
-					DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+				decision := &swf.Decision{
+					DecisionType: S(enums.DecisionTypeScheduleActivityTask),
 					ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 						ActivityID:   S(testActivityInfo.ActivityID),
 						ActivityType: testActivityInfo.ActivityType,
@@ -83,17 +84,17 @@ func TestTrackPendingActivities(t *testing.T) {
 	// Pending activities are cleared after finished
 	fsm.AddState(&FSMState{
 		Name: "done",
-		Decider: typedFuncs.Decider(func(f *FSMContext, lastEvent swf.HistoryEvent, testData *TestData) Outcome {
+		Decider: typedFuncs.Decider(func(f *FSMContext, lastEvent *swf.HistoryEvent, testData *TestData) Outcome {
 			decisions := f.EmptyDecisions()
-			if *lastEvent.EventType == swf.EventTypeTimerFired {
+			if *lastEvent.EventType == enums.EventTypeTimerFired {
 				testData.States = append(testData.States, "done")
 				serialized := f.Serialize(testData)
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
 				if trackedActivityInfo != nil {
 					t.Fatalf("pending activity not being cleared\nGot:\n%+v", trackedActivityInfo)
 				}
-				decision := swf.Decision{
-					DecisionType: S(swf.DecisionTypeCompleteWorkflowExecution),
+				decision := &swf.Decision{
+					DecisionType: S(enums.DecisionTypeCompleteWorkflowExecution),
 					CompleteWorkflowExecutionDecisionAttributes: &swf.CompleteWorkflowExecutionDecisionAttributes{
 						Result: S(serialized),
 					},
@@ -105,10 +106,10 @@ func TestTrackPendingActivities(t *testing.T) {
 	})
 
 	// Schedule a task
-	events := []swf.HistoryEvent{
-		swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
-		swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
-		swf.HistoryEvent{
+	events := []*swf.HistoryEvent{
+		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
+		&swf.HistoryEvent{
 			EventID:   I(1),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
@@ -128,7 +129,7 @@ func TestTrackPendingActivities(t *testing.T) {
 	}
 
 	// Fail the task
-	secondEvents := []swf.HistoryEvent{
+	secondEvents := []*swf.HistoryEvent{
 		{
 			EventType: S("ActivityTaskFailed"),
 			EventID:   I(7),
@@ -169,7 +170,7 @@ func TestTrackPendingActivities(t *testing.T) {
 	}
 
 	// Complete the task
-	thirdEvents := []swf.HistoryEvent{
+	thirdEvents := []*swf.HistoryEvent{
 		{
 			EventType: S("ActivityTaskCompleted"),
 			EventID:   I(11),
@@ -209,7 +210,7 @@ func TestTrackPendingActivities(t *testing.T) {
 	}
 
 	// Finish the workflow, check if pending activities were cleared
-	fourthEvents := []swf.HistoryEvent{
+	fourthEvents := []*swf.HistoryEvent{
 		{
 			EventType: S("TimerFired"),
 			EventID:   I(14),
@@ -227,7 +228,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			},
 		},
 		{
-			EventType: S(swf.EventTypeTimerStarted),
+			EventType: S(enums.EventTypeTimerStarted),
 			EventID:   I(12),
 			TimerStartedEventAttributes: &swf.TimerStartedEventAttributes{
 				TimerID: S("foo"),
@@ -253,7 +254,7 @@ func TestFSMContextActivityTracking(t *testing.T) {
 	ctx := testContext(testFSM())
 	scheduledEventID := rand.Int()
 	activityID := fmt.Sprintf("test-activity-%d", scheduledEventID)
-	taskScheduled := swf.HistoryEvent{
+	taskScheduled := &swf.HistoryEvent{
 		EventType: S("ActivityTaskScheduled"),
 		EventID:   I(scheduledEventID),
 		ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
@@ -264,7 +265,7 @@ func TestFSMContextActivityTracking(t *testing.T) {
 			},
 		},
 	}
-	ctx.Decide(taskScheduled, &TestData{}, func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+	ctx.Decide(taskScheduled, &TestData{}, func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		if len(ctx.ActivitiesInfo()) != 0 {
 			t.Fatal("There should be no activies being tracked yet")
 		}
@@ -278,14 +279,14 @@ func TestFSMContextActivityTracking(t *testing.T) {
 	}
 
 	// the pending activity can now be retrieved
-	taskCompleted := swf.HistoryEvent{
+	taskCompleted := &swf.HistoryEvent{
 		EventType: S("ActivityTaskCompleted"),
 		EventID:   I(rand.Int()),
 		ActivityTaskCompletedEventAttributes: &swf.ActivityTaskCompletedEventAttributes{
 			ScheduledEventID: I(scheduledEventID),
 		},
 	}
-	taskFailed := swf.HistoryEvent{
+	taskFailed := &swf.HistoryEvent{
 		EventType: S("ActivityTaskFailed"),
 		EventID:   I(rand.Int()),
 		ActivityTaskFailedEventAttributes: &swf.ActivityTaskFailedEventAttributes{
@@ -306,7 +307,7 @@ func TestFSMContextActivityTracking(t *testing.T) {
 	}
 
 	// pending activities are also cleared after terminated
-	ctx.Decide(taskCompleted, &TestData{}, func(ctx *FSMContext, h swf.HistoryEvent, data interface{}) Outcome {
+	ctx.Decide(taskCompleted, &TestData{}, func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		if len(ctx.ActivitiesInfo()) != 1 {
 			t.Fatal("There should be one activity being tracked")
 		}
@@ -330,7 +331,7 @@ func TestCountActivityAttemtps(t *testing.T) {
 	c := new(EventCorrelator)
 	c.Serializer = JSONStateSerializer{}
 
-	start := func(eventId int) swf.HistoryEvent {
+	start := func(eventId int) *swf.HistoryEvent {
 		return EventFromPayload(eventId, &swf.ActivityTaskScheduledEventAttributes{
 			ActivityID: S("the-id"),
 		})
@@ -375,7 +376,7 @@ func TestCountActivityAttemtps(t *testing.T) {
 
 func TestSignalTracking(t *testing.T) {
 	//track signal'->'workflowID => attempts
-	event := func(eventId int, payload interface{}) swf.HistoryEvent {
+	event := func(eventId int, payload interface{}) *swf.HistoryEvent {
 		return EventFromPayload(eventId, payload)
 	}
 
@@ -415,7 +416,7 @@ func TestSignalTracking(t *testing.T) {
 
 func TestTimerTracking(t *testing.T) {
 	//track signal'->'workflowID => attempts
-	event := func(eventId int, payload interface{}) swf.HistoryEvent {
+	event := func(eventId int, payload interface{}) *swf.HistoryEvent {
 		return EventFromPayload(eventId, payload)
 	}
 

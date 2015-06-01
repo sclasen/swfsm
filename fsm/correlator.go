@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/sclasen/swfsm/enums/swf"
 )
 
 // EventCorrelator is a serialization-friendly struct that is automatically managed by the FSM machinery
@@ -41,16 +41,16 @@ type TimerInfo struct {
 
 // Track will add or remove entries based on the EventType.
 // A new entry is added when there is a new ActivityTask, or an entry is removed when the ActivityTask is terminating.
-func (a *EventCorrelator) Track(h swf.HistoryEvent) {
+func (a *EventCorrelator) Track(h *swf.HistoryEvent) {
 	a.RemoveCorrelation(h)
 	a.Correlate(h)
 }
 
 // Correlate establishes a mapping of eventId to ActivityType. The HistoryEvent is expected to be of type EventTypeActivityTaskScheduled.
-func (a *EventCorrelator) Correlate(h swf.HistoryEvent) {
+func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 	a.checkInit()
 
-	if a.nilSafeEq(h.EventType, swf.EventTypeActivityTaskScheduled) {
+	if a.nilSafeEq(h.EventType, enums.EventTypeActivityTaskScheduled) {
 
 		a.Activities[a.key(h.EventID)] = &ActivityInfo{
 			ActivityID:   *h.ActivityTaskScheduledEventAttributes.ActivityID,
@@ -58,14 +58,14 @@ func (a *EventCorrelator) Correlate(h swf.HistoryEvent) {
 		}
 	}
 
-	if a.nilSafeEq(h.EventType, swf.EventTypeSignalExternalWorkflowExecutionInitiated) {
+	if a.nilSafeEq(h.EventType, enums.EventTypeSignalExternalWorkflowExecutionInitiated) {
 		a.Signals[a.key(h.EventID)] = &SignalInfo{
 			SignalName: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
 			WorkflowID: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 		}
 	}
 
-	if a.nilSafeEq(h.EventType, swf.EventTypeTimerStarted) {
+	if a.nilSafeEq(h.EventType, enums.EventTypeTimerStarted) {
 		control := ""
 		if h.TimerStartedEventAttributes.Control != nil {
 			control = *h.TimerStartedEventAttributes.Control
@@ -79,52 +79,52 @@ func (a *EventCorrelator) Correlate(h swf.HistoryEvent) {
 }
 
 // RemoveCorrelation gcs a mapping of eventId to ActivityType. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
-func (a *EventCorrelator) RemoveCorrelation(h swf.HistoryEvent) {
+func (a *EventCorrelator) RemoveCorrelation(h *swf.HistoryEvent) {
 	a.checkInit()
 	if h.EventType == nil {
 		return
 	}
 	switch *h.EventType {
-	case swf.EventTypeActivityTaskCompleted:
+	case enums.EventTypeActivityTaskCompleted:
 		delete(a.ActivityAttempts, a.safeActivityID(h))
 		delete(a.Activities, a.key(h.ActivityTaskCompletedEventAttributes.ScheduledEventID))
-	case swf.EventTypeActivityTaskFailed:
+	case enums.EventTypeActivityTaskFailed:
 		a.incrementActivityAttempts(h)
 		delete(a.Activities, a.key(h.ActivityTaskFailedEventAttributes.ScheduledEventID))
-	case swf.EventTypeActivityTaskTimedOut:
+	case enums.EventTypeActivityTaskTimedOut:
 		a.incrementActivityAttempts(h)
 		delete(a.Activities, a.key(h.ActivityTaskTimedOutEventAttributes.ScheduledEventID))
-	case swf.EventTypeActivityTaskCanceled:
+	case enums.EventTypeActivityTaskCanceled:
 		delete(a.ActivityAttempts, a.safeActivityID(h))
 		delete(a.Activities, a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID))
-	case swf.EventTypeExternalWorkflowExecutionSignaled:
+	case enums.EventTypeExternalWorkflowExecutionSignaled:
 		key := a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)
 		info := a.Signals[key]
 		delete(a.SignalAttempts, a.signalIDFromInfo(info))
 		delete(a.Signals, key)
-	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
+	case enums.EventTypeSignalExternalWorkflowExecutionFailed:
 		a.incrementSignalAttempts(h)
 		delete(a.Signals, a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))
-	case swf.EventTypeTimerFired:
+	case enums.EventTypeTimerFired:
 		delete(a.Timers, a.key(h.TimerFiredEventAttributes.StartedEventID))
-	case swf.EventTypeTimerCanceled:
+	case enums.EventTypeTimerCanceled:
 		delete(a.Timers, a.key(h.TimerCanceledEventAttributes.StartedEventID))
 	}
 }
 
 // ActivityInfo returns the ActivityInfo that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
-func (a *EventCorrelator) ActivityInfo(h swf.HistoryEvent) *ActivityInfo {
+func (a *EventCorrelator) ActivityInfo(h *swf.HistoryEvent) *ActivityInfo {
 	a.checkInit()
 	return a.Activities[a.getID(h)]
 }
 
 // SignalInfo returns the SignalInfo that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeSignalExternalWorkflowExecutionFailed,EventTypeExternalWorkflowExecutionSignaled.
-func (a *EventCorrelator) SignalInfo(h swf.HistoryEvent) *SignalInfo {
+func (a *EventCorrelator) SignalInfo(h *swf.HistoryEvent) *SignalInfo {
 	a.checkInit()
 	return a.Signals[a.getID(h)]
 }
 
-func (a *EventCorrelator) TimerInfo(h swf.HistoryEvent) *TimerInfo {
+func (a *EventCorrelator) TimerInfo(h *swf.HistoryEvent) *TimerInfo {
 	a.checkInit()
 	return a.Timers[a.getID(h)]
 }
@@ -161,46 +161,46 @@ func (a *EventCorrelator) checkInit() {
 	}
 }
 
-func (a *EventCorrelator) getID(h swf.HistoryEvent) (id string) {
+func (a *EventCorrelator) getID(h *swf.HistoryEvent) (id string) {
 	switch *h.EventType {
-	case swf.EventTypeActivityTaskCompleted:
+	case enums.EventTypeActivityTaskCompleted:
 		if h.ActivityTaskCompletedEventAttributes != nil {
 			id = a.key(h.ActivityTaskCompletedEventAttributes.ScheduledEventID)
 		}
-	case swf.EventTypeActivityTaskFailed:
+	case enums.EventTypeActivityTaskFailed:
 		if h.ActivityTaskFailedEventAttributes != nil {
 			id = a.key(h.ActivityTaskFailedEventAttributes.ScheduledEventID)
 		}
-	case swf.EventTypeActivityTaskTimedOut:
+	case enums.EventTypeActivityTaskTimedOut:
 		if h.ActivityTaskTimedOutEventAttributes != nil {
 			id = a.key(h.ActivityTaskTimedOutEventAttributes.ScheduledEventID)
 		}
-	case swf.EventTypeActivityTaskCanceled:
+	case enums.EventTypeActivityTaskCanceled:
 		if h.ActivityTaskCanceledEventAttributes != nil {
 			id = a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID)
 		}
 	//might want to get info on started too
-	case swf.EventTypeActivityTaskStarted:
+	case enums.EventTypeActivityTaskStarted:
 		if h.ActivityTaskStartedEventAttributes != nil {
 			id = a.key(h.ActivityTaskStartedEventAttributes.ScheduledEventID)
 		}
-	case swf.EventTypeExternalWorkflowExecutionSignaled:
+	case enums.EventTypeExternalWorkflowExecutionSignaled:
 		if h.ExternalWorkflowExecutionSignaledEventAttributes != nil {
 			id = a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)
 		}
-	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
+	case enums.EventTypeSignalExternalWorkflowExecutionFailed:
 		if h.SignalExternalWorkflowExecutionFailedEventAttributes != nil {
 			id = a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID)
 		}
-	case swf.EventTypeTimerFired:
+	case enums.EventTypeTimerFired:
 		if h.TimerFiredEventAttributes != nil {
 			id = a.key(h.TimerFiredEventAttributes.StartedEventID)
 		}
-	case swf.EventTypeTimerCanceled:
+	case enums.EventTypeTimerCanceled:
 		if h.TimerCanceledEventAttributes != nil {
 			id = a.key(h.TimerCanceledEventAttributes.StartedEventID)
 		}
-	case swf.EventTypeWorkflowExecutionSignaled:
+	case enums.EventTypeWorkflowExecutionSignaled:
 		event := h.WorkflowExecutionSignaledEventAttributes
 		if event != nil && event.SignalName != nil && event.Input != nil {
 			switch *event.SignalName {
@@ -216,7 +216,7 @@ func (a *EventCorrelator) getID(h swf.HistoryEvent) (id string) {
 	return
 }
 
-func (a *EventCorrelator) safeActivityID(h swf.HistoryEvent) string {
+func (a *EventCorrelator) safeActivityID(h *swf.HistoryEvent) string {
 	info := a.Activities[a.getID(h)]
 	if info != nil {
 		return info.ActivityID
@@ -224,7 +224,7 @@ func (a *EventCorrelator) safeActivityID(h swf.HistoryEvent) string {
 	return ""
 }
 
-func (a *EventCorrelator) safeSignalID(h swf.HistoryEvent) string {
+func (a *EventCorrelator) safeSignalID(h *swf.HistoryEvent) string {
 	info := a.Signals[a.getID(h)]
 	if info != nil {
 		return a.signalIDFromInfo(info)
@@ -236,25 +236,25 @@ func (a *EventCorrelator) signalIDFromInfo(info *SignalInfo) string {
 	return fmt.Sprintf("%s->%s", info.SignalName, info.WorkflowID)
 }
 
-func (a *EventCorrelator) incrementActivityAttempts(h swf.HistoryEvent) {
+func (a *EventCorrelator) incrementActivityAttempts(h *swf.HistoryEvent) {
 	id := a.safeActivityID(h)
 	if id != "" {
 		a.ActivityAttempts[id]++
 	}
 }
 
-func (a *EventCorrelator) incrementSignalAttempts(h swf.HistoryEvent) {
+func (a *EventCorrelator) incrementSignalAttempts(h *swf.HistoryEvent) {
 	id := a.safeSignalID(h)
 	if id != "" {
 		a.SignalAttempts[id]++
 	}
 }
 
-func (a *EventCorrelator) key(eventID aws.LongValue) string {
+func (a *EventCorrelator) key(eventID *int64) string {
 	return strconv.FormatInt(*eventID, 10)
 }
 
-func (a *EventCorrelator) nilSafeEq(sv aws.StringValue, s string) bool {
+func (a *EventCorrelator) nilSafeEq(sv *string, s string) bool {
 	if sv == nil {
 		return false
 	}

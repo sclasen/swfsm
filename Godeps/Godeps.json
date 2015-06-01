@@ -17,19 +17,39 @@
 		},
 		{
 			"ImportPath": "github.com/awslabs/aws-sdk-go/aws",
-			"Rev": "295e08b503c4ee9fbcdc9aa1aa06966a16364e5a"
+			"Rev": "43d7c58d0a71c01d98b7881cb9f90047f04f4acd"
 		},
 		{
-			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/endpoints",
-			"Rev": "295e08b503c4ee9fbcdc9aa1aa06966a16364e5a"
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/apierr",
+			"Rev": "43d7c58d0a71c01d98b7881cb9f90047f04f4acd"
 		},
 		{
-			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/kinesis",
-			"Rev": "295e08b503c4ee9fbcdc9aa1aa06966a16364e5a"
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/endpoints",
+			"Rev": "43d7c58d0a71c01d98b7881cb9f90047f04f4acd"
 		},
 		{
-			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/swf",
-			"Rev": "295e08b503c4ee9fbcdc9aa1aa06966a16364e5a"
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/json/jsonutil",
+			"Rev": "43d7c58d0a71c01d98b7881cb9f90047f04f4acd"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/jsonrpc",
+			"Rev": "43d7c58d0a71c01d98b7881cb9f90047f04f4acd"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/rest",
+			"Rev": "43d7c58d0a71c01d98b7881cb9f90047f04f4acd"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/signer/v4",
+			"Rev": "43d7c58d0a71c01d98b7881cb9f90047f04f4acd"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/service/kinesis",
+			"Rev": "43d7c58d0a71c01d98b7881cb9f90047f04f4acd"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/service/swf",
+			"Rev": "43d7c58d0a71c01d98b7881cb9f90047f04f4acd"
 		},
 		{
 			"ImportPath": "github.com/juju/errors",

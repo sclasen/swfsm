@@ -3,13 +3,15 @@ package migrator
 import (
 	"log"
 
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/kinesis"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
-	. "github.com/sclasen/swfsm/sugar"
-	//"github.com/awslabs/aws-sdk-go/gen/dynamodb"
 	"fmt"
 	"time"
+
+	"github.com/awslabs/aws-sdk-go/aws/awserr"
+	"github.com/awslabs/aws-sdk-go/service/kinesis"
+	"github.com/awslabs/aws-sdk-go/service/swf"
+	kenums "github.com/sclasen/swfsm/enums/kinesis"
+	enums "github.com/sclasen/swfsm/enums/swf"
+	. "github.com/sclasen/swfsm/sugar"
 )
 
 // TypesMigrator is composed of a DomainMigrator, a WorkflowTypeMigrator and an ActivityTypeMigrator.
@@ -21,21 +23,21 @@ type TypesMigrator struct {
 }
 
 type SWFOps interface {
-	DeprecateActivityType(req *swf.DeprecateActivityTypeInput) (err error)
-	DeprecateDomain(req *swf.DeprecateDomainInput) (err error)
-	DeprecateWorkflowType(req *swf.DeprecateWorkflowTypeInput) (err error)
-	DescribeActivityType(req *swf.DescribeActivityTypeInput) (resp *swf.ActivityTypeDetail, err error)
-	DescribeDomain(req *swf.DescribeDomainInput) (resp *swf.DomainDetail, err error)
-	DescribeWorkflowExecution(req *swf.DescribeWorkflowExecutionInput) (resp *swf.WorkflowExecutionDetail, err error)
-	DescribeWorkflowType(req *swf.DescribeWorkflowTypeInput) (resp *swf.WorkflowTypeDetail, err error)
-	RegisterActivityType(req *swf.RegisterActivityTypeInput) (err error)
-	RegisterDomain(req *swf.RegisterDomainInput) (err error)
-	RegisterWorkflowType(req *swf.RegisterWorkflowTypeInput) (err error)
+	DeprecateActivityType(req *swf.DeprecateActivityTypeInput) (*swf.DeprecateActivityTypeOutput, error)
+	DeprecateDomain(req *swf.DeprecateDomainInput) (*swf.DeprecateDomainOutput, error)
+	DeprecateWorkflowType(req *swf.DeprecateWorkflowTypeInput) (*swf.DeprecateWorkflowTypeOutput, error)
+	DescribeActivityType(req *swf.DescribeActivityTypeInput) (*swf.DescribeActivityTypeOutput, error)
+	DescribeDomain(req *swf.DescribeDomainInput) (*swf.DescribeDomainOutput, error)
+	DescribeWorkflowExecution(req *swf.DescribeWorkflowExecutionInput) (*swf.DescribeWorkflowExecutionOutput, error)
+	DescribeWorkflowType(req *swf.DescribeWorkflowTypeInput) (*swf.DescribeWorkflowTypeOutput, error)
+	RegisterActivityType(req *swf.RegisterActivityTypeInput) (*swf.RegisterActivityTypeOutput, error)
+	RegisterDomain(req *swf.RegisterDomainInput) (*swf.RegisterDomainOutput, error)
+	RegisterWorkflowType(req *swf.RegisterWorkflowTypeInput) (*swf.RegisterWorkflowTypeOutput, error)
 }
 
 type KinesisOps interface {
-	CreateStream(req *kinesis.CreateStreamInput) (err error)
-	DescribeStream(req *kinesis.DescribeStreamInput) (resp *kinesis.DescribeStreamOutput, err error)
+	CreateStream(req *kinesis.CreateStreamInput) (*kinesis.CreateStreamOutput, error)
+	DescribeStream(req *kinesis.DescribeStreamInput) (*kinesis.DescribeStreamOutput, error)
 }
 
 // Migrate runs Migrate on the underlying DomainMigrator, a WorkflowTypeMigrator and ActivityTypeMigrator.
@@ -115,7 +117,7 @@ func (d *DomainMigrator) Migrate() { //add parallel migrations to all Migrate!
 func (d *DomainMigrator) isRegisteredNotDeprecated(rd swf.RegisterDomainInput) bool {
 	desc, err := d.describe(rd.Name)
 	if err != nil {
-		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeUnknownResourceFault {
+		if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeUnknownResourceFault {
 			return false
 		}
 
@@ -123,13 +125,13 @@ func (d *DomainMigrator) isRegisteredNotDeprecated(rd swf.RegisterDomainInput) b
 
 	}
 
-	return *desc.DomainInfo.Status == swf.RegistrationStatusRegistered
+	return *desc.DomainInfo.Status == enums.RegistrationStatusRegistered
 }
 
 func (d *DomainMigrator) register(rd swf.RegisterDomainInput) {
-	err := d.Client.RegisterDomain(&rd)
+	_, err := d.Client.RegisterDomain(&rd)
 	if err != nil {
-		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeDomainAlreadyExistsFault {
+		if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeDomainAlreadyExistsFault {
 			return
 		}
 
@@ -138,24 +140,24 @@ func (d *DomainMigrator) register(rd swf.RegisterDomainInput) {
 	}
 }
 
-func (d *DomainMigrator) isDeprecated(domain aws.StringValue) bool {
+func (d *DomainMigrator) isDeprecated(domain *string) bool {
 	desc, err := d.describe(domain)
 	if err != nil {
 		log.Printf("action=migrate at=is-dep domain=%s error=%s", LS(domain), err.Error())
 		return false
 	}
 
-	return *desc.DomainInfo.Status == swf.RegistrationStatusDeprecated
+	return *desc.DomainInfo.Status == enums.RegistrationStatusDeprecated
 }
 
 func (d *DomainMigrator) deprecate(dd swf.DeprecateDomainInput) {
-	err := d.Client.DeprecateDomain(&dd)
+	_, err := d.Client.DeprecateDomain(&dd)
 	if err != nil {
 		panicWithError(err)
 	}
 }
 
-func (d *DomainMigrator) describe(domain aws.StringValue) (*swf.DomainDetail, error) {
+func (d *DomainMigrator) describe(domain *string) (*swf.DescribeDomainOutput, error) {
 	resp, err := d.Client.DescribeDomain(&swf.DescribeDomainInput{Name: domain})
 	if err != nil {
 		return nil, err
@@ -193,7 +195,7 @@ func (w *WorkflowTypeMigrator) Migrate() {
 func (w *WorkflowTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterWorkflowTypeInput) bool {
 	desc, err := w.describe(rd.Domain, rd.Name, rd.Version)
 	if err != nil {
-		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeUnknownResourceFault {
+		if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeUnknownResourceFault {
 			return false
 		}
 
@@ -201,13 +203,13 @@ func (w *WorkflowTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterWorkflow
 
 	}
 
-	return *desc.TypeInfo.Status == swf.RegistrationStatusRegistered
+	return *desc.TypeInfo.Status == enums.RegistrationStatusRegistered
 }
 
 func (w *WorkflowTypeMigrator) register(rd swf.RegisterWorkflowTypeInput) {
-	err := w.Client.RegisterWorkflowType(&rd)
+	_, err := w.Client.RegisterWorkflowType(&rd)
 	if err != nil {
-		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeAlreadyExistsFault {
+		if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeAlreadyExistsFault {
 			return
 		}
 
@@ -215,24 +217,24 @@ func (w *WorkflowTypeMigrator) register(rd swf.RegisterWorkflowTypeInput) {
 	}
 }
 
-func (w *WorkflowTypeMigrator) isDeprecated(domain aws.StringValue, name aws.StringValue, version aws.StringValue) bool {
+func (w *WorkflowTypeMigrator) isDeprecated(domain *string, name *string, version *string) bool {
 	desc, err := w.describe(domain, name, version)
 	if err != nil {
 		log.Printf("action=migrate at=is-dep domain=%s workflow=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
 		return false
 	}
 
-	return *desc.TypeInfo.Status == swf.RegistrationStatusDeprecated
+	return *desc.TypeInfo.Status == enums.RegistrationStatusDeprecated
 }
 
 func (w *WorkflowTypeMigrator) deprecate(dd swf.DeprecateWorkflowTypeInput) {
-	err := w.Client.DeprecateWorkflowType(&dd)
+	_, err := w.Client.DeprecateWorkflowType(&dd)
 	if err != nil {
 		panicWithError(err)
 	}
 }
 
-func (w *WorkflowTypeMigrator) describe(domain aws.StringValue, name aws.StringValue, version aws.StringValue) (*swf.WorkflowTypeDetail, error) {
+func (w *WorkflowTypeMigrator) describe(domain *string, name *string, version *string) (*swf.DescribeWorkflowTypeOutput, error) {
 	resp, err := w.Client.DescribeWorkflowType(&swf.DescribeWorkflowTypeInput{Domain: domain, WorkflowType: &swf.WorkflowType{Name: name, Version: version}})
 	if err != nil {
 		return nil, err
@@ -270,7 +272,7 @@ func (a *ActivityTypeMigrator) Migrate() {
 func (a *ActivityTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterActivityTypeInput) bool {
 	desc, err := a.describe(rd.Domain, rd.Name, rd.Version)
 	if err != nil {
-		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeUnknownResourceFault {
+		if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeUnknownResourceFault {
 			return false
 		}
 
@@ -278,13 +280,13 @@ func (a *ActivityTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterActivity
 
 	}
 
-	return *desc.TypeInfo.Status == swf.RegistrationStatusRegistered
+	return *desc.TypeInfo.Status == enums.RegistrationStatusRegistered
 }
 
 func (a *ActivityTypeMigrator) register(rd swf.RegisterActivityTypeInput) {
-	err := a.Client.RegisterActivityType(&rd)
+	_, err := a.Client.RegisterActivityType(&rd)
 	if err != nil {
-		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeAlreadyExistsFault {
+		if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeAlreadyExistsFault {
 			return
 		}
 
@@ -292,24 +294,24 @@ func (a *ActivityTypeMigrator) register(rd swf.RegisterActivityTypeInput) {
 	}
 }
 
-func (a *ActivityTypeMigrator) isDeprecated(domain aws.StringValue, name aws.StringValue, version aws.StringValue) bool {
+func (a *ActivityTypeMigrator) isDeprecated(domain *string, name *string, version *string) bool {
 	desc, err := a.describe(domain, name, version)
 	if err != nil {
 		log.Printf("action=migrate at=is-dep domain=%s activity=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
 		return false
 	}
 
-	return *desc.TypeInfo.Status == swf.RegistrationStatusDeprecated
+	return *desc.TypeInfo.Status == enums.RegistrationStatusDeprecated
 }
 
 func (a *ActivityTypeMigrator) deprecate(dd swf.DeprecateActivityTypeInput) {
-	err := a.Client.DeprecateActivityType(&dd)
+	_, err := a.Client.DeprecateActivityType(&dd)
 	if err != nil {
 		panicWithError(err)
 	}
 }
 
-func (a *ActivityTypeMigrator) describe(domain aws.StringValue, name aws.StringValue, version aws.StringValue) (*swf.ActivityTypeDetail, error) {
+func (a *ActivityTypeMigrator) describe(domain *string, name *string, version *string) (*swf.DescribeActivityTypeOutput, error) {
 	resp, err := a.Client.DescribeActivityType(&swf.DescribeActivityTypeInput{Domain: domain, ActivityType: &swf.ActivityType{Name: name, Version: version}})
 	if err != nil {
 		return nil, err
@@ -340,7 +342,7 @@ func (s *StreamMigrator) Migrate() {
 func (s *StreamMigrator) isCreated(st kinesis.CreateStreamInput) bool {
 	_, err := s.describe(st)
 	if err != nil {
-		if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeStreamNotFound {
+		if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeStreamNotFound {
 			return false
 		}
 		panicWithError(err)
@@ -351,8 +353,8 @@ func (s *StreamMigrator) isCreated(st kinesis.CreateStreamInput) bool {
 }
 
 func (s *StreamMigrator) create(st kinesis.CreateStreamInput) {
-	err := s.Client.CreateStream(&st)
-	if ae, ok := err.(aws.APIError); ok && ae.Type == ErrorTypeStreamAlreadyExists {
+	_, err := s.Client.CreateStream(&st)
+	if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeStreamAlreadyExists {
 		return
 	}
 }
@@ -368,11 +370,11 @@ func (s *StreamMigrator) describe(st kinesis.CreateStreamInput) (*kinesis.Descri
 	return resp, nil
 }
 
-func (s *StreamMigrator) awaitActive(stream aws.StringValue, atMostSeconds int) {
+func (s *StreamMigrator) awaitActive(stream *string, atMostSeconds int) {
 
 	waited := 0
-	status := kinesis.StreamStatusCreating
-	for status != kinesis.StreamStatusActive {
+	status := kenums.StreamStatusCreating
+	for status != kenums.StreamStatusActive {
 		desc, err := s.Client.DescribeStream(&kinesis.DescribeStreamInput{
 			StreamName: stream,
 		})
@@ -392,8 +394,8 @@ func (s *StreamMigrator) awaitActive(stream aws.StringValue, atMostSeconds int) 
 }
 
 func panicWithError(err error) {
-	if ae, ok := err.(aws.APIError); ok {
-		panic(fmt.Sprintf("aws error while migrating type=%s message=%s code=%s request-id=%s", ae.Type, ae.Message, ae.Code, ae.RequestID))
+	if ae, ok := err.(awserr.RequestFailure); ok {
+		panic(fmt.Sprintf("aws error while migrating type=%s message=%s code=%s request-id=%s", ae.Code(), ae.Message(), ae.Code, ae.RequestID()))
 	}
 
 	panic(err)

@@ -4,13 +4,13 @@ import (
 	"log"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/kinesis"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/service/kinesis"
+	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
 )
 
 //ReplicationHandler can be configured on an FSM and will be called when a DecisionTask is successfully completed.
-type ReplicationHandler func(*FSMContext, *swf.DecisionTask, *swf.RespondDecisionTaskCompletedInput, *SerializedState) error
+type ReplicationHandler func(*FSMContext, *swf.PollForDecisionTaskOutput, *swf.RespondDecisionTaskCompletedInput, *SerializedState) error
 
 //KinesisOps is the subset of kinesis.Kinesis ops required by KinesisReplication
 type KinesisOps interface {
@@ -34,7 +34,7 @@ type KinesisReplication struct {
 }
 
 //Handler is a ReplicationHandler. to configure it on your FSM, do fsm.ReplicationHandler = &KinesisReplication{...).Handler
-func (f *KinesisReplication) Handler(ctx *FSMContext, decisionTask *swf.DecisionTask, completedDecision *swf.RespondDecisionTaskCompletedInput, state *SerializedState) error {
+func (f *KinesisReplication) Handler(ctx *FSMContext, decisionTask *swf.PollForDecisionTaskOutput, completedDecision *swf.RespondDecisionTaskCompletedInput, state *SerializedState) error {
 	if state == nil || f.KinesisStream == "" {
 		return nil
 	}

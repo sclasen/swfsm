@@ -9,50 +9,50 @@ import (
 	"time"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/swf"
+	"github.com/awslabs/aws-sdk-go/aws/credentials"
+	"github.com/awslabs/aws-sdk-go/service/swf"
+	enum "github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/fsm"
 	"github.com/sclasen/swfsm/migrator"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
 type MockSWF struct {
-	Activity        *swf.ActivityTask
-	Failed          bool
-	Completed       *string
-	CompletedSet    bool
-	History         *swf.History
-	Canceled        bool
-	CancelResponded bool
+	Activity     *swf.PollForActivityTaskOutput
+	Failed       bool
+	Completed    *string
+	CompletedSet bool
+	History      *swf.GetWorkflowExecutionHistoryOutput
+	Canceled     bool
 }
 
-func (m *MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (resp *swf.ActivityTaskStatus, err error) {
-	return &swf.ActivityTaskStatus{
+func (m *MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (*swf.RecordActivityTaskHeartbeatOutput, error) {
+	return &swf.RecordActivityTaskHeartbeatOutput{
 		CancelRequested: &m.Canceled,
 	}, nil
 }
-func (m *MockSWF) RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceledInput) (err error) {
-	m.CancelResponded = true
-	return nil
+func (*MockSWF) RespondActivityTaskCanceled(req *swf.RespondActivityTaskCanceledInput) (*swf.RespondActivityTaskCanceledOutput, error) {
+	return nil, nil
 }
-func (m *MockSWF) RespondActivityTaskCompleted(req *swf.RespondActivityTaskCompletedInput) (err error) {
+func (m *MockSWF) RespondActivityTaskCompleted(req *swf.RespondActivityTaskCompletedInput) (*swf.RespondActivityTaskCompletedOutput, error) {
 	m.Completed = req.Result
 	m.CompletedSet = true
-	return nil
+	return nil, nil
 }
-func (m *MockSWF) RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedInput) (err error) {
+func (m *MockSWF) RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedInput) (*swf.RespondActivityTaskFailedOutput, error) {
 	m.Failed = true
-	return nil
+	return nil, nil
 }
-func (m *MockSWF) PollForActivityTask(req *swf.PollForActivityTaskInput) (resp *swf.ActivityTask, err error) {
+func (m *MockSWF) PollForActivityTask(req *swf.PollForActivityTaskInput) (*swf.PollForActivityTaskOutput, error) {
 	return m.Activity, nil
 }
 
-func (m *MockSWF) GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHistoryInput) (resp *swf.History, err error) {
+func (m *MockSWF) GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHistoryInput) (*swf.GetWorkflowExecutionHistoryOutput, error) {
 	return m.History, nil
 }
 
-func (m *MockSWF) SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (err error) {
-	return nil
+func (m *MockSWF) SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (*swf.SignalWorkflowExecutionOutput, error) {
+	return nil, nil
 }
 
 func ExampleActivityWorker() {
@@ -61,11 +61,11 @@ func ExampleActivityWorker() {
 
 	taskList := "aTaskListSharedBetweenTaskOneAndTwo"
 
-	handleTask1 := func(task *swf.ActivityTask, input interface{}) (interface{}, error) {
+	handleTask1 := func(task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 		return input, nil
 	}
 
-	handleTask2 := func(task *swf.ActivityTask, input interface{}) (interface{}, error) {
+	handleTask2 := func(task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 		return input, nil
 	}
 
@@ -134,13 +134,13 @@ type Output2 struct {
 //We define the operations our activity worker will handle in an interface
 //Then it is easy to provide a mocked impl
 type Activities interface {
-	Task1(*swf.ActivityTask, *Input1) (*Output1, error)
-	Task2(*swf.ActivityTask, *Input2) (*Output2, error)
+	Task1(*swf.PollForActivityTaskOutput, *Input1) (*Output1, error)
+	Task2(*swf.PollForActivityTaskOutput, *Input2) (*Output2, error)
 }
 
 type MockActivities struct{}
 
-func (m MockActivities) Task1(task *swf.ActivityTask, in *Input1) (*Output1, error) {
+func (m MockActivities) Task1(task *swf.PollForActivityTaskOutput, in *Input1) (*Output1, error) {
 	if rand.Intn(10) < 4 {
 		log.Printf("TASK 1 OK")
 		return &Output1{Data: in.Data}, nil
@@ -149,7 +149,7 @@ func (m MockActivities) Task1(task *swf.ActivityTask, in *Input1) (*Output1, err
 	return nil, errors.New("FAILED")
 }
 
-func (m MockActivities) Task2(task *swf.ActivityTask, in *Input2) (*Output2, error) {
+func (m MockActivities) Task2(task *swf.PollForActivityTaskOutput, in *Input2) (*Output2, error) {
 	if rand.Intn(10) < 4 {
 		log.Printf("TASK 2 OK")
 		return &Output2{Data2: in.Data2}, nil
@@ -207,34 +207,34 @@ func (w *WorkerFSM) Two() fsm.Decider {
 	)
 }
 
-func (w *WorkerFSM) actOne(ctx *fsm.FSMContext, h swf.HistoryEvent, data interface{}) swf.Decision {
+func (w *WorkerFSM) actOne(ctx *fsm.FSMContext, h *swf.HistoryEvent, data interface{}) *swf.Decision {
 	return w.activity(ctx, "one", &Input1{Data: "one"})
 }
 
-func (w *WorkerFSM) afterOne(ctx *fsm.FSMContext, h swf.HistoryEvent, data interface{}) {
+func (w *WorkerFSM) afterOne(ctx *fsm.FSMContext, h *swf.HistoryEvent, data interface{}) {
 	result := new(Output1)
 	ctx.EventData(h, result)
 	data.(*Input1).Data = result.Data
 }
 
-func (w *WorkerFSM) afterTwo(ctx *fsm.FSMContext, h swf.HistoryEvent, data interface{}) {
+func (w *WorkerFSM) afterTwo(ctx *fsm.FSMContext, h *swf.HistoryEvent, data interface{}) {
 	result := new(Output2)
 	ctx.EventData(h, result)
 	data.(*Input1).Data = result.Data2
 	w.done <- struct{}{}
 }
 
-func (w *WorkerFSM) actTwo(ctx *fsm.FSMContext, h swf.HistoryEvent, data interface{}) swf.Decision {
+func (w *WorkerFSM) actTwo(ctx *fsm.FSMContext, h *swf.HistoryEvent, data interface{}) *swf.Decision {
 	return w.activity(ctx, "two", &Input1{Data: "two"})
 }
 
-func (w *WorkerFSM) activity(ctx *fsm.FSMContext, name string, input interface{}) swf.Decision {
+func (w *WorkerFSM) activity(ctx *fsm.FSMContext, name string, input interface{}) *swf.Decision {
 	var serialized *string
 	if input != nil {
 		serialized = S(ctx.Serialize(input))
 	}
-	return swf.Decision{
-		DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+	return &swf.Decision{
+		DecisionType: S(enum.DecisionTypeScheduleActivityTask),
 		ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 			ActivityID:             S(name),
 			ActivityType:           &swf.ActivityType{Name: S(name), Version: S(name)},
@@ -254,8 +254,12 @@ func TestTypedActivityWorker(t *testing.T) {
 		return
 	}
 
-	creds, _ := aws.EnvCreds()
-	client := swf.New(creds, "us-east-1", nil)
+	config := &aws.Config{
+		Credentials: credentials.NewEnvCredentials(),
+		Region:      "us-east-1",
+	}
+
+	client := swf.New(config)
 
 	domain := "worker-test-domain"
 
@@ -368,17 +372,17 @@ func TestStringHandler(t *testing.T) {
 	worker.Init()
 	worker.AllowPanics = true
 
-	handler := func(task *swf.ActivityTask, input string) (string, error) {
+	handler := func(task *swf.PollForActivityTaskOutput, input string) (string, error) {
 		return input + "Out", nil
 	}
 
-	nilHandler := func(task *swf.ActivityTask, input string) (*swf.ActivityTask, error) {
+	nilHandler := func(task *swf.PollForActivityTaskOutput, input string) (*swf.PollForActivityTaskOutput, error) {
 		return nil, nil
 	}
 
 	worker.AddHandler(NewActivityHandler("activity", handler))
 	worker.AddHandler(NewActivityHandler("nilactivity", nilHandler))
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType:      &swf.ActivityType{Name: S("activity")},
 		Input:             S("theInput"),
@@ -391,7 +395,7 @@ func TestStringHandler(t *testing.T) {
 	ops.Completed = nil
 	ops.CompletedSet = false
 
-	worker.handleActivityTask(&swf.ActivityTask{
+	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType:      &swf.ActivityType{Name: S("nilactivity")},
 		Input:             S("theInput"),
@@ -415,10 +419,10 @@ func TestBackoff(t *testing.T) {
 	correlator.ActivityAttempts["the-id"] = 3
 	s, _ := serializer.Serialize(correlator)
 
-	history := &swf.History{
-		Events: []swf.HistoryEvent{
+	history := &swf.GetWorkflowExecutionHistoryOutput{
+		Events: []*swf.HistoryEvent{
 			{
-				EventType: S(swf.EventTypeMarkerRecorded),
+				EventType: S(enum.EventTypeMarkerRecorded),
 				MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
 					MarkerName: S(fsm.CorrelatorMarker),
 					Details:    S(s),
@@ -438,7 +442,7 @@ func TestBackoff(t *testing.T) {
 
 	failed := make(chan struct{})
 	go func() {
-		worker.fail(&swf.ActivityTask{
+		worker.fail(&swf.PollForActivityTaskOutput{
 			WorkflowExecution: &swf.WorkflowExecution{},
 			ActivityType:      &swf.ActivityType{Name: S("activity")},
 			ActivityID:        S("the-id"),
