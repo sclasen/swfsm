@@ -11,6 +11,7 @@ import (
 	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
 	"github.com/sclasen/swfsm/enums/swf"
+	. "github.com/sclasen/swfsm/sugar"
 )
 
 // constants used as marker names or signal names
@@ -22,6 +23,7 @@ const (
 	ContinueTimer     = "FSM.ContinueWorkflow"
 	ContinueSignal    = "FSM.ContinueWorkflow"
 	CompleteState     = "complete"
+	CanceledState     = "canceled"
 	ErrorState        = "error"
 	//the FSM was not configured with a state named in an outcome.
 	FSMErrorMissingState = "ErrorMissingFsmState"
@@ -227,6 +229,21 @@ func (f *FSMContext) ContinueWorkflow(data interface{}, decisions ...*swf.Decisi
 	}
 }
 
+// CancelWorkflow is a helper func to easily create a CompleteOutcome that sends a ContinueWorklfow decision.
+func (f *FSMContext) CancelWorkflow(data interface{}, details *string) Outcome {
+	d := &swf.Decision{
+		DecisionType: S(enums.DecisionTypeCancelWorkflowExecution),
+		CancelWorkflowExecutionDecisionAttributes: &swf.CancelWorkflowExecutionDecisionAttributes{
+			Details: details,
+		},
+	}
+	return Outcome{
+		State:     CanceledState,
+		Data:      data,
+		Decisions: f.Decision(d),
+	}
+}
+
 // Decide executes a decider making sure that Activity tasks are being tracked.
 func (f *FSMContext) Decide(h *swf.HistoryEvent, data interface{}, decider Decider) Outcome {
 	outcome := decider(f, h, data)
@@ -283,6 +300,11 @@ func (f *FSMContext) Deserialize(serialized string, data interface{}) {
 // EmptyDecisions is a helper to give you an empty Decision slice.
 func (f *FSMContext) EmptyDecisions() []*swf.Decision {
 	return make([]*swf.Decision, 0)
+}
+
+// EmptyDecisions is a helper to give you an empty Decision slice.
+func (f *FSMContext) Decision(d *swf.Decision) []*swf.Decision {
+	return append(f.EmptyDecisions(), d)
 }
 
 func (f *FSMContext) Correlator() *EventCorrelator {

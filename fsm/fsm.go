@@ -65,6 +65,7 @@ type FSM struct {
 	errorHandlers    map[string]DecisionErrorHandler
 	initialState     *FSMState
 	completeState    *FSMState
+	canceledState    *FSMState
 	stop             chan bool
 	stopAck          chan bool
 	allowPanics      bool //makes testing easier
@@ -101,6 +102,13 @@ func (f *FSM) AddCompleteState(state *FSMState) {
 	f.completeState = state
 }
 
+// AddCanceledState adds a state to the FSM and uses it as the final state of a workflow.
+// it will only receive events if you returned FSMContext.CancelWorkflow(...) and the workflow was unable to cancel.
+func (f *FSM) AddCanceledState(state *FSMState) {
+	f.AddState(state)
+	f.canceledState = state
+}
+
 // AddInitialStateWithHandler adds a state to the FSM and uses it as the initial state when a workflow execution is started.
 // it uses the FSM DefaultDecisionErrorHandler, which defaults to FSM.DefaultDecisionErrorHandler if unset.
 func (f *FSM) AddInitialStateWithHandler(state *FSMState, handler DecisionErrorHandler) {
@@ -135,6 +143,19 @@ func (f *FSM) DefaultCompleteState() *FSMState {
 		Decider: func(fsm *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 			f.log("state=complete at=attempt-completion event=%s", h)
 			return fsm.CompleteWorkflow(data)
+		},
+	}
+}
+
+// DefaultCanceledState is the canceled state used in an FSM if one has not been set.
+// It simply responds with a CancelWorkflow which attempts to Cancel the workflow.
+// This state will only get events if you previously attempted to cancel the workflow and it failed.
+func (f *FSM) DefaultCanceledState() *FSMState {
+	return &FSMState{
+		Name: CanceledState,
+		Decider: func(fsm *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+			f.log("state=complete at=attempt-cancel event=%s", h)
+			return fsm.CancelWorkflow(data, s.S("default-canceled-state"))
 		},
 	}
 }
@@ -180,6 +201,10 @@ func (f *FSM) Init() {
 
 	if f.completeState == nil {
 		f.AddCompleteState(f.DefaultCompleteState())
+	}
+
+	if f.canceledState == nil {
+		f.AddCanceledState(f.DefaultCanceledState())
 	}
 
 	if f.stop == nil {
