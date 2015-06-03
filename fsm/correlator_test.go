@@ -476,3 +476,44 @@ func TestTimerTracking(t *testing.T) {
 		t.Fatal("non nil info2 %v", info)
 	}
 }
+
+func TestCancelTracking(t *testing.T) {
+	//track signal'->'workflowID => attempts
+	event := func(eventId int, payload interface{}) *swf.HistoryEvent {
+		return EventFromPayload(eventId, payload)
+	}
+
+	start := event(1, &swf.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes{
+		WorkflowID: S("the-workflow"),
+	})
+
+	fail := EventFromPayload(2, &swf.RequestCancelExternalWorkflowExecutionFailedEventAttributes{
+		InitiatedEventID: I(1),
+	})
+
+	ok := EventFromPayload(4, &swf.WorkflowExecutionCancelRequestedEventAttributes{
+		ExternalInitiatedEventID: I(3),
+	})
+
+	c := new(EventCorrelator)
+	c.Serializer = JSONStateSerializer{}
+
+	c.Track(start)
+
+	//track happens in FSM after Decider
+	info := c.CancellationInfo(fail)
+	t.Log(info, c.Cancellations, c.CancelationAttempts)
+
+	c.Track(fail)
+	start.EventID = I(3)
+	c.Track(start)
+	if c.AttemptsForCancellation(info) != 1 {
+		t.Fatal("attempts not", info, c.AttemptsForCancellation(info), c.Cancellations, c.CancelationAttempts)
+	}
+	info = c.CancellationInfo(ok)
+	c.Track(ok)
+
+	if c.AttemptsForCancellation(info) != 0 {
+		t.Fatal("expected zero attempts", c)
+	}
+}
