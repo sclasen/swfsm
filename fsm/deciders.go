@@ -421,6 +421,14 @@ func CompleteWorkflow() Decider {
 	}
 }
 
+// CompleteWorkflow completes the workflow
+func CancelWorkflow(details *string) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		log.Printf("at=complete-workflow workflowID=%s", LS(ctx.WorkflowID))
+		return ctx.CancelWorkflow(data, details)
+	}
+}
+
 // Stay keeps the fsm in the same state, and terminates the decider.
 func Stay() Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
