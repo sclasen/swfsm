@@ -40,6 +40,7 @@ func NewTestListener(t TestConfig) *TestListener {
 		historyInterest:  make(map[string]chan *swf.HistoryEvent, 1000),
 		decisionInterest: make(map[string]chan *swf.Decision, 1000),
 		stateInterest:    make(map[string]chan string, 1000),
+		dataInterest:     make(map[string]chan interface{}, 1000),
 		DefaultWait:      time.Duration(t.DefaultWaitTimeout) * time.Second,
 		testAdapter:      t.Testing,
 		TestID:           uuid.New(),
