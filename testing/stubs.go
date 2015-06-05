@@ -29,7 +29,7 @@ type DecisionOutcome struct {
 
 type StateData struct {
 	State string
-	Data interface{}
+	Data  interface{}
 }
 
 func StubFSM(domain string, client fsm.SWFOps) *fsm.FSM {

@@ -40,7 +40,7 @@ func NewTestListener(t TestConfig) *TestListener {
 		historyInterest:  make(map[string]chan *swf.HistoryEvent, 1000),
 		decisionInterest: make(map[string]chan *swf.Decision, 1000),
 		stateInterest:    make(map[string]chan string, 1000),
-		dataInterest:make(map[string]chan *StateData, 1000),
+		dataInterest:     make(map[string]chan *StateData, 1000),
 		DefaultWait:      time.Duration(t.DefaultWaitTimeout) * time.Second,
 		testAdapter:      t.Testing,
 		TestID:           uuid.New(),
@@ -277,7 +277,7 @@ func (tl *TestListener) forward() {
 				tl.testAdapter.Logf("TestListener: yes stateInterest for workflow %s %s", workflow, do.State)
 				stateData := &StateData{
 					State: do.State.StateName,
-				    Data: tl.deserialize(do.State.StateData),
+					Data:  tl.deserialize(do.State.StateData),
 				}
 				c <- stateData
 			} else {
