@@ -40,7 +40,7 @@ func NewTestListener(t TestConfig) *TestListener {
 		historyInterest:  make(map[string]chan *swf.HistoryEvent, 1000),
 		decisionInterest: make(map[string]chan *swf.Decision, 1000),
 		stateInterest:    make(map[string]chan string, 1000),
-		dataInterest:     make(map[string]chan interface{}, 1000),
+		dataInterest:make(map[string]chan *StateData, 1000),
 		DefaultWait:      time.Duration(t.DefaultWaitTimeout) * time.Second,
 		testAdapter:      t.Testing,
 		TestID:           uuid.New(),
@@ -73,7 +73,7 @@ type TestListener struct {
 	decisionLock     sync.Mutex
 	stateInterest    map[string]chan string
 	stateLock        sync.Mutex
-	dataInterest     map[string]chan interface{}
+	dataInterest     map[string]chan *StateData
 	dataLock         sync.Mutex
 	DefaultWait      time.Duration
 	testAdapter      TestAdapter
@@ -115,12 +115,12 @@ func (tl *TestListener) RegisterStateInterest(workflowID string) chan string {
 	return stateChan
 }
 
-func (tl *TestListener) RegisterDataInterest(workflowID string) chan interface{} {
+func (tl *TestListener) RegisterDataInterest(workflowID string) chan *StateData {
 	defer tl.dataLock.Unlock()
 	tl.dataLock.Lock()
 	dataChan, ok := tl.dataInterest[workflowID]
 	if !ok {
-		dataChan = make(chan interface{}, 1000)
+		dataChan = make(chan *StateData, 1000)
 		tl.dataInterest[workflowID] = dataChan
 	}
 	return dataChan
@@ -197,7 +197,7 @@ func (tl *TestListener) AwaitDecision(workflowID string, predicate func(*swf.Dec
 	tl.AwaitDecisionFor(workflowID, tl.DefaultWait, predicate)
 }
 
-func (tl *TestListener) AwaitDataFor(workflowID string, waitFor time.Duration, predicate func(interface{}) bool) {
+func (tl *TestListener) AwaitDataFor(workflowID string, waitFor time.Duration, predicate func(*StateData) bool) {
 	ch := tl.RegisterDataInterest(workflowID)
 	timer := time.After(waitFor)
 	for {
@@ -217,7 +217,7 @@ func (tl *TestListener) AwaitDataFor(workflowID string, waitFor time.Duration, p
 	}
 }
 
-func (tl *TestListener) AwaitData(workflowID string, predicate func(interface{}) bool) {
+func (tl *TestListener) AwaitData(workflowID string, predicate func(*StateData) bool) {
 	tl.AwaitDataFor(workflowID, tl.DefaultWait, predicate)
 }
 
@@ -275,7 +275,11 @@ func (tl *TestListener) forward() {
 			//send data
 			if c, ok := tl.dataInterest[workflow]; ok {
 				tl.testAdapter.Logf("TestListener: yes stateInterest for workflow %s %s", workflow, do.State)
-				c <- tl.deserialize(do.State.StateData)
+				stateData := &StateData{
+					State: do.State.StateName,
+				    Data: tl.deserialize(do.State.StateData),
+				}
+				c <- stateData
 			} else {
 				tl.testAdapter.Logf("TestListener: no stateInterest for workflow %s", workflow)
 			}

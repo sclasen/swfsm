@@ -27,6 +27,11 @@ type DecisionOutcome struct {
 	Decisions    []*swf.Decision
 }
 
+type StateData struct {
+	State string
+	Data interface{}
+}
+
 func StubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 	f := &fsm.FSM{
 		SWF:        client,
