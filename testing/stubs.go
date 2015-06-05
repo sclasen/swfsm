@@ -23,7 +23,7 @@ var (
 
 type DecisionOutcome struct {
 	DecisionTask *swf.PollForDecisionTaskOutput
-	State        string
+	State        *fsm.SerializedState
 	Decisions    []*swf.Decision
 }
 
@@ -107,7 +107,7 @@ func TestInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []st
 
 func TestReplicator(decisionOutcomes chan DecisionOutcome) fsm.ReplicationHandler {
 	return func(ctx *fsm.FSMContext, task *swf.PollForDecisionTaskOutput, outcome *swf.RespondDecisionTaskCompletedInput, state *fsm.SerializedState) error {
-		decisionOutcomes <- DecisionOutcome{State: state.StateName, DecisionTask: task, Decisions: outcome.Decisions}
+		decisionOutcomes <- DecisionOutcome{State: state, DecisionTask: task, Decisions: outcome.Decisions}
 		return nil
 	}
 }
