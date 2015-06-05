@@ -6,6 +6,8 @@ import (
 
 	"fmt"
 
+	"reflect"
+
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/activity"
@@ -38,9 +40,12 @@ func NewTestListener(t TestConfig) *TestListener {
 		historyInterest:  make(map[string]chan *swf.HistoryEvent, 1000),
 		decisionInterest: make(map[string]chan *swf.Decision, 1000),
 		stateInterest:    make(map[string]chan string, 1000),
+		dataInterest:     make(map[string]chan *StateData, 1000),
 		DefaultWait:      time.Duration(t.DefaultWaitTimeout) * time.Second,
 		testAdapter:      t.Testing,
 		TestID:           uuid.New(),
+		dataType:         t.FSM.DataType,
+		serializer:       t.FSM.Serializer,
 	}
 
 	t.FSM.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
@@ -68,9 +73,13 @@ type TestListener struct {
 	decisionLock     sync.Mutex
 	stateInterest    map[string]chan string
 	stateLock        sync.Mutex
+	dataInterest     map[string]chan *StateData
+	dataLock         sync.Mutex
 	DefaultWait      time.Duration
 	testAdapter      TestAdapter
 	TestID           string
+	dataType         interface{}
+	serializer       fsm.StateSerializer
 }
 
 func (tl *TestListener) RegisterHistoryInterest(workflowID string) chan *swf.HistoryEvent {
@@ -104,6 +113,17 @@ func (tl *TestListener) RegisterStateInterest(workflowID string) chan string {
 		tl.stateInterest[workflowID] = stateChan
 	}
 	return stateChan
+}
+
+func (tl *TestListener) RegisterDataInterest(workflowID string) chan *StateData {
+	defer tl.dataLock.Unlock()
+	tl.dataLock.Lock()
+	dataChan, ok := tl.dataInterest[workflowID]
+	if !ok {
+		dataChan = make(chan *StateData, 1000)
+		tl.dataInterest[workflowID] = dataChan
+	}
+	return dataChan
 }
 
 func (tl *TestListener) AwaitStateFor(workflowID, state string, waitFor time.Duration) {
@@ -177,6 +197,30 @@ func (tl *TestListener) AwaitDecision(workflowID string, predicate func(*swf.Dec
 	tl.AwaitDecisionFor(workflowID, tl.DefaultWait, predicate)
 }
 
+func (tl *TestListener) AwaitDataFor(workflowID string, waitFor time.Duration, predicate func(*StateData) bool) {
+	ch := tl.RegisterDataInterest(workflowID)
+	timer := time.After(waitFor)
+	for {
+		select {
+		case d := <-ch:
+			if predicate(d) {
+				tl.testAdapter.Logf("TestListener: await data for workflow=%s received-data=%+v predicate=true", workflowID, d)
+				return
+			} else {
+				tl.testAdapter.Logf("TestListener: await data for workflow=%s received-data=%+v predicate=false", workflowID, d)
+			}
+		case <-timer:
+			panic(fmt.Sprintf("TestListener: timed out waiting for workflow=%s data", workflowID))
+			tl.testAdapter.Fatalf("TestListener: timed out waiting for workflow=%s data", workflowID)
+			tl.testAdapter.FailNow()
+		}
+	}
+}
+
+func (tl *TestListener) AwaitData(workflowID string, predicate func(*StateData) bool) {
+	tl.AwaitDataFor(workflowID, tl.DefaultWait, predicate)
+}
+
 func (tl *TestListener) Start() {
 	tl.testAdapter.Logf("TestListener: Starting")
 	go tl.forward()
@@ -224,7 +268,18 @@ func (tl *TestListener) forward() {
 			//send states
 			if c, ok := tl.stateInterest[workflow]; ok {
 				tl.testAdapter.Logf("TestListener: yes stateInterest for workflow %s %s", workflow, do.State)
-				c <- do.State
+				c <- do.State.StateName
+			} else {
+				tl.testAdapter.Logf("TestListener: no stateInterest for workflow %s", workflow)
+			}
+			//send data
+			if c, ok := tl.dataInterest[workflow]; ok {
+				tl.testAdapter.Logf("TestListener: yes stateInterest for workflow %s %s", workflow, do.State)
+				stateData := &StateData{
+					State: do.State.StateName,
+					Data:  tl.deserialize(do.State.StateData),
+				}
+				c <- stateData
 			} else {
 				tl.testAdapter.Logf("TestListener: no stateInterest for workflow %s", workflow)
 			}
@@ -232,4 +287,13 @@ func (tl *TestListener) forward() {
 			tl.testAdapter.Logf("TestListener: warn, no DecisionOutcomes after 1 second")
 		}
 	}
+}
+
+func (tl *TestListener) deserialize(serialized string) interface{} {
+	data := reflect.New(reflect.TypeOf(tl.dataType)).Interface()
+	err := tl.serializer.Deserialize(serialized, data)
+	if err != nil {
+		panic("cant deserialize data")
+	}
+	return data
 }
