@@ -24,6 +24,7 @@ type FSMClient interface {
 	GetState(id string) (string, interface{}, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
+    RequestCancel(id string) error
 }
 
 type ClientSWFOps interface {
@@ -247,4 +248,12 @@ func (c *client) Start(startTemplate swf.StartWorkflowExecutionInput, id string,
 	startTemplate.WorkflowID = S(id)
 	startTemplate.Input = serializedInput
 	return c.c.StartWorkflowExecution(&startTemplate)
+}
+
+func (c *client) RequestCancel(id string) error {
+    _, err := c.c.RequestCancelWorkflowExecution(&swf.RequestCancelWorkflowExecutionInput{
+        Domain:     S(c.f.Domain),
+        WorkflowID: S(id),
+    })
+    return err
 }
