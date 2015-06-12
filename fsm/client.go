@@ -46,7 +46,13 @@ type client struct {
 	c ClientSWFOps
 }
 
-type WorkflowInfosFunc func(infos *swf.WorkflowExecutionInfos) (shouldContinue bool, err error)
+type WorkflowInfosFunc func(infos *swf.WorkflowExecutionInfos) error
+
+type stopWalkingError error
+
+func StopWalking() stopWalkingError {
+	return stopWalkingError(fmt.Errorf(""))
+}
 
 func (c *client) WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error {
 	template.Domain = S(c.f.Domain)
@@ -66,14 +72,13 @@ func (c *client) WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsI
 			return err
 		}
 
-		shouldContinue, err := workflowInfosFunc(infos)
+		err := workflowInfosFunc(infos)
 
 		if err != nil {
+			if _, ok := err.(stopWalkingError); ok {
+				return nil
+			}
 			return err
-		}
-
-		if !shouldContinue {
-			break
 		}
 
 		if infos.NextPageToken == nil {
