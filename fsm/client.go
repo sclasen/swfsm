@@ -17,14 +17,11 @@ import (
 )
 
 type FSMClient interface {
-	ListOpenIds() ([]string, string, error)
-	ListNextOpenIds(previousPageToken string) ([]string, string, error)
-	ListClosedIds() ([]string, string, error)
-	ListNextClosedIds(previousPageToken string) ([]string, string, error)
+	WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error
 	GetState(id string) (string, interface{}, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
-    RequestCancel(id string) error
+	RequestCancel(id string) error
 }
 
 type ClientSWFOps interface {
@@ -49,49 +46,44 @@ type client struct {
 	c ClientSWFOps
 }
 
-func (c *client) ListOpenIds() ([]string, string, error) {
-	return c.listIds(func() (*swf.WorkflowExecutionInfos, error) {
-		return c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
-			Domain:          S(c.f.Domain),
-			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
-			TypeFilter:      &swf.WorkflowTypeFilter{Name: S(c.f.Name)},
-		})
-	})
+type WorkflowInfosFunc func(infos *swf.WorkflowExecutionInfos) (shouldContinue bool, err error)
+
+func (c *client) WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error {
+	template.Domain = S(c.f.Domain)
+
+	if template.StartTimeFilter == nil {
+		template.StartTimeFilter = &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))}
+	}
+
+	infos, err := c.c.ListOpenWorkflowExecutions(template)
+
+	for {
+		if err != nil {
+			return err
+		}
+
+		shouldContinue, err := workflowInfosFunc(infos)
+
+		if err != nil {
+			return err
+		}
+
+		if !shouldContinue {
+			break
+		}
+
+		if infos.NextPageToken == nil {
+			break
+		}
+
+		template.NextPageToken = infos.NextPageToken
+		infos, err = c.c.ListOpenWorkflowExecutions(template)
+	}
+
+	return nil
 }
 
-func (c *client) ListNextOpenIds(previousPageToken string) ([]string, string, error) {
-	return c.listIds(func() (*swf.WorkflowExecutionInfos, error) {
-		return c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
-			Domain:          S(c.f.Domain),
-			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
-			TypeFilter:      &swf.WorkflowTypeFilter{Name: S(c.f.Name)},
-			NextPageToken:   S(previousPageToken),
-		})
-	})
-}
-
-func (c *client) ListClosedIds() ([]string, string, error) {
-	return c.listIds(func() (*swf.WorkflowExecutionInfos, error) {
-		return c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
-			Domain:          S(c.f.Domain),
-			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
-			TypeFilter:      &swf.WorkflowTypeFilter{Name: S(c.f.Name)},
-		})
-	})
-}
-
-func (c *client) ListNextClosedIds(previousPageToken string) ([]string, string, error) {
-	return c.listIds(func() (*swf.WorkflowExecutionInfos, error) {
-		return c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
-			Domain:          S(c.f.Domain),
-			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
-			TypeFilter:      &swf.WorkflowTypeFilter{Name: S(c.f.Name)},
-			NextPageToken:   S(previousPageToken),
-		})
-
-	})
-}
-
+// TODO: make usable again
 func (c *client) listIds(executionInfosFunc func() (*swf.WorkflowExecutionInfos, error)) ([]string, string, error) {
 	executionInfos, err := executionInfosFunc()
 
@@ -251,9 +243,9 @@ func (c *client) Start(startTemplate swf.StartWorkflowExecutionInput, id string,
 }
 
 func (c *client) RequestCancel(id string) error {
-    _, err := c.c.RequestCancelWorkflowExecution(&swf.RequestCancelWorkflowExecutionInput{
-        Domain:     S(c.f.Domain),
-        WorkflowID: S(id),
-    })
-    return err
+	_, err := c.c.RequestCancelWorkflowExecution(&swf.RequestCancelWorkflowExecutionInput{
+		Domain:     S(c.f.Domain),
+		WorkflowID: S(id),
+	})
+	return err
 }
