@@ -55,6 +55,10 @@ func (c *client) WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsI
 		template.StartTimeFilter = &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))}
 	}
 
+	if template.TypeFilter == nil && template.ExecutionFilter == nil && template.TagFilter == nil {
+		template.TypeFilter = &swf.WorkflowTypeFilter{Name: S(c.f.Name)}
+	}
+
 	infos, err := c.c.ListOpenWorkflowExecutions(template)
 
 	for {
