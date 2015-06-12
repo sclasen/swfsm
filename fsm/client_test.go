@@ -13,6 +13,7 @@ import (
 	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/migrator"
+	"fmt"
 )
 
 func TestClient(t *testing.T) {
@@ -103,23 +104,24 @@ func TestClient(t *testing.T) {
 		t.Fatal("not in initial")
 	}
 
-	ids, _, err := fsmClient.ListOpenIds()
+	found := false
+	err = fsmClient.WalkOpenWorkflowInfos(&swf.ListOpenWorkflowExecutionsInput{}, func(infos *swf.WorkflowExecutionInfos) error {
+		for _, info := range infos.ExecutionInfos {
+			if *info.Execution.WorkflowID == workflow {
+				found = true
+				return StopWalking()
+			}
+		}
+		return nil
+	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !stringSliceContains(ids, workflow) {
-		t.Fatal(ids)
+	if !found {
+		t.Fatalf("%s not found", workflow)
 	}
-}
-
-func stringSliceContains(haystack []string, needle string) bool {
-	for _, hay := range haystack {
-		if hay == needle {
-			return true
-		}
-	}
-	return false
 }
 
 func TestStringDoesntSerialize(t *testing.T) {
