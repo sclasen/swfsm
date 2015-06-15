@@ -121,6 +121,36 @@ func TestClient(t *testing.T) {
 	if !found {
 		t.Fatalf("%s not found", workflow)
 	}
+
+	snapshots, err := fsmClient.GetSnapshots(workflow)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if length := len(snapshots); length != 1 {
+		t.Fatalf("snapshots length: %d", length)
+	}
+
+	if name := snapshots[0].Event.Name; name != "start" {
+		t.Fatalf("snapshots[0].Event.Name: %s ", name)
+	}
+
+	if Type := snapshots[0].Event.Type; Type != enums.EventTypeWorkflowExecutionStarted {
+		t.Fatalf("snapshots[0].Event.Type: %s ", Type)
+	}
+
+	if name := snapshots[0].State.Name; name != "initial" {
+		t.Fatalf("snapshots[0].State.Name: %s ", name)
+	}
+
+	if version := snapshots[0].State.Version; version != 0 {
+		t.Fatalf("snapshots[0].State.Version: %d ", version)
+	}
+
+	if id := snapshots[0].State.ID; id != 1 {
+		t.Fatalf("snapshots[0].State.ID: %d ", id)
+	}
+
 }
 
 func TestStringDoesntSerialize(t *testing.T) {

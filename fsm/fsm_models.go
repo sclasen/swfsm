@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"strings"
 
+	"time"
+
 	"code.google.com/p/goprotobuf/proto"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/service/swf"
@@ -361,4 +363,28 @@ type SerializedErrorState struct {
 type SerializedActivityState struct {
 	ActivityID string
 	Input      *string
+}
+
+type FSMSnapshot struct {
+	State *FSMSnapshotState
+	Event *FSMSnapshotEvent
+	//	Actions // TODO: separate Actions from Events?
+}
+
+type FSMSnapshotState struct {
+	ID        int64
+	Timestamp time.Time
+	Version   uint64
+	Name      string
+	Data      interface{}
+}
+
+type FSMSnapshotEvent struct {
+	Type    string
+	Name    string
+	Version string
+	Source  string
+	Target  string
+	Input   interface{}
+	Output  interface{}
 }

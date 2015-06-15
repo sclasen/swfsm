@@ -13,12 +13,14 @@ import (
 	"github.com/awslabs/aws-sdk-go/aws/awserr"
 	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
 type FSMClient interface {
 	WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error
 	GetState(id string) (string, interface{}, error)
+	GetSnapshots(id string) ([]FSMSnapshot, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
 	RequestCancel(id string) error
@@ -123,10 +125,29 @@ func (c *client) listIds(executionInfosFunc func() (*swf.WorkflowExecutionInfos,
 	return ids, nextPageToken, nil
 }
 
-func (c *client) GetState(id string) (string, interface{}, error) {
-	getState := func() (string, interface{}, error) {
-		var execution *swf.WorkflowExecution
-		open, err := c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
+	open, err := c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+		Domain:          S(c.f.Domain),
+		MaximumPageSize: aws.Long(1),
+		StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
+		ExecutionFilter: &swf.WorkflowExecutionFilter{
+			WorkflowID: S(id),
+		},
+	})
+
+	if err != nil {
+		if ae, ok := err.(awserr.Error); ok {
+			log.Printf("component=client fn=findExecution at=list-open error-type=%s message=%s", ae.Code(), ae.Message())
+		} else {
+			log.Printf("component=client fn=findExecution at=list-open error=%s", err)
+		}
+		return nil, err
+	}
+
+	if len(open.ExecutionInfos) == 1 {
+		return open.ExecutionInfos[0].Execution, nil
+	} else {
+		closed, err := c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
 			Domain:          S(c.f.Domain),
 			MaximumPageSize: aws.Long(1),
 			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
@@ -137,39 +158,26 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 
 		if err != nil {
 			if ae, ok := err.(awserr.Error); ok {
-				log.Printf("component=client fn=GetState at=list-open error-type=%s message=%s", ae.Code(), ae.Message())
+				log.Printf("component=client fn=findExecution at=list-closed error-type=%s message=%s", ae.Code(), ae.Message())
 			} else {
-				log.Printf("component=client fn=GetState at=list-open error=%s", err)
+				log.Printf("component=client fn=findExecution at=list-closed error=%s", err)
 			}
-			return "", nil, err
+			return nil, err
 		}
 
-		if len(open.ExecutionInfos) == 1 {
-			execution = open.ExecutionInfos[0].Execution
+		if len(closed.ExecutionInfos) > 0 {
+			return closed.ExecutionInfos[0].Execution, nil
 		} else {
-			closed, err := c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
-				Domain:          S(c.f.Domain),
-				MaximumPageSize: aws.Long(1),
-				StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
-				ExecutionFilter: &swf.WorkflowExecutionFilter{
-					WorkflowID: S(id),
-				},
-			})
+			return nil, errors.Trace(fmt.Errorf("workflow not found for id %s", id))
+		}
+	}
+}
 
-			if err != nil {
-				if ae, ok := err.(awserr.Error); ok {
-					log.Printf("component=client fn=GetState at=list-closed error-type=%s message=%s", ae.Code(), ae.Message())
-				} else {
-					log.Printf("component=client fn=GetState at=list-closed error=%s", err)
-				}
-				return "", nil, err
-			}
-
-			if len(closed.ExecutionInfos) > 0 {
-				execution = closed.ExecutionInfos[0].Execution
-			} else {
-				return "", nil, errors.Trace(fmt.Errorf("workflow not found for id %s", id))
-			}
+func (c *client) GetState(id string) (string, interface{}, error) {
+	getState := func() (string, interface{}, error) {
+		execution, err := c.findExecution(id)
+		if err != nil {
+			return "", nil, err
 		}
 
 		history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
@@ -262,4 +270,135 @@ func (c *client) RequestCancel(id string) error {
 		WorkflowID: S(id),
 	})
 	return err
+}
+
+func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
+	snapshots := []FSMSnapshot{}
+
+	execution, err := c.findExecution(id)
+	if err != nil {
+		return snapshots, err
+	}
+
+	// TODO: extract out history walker and/or nextpagetoken support
+	history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
+		Domain:       S(c.f.Domain),
+		Execution:    execution,
+		ReverseOrder: aws.Boolean(true),
+	})
+
+	if err != nil {
+		return snapshots, err
+	}
+
+	snapshot := FSMSnapshot{}
+	for _, historyEvent := range history.Events {
+		// TODO: how to deal with failure events?
+		switch EventType := *historyEvent.EventType; EventType {
+		case enums.EventTypeWorkflowExecutionStarted:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:  EventType,
+				Name:  "start",
+				Input: c.tryDeserialize(*historyEvent.WorkflowExecutionStartedEventAttributes.Input),
+			}
+		case enums.EventTypeWorkflowExecutionSignaled:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:  EventType,
+				Name:  *historyEvent.WorkflowExecutionSignaledEventAttributes.SignalName,
+				Input: c.tryDeserialize(*historyEvent.WorkflowExecutionSignaledEventAttributes.Input),
+			}
+		case enums.EventTypeActivityTaskScheduled:
+			if snapshot.Event != nil && snapshot.Event.Input == c.pointerScheduledEventID(historyEvent.EventID) {
+				snapshot.Event.Name = *historyEvent.ActivityTaskScheduledEventAttributes.ActivityType.Name
+				snapshot.Event.Version = *historyEvent.ActivityTaskScheduledEventAttributes.ActivityType.Version
+				snapshot.Event.Input = c.tryDeserialize(*historyEvent.ActivityTaskScheduledEventAttributes.Input)
+			}
+		case enums.EventTypeActivityTaskCompleted:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Input:  c.pointerScheduledEventID(historyEvent.ActivityTaskCompletedEventAttributes.ScheduledEventID),
+				Output: c.tryDeserialize(*historyEvent.ActivityTaskCompletedEventAttributes.Result),
+			}
+		case enums.EventTypeStartChildWorkflowExecutionInitiated:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Name:   *historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType.Name,
+				Input:  c.tryDeserialize(*historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.Input),
+				Target: *historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowID,
+			}
+		case enums.EventTypeSignalExternalWorkflowExecutionInitiated:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Name:   *historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
+				Input:  c.tryDeserialize(*historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input),
+				Target: *historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
+			}
+		case enums.EventTypeRequestCancelExternalWorkflowExecutionInitiated:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Target: *historyEvent.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
+			}
+		case enums.EventTypeTimerStarted:
+			if snapshot.Event != nil && snapshot.Event.Input == c.pointerStartedEventID(historyEvent.EventID) {
+				snapshot.Event.Input = *historyEvent.TimerStartedEventAttributes.StartToFireTimeout
+			}
+		case enums.EventTypeTimerFired:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:  EventType,
+				Name:  *historyEvent.TimerFiredEventAttributes.TimerID,
+				Input: c.pointerStartedEventID(historyEvent.TimerFiredEventAttributes.StartedEventID),
+			}
+		case enums.EventTypeWorkflowExecutionCancelRequested:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type: EventType,
+			}
+		}
+
+		state, err := c.f.statefulHistoryEventToSerializedState(historyEvent)
+		if err != nil {
+			break
+		}
+
+		if state != nil {
+			snapshot.State = &FSMSnapshotState{
+				ID:        *historyEvent.EventID,
+				Timestamp: *historyEvent.EventTimestamp,
+				Version:   state.StateVersion,
+				Name:      state.StateName,
+				Data:      c.f.zeroStateData(),
+			}
+			err = c.f.Serializer.Deserialize(state.StateData, snapshot.State.Data)
+			if err != nil {
+				return snapshots, err
+			}
+
+			snapshots = append(snapshots, snapshot)
+			snapshot = FSMSnapshot{}
+		}
+	}
+
+	return snapshots, err
+}
+
+func (c *client) tryDeserialize(serialized string) interface{} {
+	if serialized == "" {
+		return ""
+	}
+
+	tryMap := make(map[string]interface{})
+	err := c.f.systemSerializer.Deserialize(serialized, &tryMap)
+	if err == nil {
+		return tryMap
+	}
+	log.Printf("component=client fn=trySystemDeserialize at=deserialize-map error=%s", err)
+
+	return serialized
+}
+
+func (c *client) pointerStartedEventID(id *int64) string {
+	return fmt.Sprintf("StartedEventID->%d", *id)
+}
+
+func (c *client) pointerScheduledEventID(id *int64) string {
+	return fmt.Sprintf("ScheduledEventID->%d", *id)
 }
