@@ -13,7 +13,6 @@ import (
 	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/migrator"
-	"fmt"
 )
 
 func TestClient(t *testing.T) {

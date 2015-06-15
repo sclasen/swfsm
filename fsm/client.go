@@ -54,6 +54,11 @@ func StopWalking() stopWalkingError {
 	return stopWalkingError(fmt.Errorf(""))
 }
 
+func IsStopWalking(err error) bool {
+	_, ok := err.(stopWalkingError)
+	return ok
+}
+
 func (c *client) WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error {
 	template.Domain = S(c.f.Domain)
 
@@ -75,7 +80,7 @@ func (c *client) WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsI
 		err := workflowInfosFunc(infos)
 
 		if err != nil {
-			if _, ok := err.(stopWalkingError); ok {
+			if IsStopWalking(err) {
 				return nil
 			}
 			return err
