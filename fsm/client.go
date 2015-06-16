@@ -299,38 +299,38 @@ func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:  EventType,
 				Name:  "start",
-				Input: c.tryDeserialize(*historyEvent.WorkflowExecutionStartedEventAttributes.Input),
+				Input: c.tryDeserialize(historyEvent.WorkflowExecutionStartedEventAttributes.Input),
 			}
 		case enums.EventTypeWorkflowExecutionSignaled:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:  EventType,
 				Name:  *historyEvent.WorkflowExecutionSignaledEventAttributes.SignalName,
-				Input: c.tryDeserialize(*historyEvent.WorkflowExecutionSignaledEventAttributes.Input),
+				Input: c.tryDeserialize(historyEvent.WorkflowExecutionSignaledEventAttributes.Input),
 			}
 		case enums.EventTypeActivityTaskScheduled:
 			if snapshot.Event != nil && snapshot.Event.Input == c.pointerScheduledEventID(historyEvent.EventID) {
 				snapshot.Event.Name = *historyEvent.ActivityTaskScheduledEventAttributes.ActivityType.Name
 				snapshot.Event.Version = *historyEvent.ActivityTaskScheduledEventAttributes.ActivityType.Version
-				snapshot.Event.Input = c.tryDeserialize(*historyEvent.ActivityTaskScheduledEventAttributes.Input)
+				snapshot.Event.Input = c.tryDeserialize(historyEvent.ActivityTaskScheduledEventAttributes.Input)
 			}
 		case enums.EventTypeActivityTaskCompleted:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
 				Input:  c.pointerScheduledEventID(historyEvent.ActivityTaskCompletedEventAttributes.ScheduledEventID),
-				Output: c.tryDeserialize(*historyEvent.ActivityTaskCompletedEventAttributes.Result),
+				Output: c.tryDeserialize(historyEvent.ActivityTaskCompletedEventAttributes.Result),
 			}
 		case enums.EventTypeStartChildWorkflowExecutionInitiated:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
 				Name:   *historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType.Name,
-				Input:  c.tryDeserialize(*historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.Input),
+				Input:  c.tryDeserialize(historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.Input),
 				Target: *historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 			}
 		case enums.EventTypeSignalExternalWorkflowExecutionInitiated:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
 				Name:   *historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
-				Input:  c.tryDeserialize(*historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input),
+				Input:  c.tryDeserialize(historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input),
 				Target: *historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 			}
 		case enums.EventTypeRequestCancelExternalWorkflowExecutionInitiated:
@@ -380,19 +380,19 @@ func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
 	return snapshots, err
 }
 
-func (c *client) tryDeserialize(serialized string) interface{} {
-	if serialized == "" {
+func (c *client) tryDeserialize(serialized *string) interface{} {
+	if serialized == nil || *serialized == "" {
 		return ""
 	}
 
 	tryMap := make(map[string]interface{})
-	err := c.f.systemSerializer.Deserialize(serialized, &tryMap)
+	err := c.f.systemSerializer.Deserialize(*serialized, &tryMap)
 	if err == nil {
 		return tryMap
 	}
 	log.Printf("component=client fn=trySystemDeserialize at=deserialize-map error=%s", err)
 
-	return serialized
+	return *serialized
 }
 
 func (c *client) pointerStartedEventID(id *int64) string {
