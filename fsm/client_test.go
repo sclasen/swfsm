@@ -103,23 +103,54 @@ func TestClient(t *testing.T) {
 		t.Fatal("not in initial")
 	}
 
-	ids, _, err := fsmClient.ListOpenIds()
+	found := false
+	err = fsmClient.WalkOpenWorkflowInfos(&swf.ListOpenWorkflowExecutionsInput{}, func(infos *swf.WorkflowExecutionInfos) error {
+		for _, info := range infos.ExecutionInfos {
+			if *info.Execution.WorkflowID == workflow {
+				found = true
+				return StopWalking()
+			}
+		}
+		return nil
+	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !stringSliceContains(ids, workflow) {
-		t.Fatal(ids)
+	if !found {
+		t.Fatalf("%s not found", workflow)
 	}
-}
 
-func stringSliceContains(haystack []string, needle string) bool {
-	for _, hay := range haystack {
-		if hay == needle {
-			return true
-		}
+	snapshots, err := fsmClient.GetSnapshots(workflow)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return false
+
+	if length := len(snapshots); length != 1 {
+		t.Fatalf("snapshots length: %d", length)
+	}
+
+	if name := snapshots[0].Event.Name; name != "start" {
+		t.Fatalf("snapshots[0].Event.Name: %s ", name)
+	}
+
+	if Type := snapshots[0].Event.Type; Type != enums.EventTypeWorkflowExecutionStarted {
+		t.Fatalf("snapshots[0].Event.Type: %s ", Type)
+	}
+
+	if name := snapshots[0].State.Name; name != "initial" {
+		t.Fatalf("snapshots[0].State.Name: %s ", name)
+	}
+
+	if version := snapshots[0].State.Version; version != 0 {
+		t.Fatalf("snapshots[0].State.Version: %d ", version)
+	}
+
+	if id := snapshots[0].State.ID; id != 1 {
+		t.Fatalf("snapshots[0].State.ID: %d ", id)
+	}
+
 }
 
 func TestStringDoesntSerialize(t *testing.T) {

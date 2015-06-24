@@ -587,30 +587,37 @@ func (f *FSM) clog(ctx *FSMContext, format string, data ...interface{}) {
 
 func (f *FSM) findSerializedState(events []*swf.HistoryEvent) (*SerializedState, error) {
 	for _, event := range events {
-		if f.isStateMarker(event) {
-			state := &SerializedState{}
-			err := f.systemSerializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, state)
+		if state, err := f.statefulHistoryEventToSerializedState(event); state != nil || err != nil {
 			return state, err
-		} else if *event.EventType == enums.EventTypeWorkflowExecutionStarted {
-			state := &SerializedState{}
-			//If the workflow is continued, we expect a full SerializedState as Input
-			if event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunID != nil {
-				err := f.Serializer.Deserialize(*event.WorkflowExecutionStartedEventAttributes.Input, state)
-				if err == nil {
-					if state.StateName == "" {
-						state.StateName = f.initialState.Name
-					}
-				}
-				return state, err
-			}
-			//Otherwise we expect just a stateData struct
-			state.StateVersion = 0
-			state.StateName = f.initialState.Name
-			state.StateData = *event.WorkflowExecutionStartedEventAttributes.Input
-			return state, nil
 		}
 	}
 	return nil, errors.New("Cant Find Current Data")
+}
+
+func (f *FSM) statefulHistoryEventToSerializedState(event *swf.HistoryEvent) (*SerializedState, error) {
+	if f.isStateMarker(event) {
+		state := &SerializedState{}
+		err := f.systemSerializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, state)
+		return state, err
+	} else if *event.EventType == enums.EventTypeWorkflowExecutionStarted {
+		state := &SerializedState{}
+		//If the workflow is continued, we expect a full SerializedState as Input
+		if event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunID != nil {
+			err := f.Serializer.Deserialize(*event.WorkflowExecutionStartedEventAttributes.Input, state)
+			if err == nil {
+				if state.StateName == "" {
+					state.StateName = f.initialState.Name
+				}
+			}
+			return state, err
+		}
+		//Otherwise we expect just a stateData struct
+		state.StateVersion = 0
+		state.StateName = f.initialState.Name
+		state.StateData = *event.WorkflowExecutionStartedEventAttributes.Input
+		return state, nil
+	}
+	return nil, nil
 }
 
 func (f *FSM) findSerializedEventCorrelator(events []*swf.HistoryEvent) (*EventCorrelator, error) {
