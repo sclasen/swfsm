@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 
+	"sync"
+
 	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/activity"
 	"github.com/sclasen/swfsm/enums/swf"
@@ -118,9 +120,13 @@ func NoOpActivityInterceptor() activity.ActivityInterceptor {
 // interceptor that fails the activity once per activity and returns to actual result subsequent time
 // used to test error handling and retries of activities in fsms
 func TestFailOnceActivityInterceptor() activity.ActivityInterceptor {
+	mutex := sync.Mutex{}
 	tried := map[string]bool{}
 	return &activity.FuncInterceptor{
 		AfterTaskFn: func(t *swf.PollForActivityTaskOutput, result interface{}, err error) (interface{}, error) {
+			mutex.Lock()
+			defer mutex.Unlock()
+
 			if err != nil || tried[*t.ActivityID] {
 				log.Printf("interceptor.test.fail-once at=passthrough activity-id=%q", *t.ActivityID)
 				return result, err
