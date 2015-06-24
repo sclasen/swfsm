@@ -21,18 +21,23 @@ type TestAdapter interface {
 }
 
 type TestConfig struct {
-	Testing               TestAdapter
-	FSM                   *fsm.FSM
-	StubFSM               *fsm.FSM
-	Workers               []*activity.ActivityWorker
-	StubbedWorkflows      []string
-	ShortStubbedWorkflows []string
-	DefaultWaitTimeout    int
+	Testing                    TestAdapter
+	FSM                        *fsm.FSM
+	StubFSM                    *fsm.FSM
+	Workers                    []*activity.ActivityWorker
+	StubbedWorkflows           []string
+	ShortStubbedWorkflows      []string
+	DefaultWaitTimeout         int
+	DefaultActivityInterceptor activity.ActivityInterceptor
 }
 
 func NewTestListener(t TestConfig) *TestListener {
 	if t.DefaultWaitTimeout == 0 {
 		t.DefaultWaitTimeout = 10
+	}
+
+	if t.DefaultActivityInterceptor == nil {
+		t.DefaultActivityInterceptor = TestFailOnceActivityInterceptor()
 	}
 
 	tl := &TestListener{
@@ -49,7 +54,7 @@ func NewTestListener(t TestConfig) *TestListener {
 	}
 
 	t.FSM.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
-	t.FSM.DecisionInterceptor = TestInterceptor(tl.TestID, t.StubbedWorkflows, t.ShortStubbedWorkflows)
+	t.FSM.DecisionInterceptor = TestDecisionInterceptor(tl.TestID, t.StubbedWorkflows, t.ShortStubbedWorkflows)
 	t.FSM.TaskList = tl.TestID
 
 	if t.StubFSM != nil {
@@ -57,6 +62,9 @@ func NewTestListener(t TestConfig) *TestListener {
 	}
 
 	for _, w := range t.Workers {
+		if w.ActivityInterceptor == nil {
+			w.ActivityInterceptor = t.DefaultActivityInterceptor
+		}
 		w.TaskList = w.TaskList + tl.TestID
 		w.AllowPanics = true
 	}
