@@ -8,6 +8,8 @@ import (
 
 	"reflect"
 
+	"strings"
+
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/awslabs/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/activity"
@@ -15,6 +17,7 @@ import (
 )
 
 type TestAdapter interface {
+	TestName() string
 	Logf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
 	FailNow()
@@ -47,15 +50,15 @@ func NewTestListener(t TestConfig) *TestListener {
 		stateInterest:    make(map[string]chan string, 1000),
 		dataInterest:     make(map[string]chan *StateData, 1000),
 		DefaultWait:      time.Duration(t.DefaultWaitTimeout) * time.Second,
+		TestID:           strings.Join([]string{t.Testing.TestName(), uuid.New()}, "-"),
 		testAdapter:      t.Testing,
-		TestID:           uuid.New(),
 		dataType:         t.FSM.DataType,
 		serializer:       t.FSM.Serializer,
 	}
 
 	t.FSM.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
 	t.FSM.DecisionInterceptor = TestDecisionInterceptor(tl.TestID, t.StubbedWorkflows, t.ShortStubbedWorkflows)
-	t.FSM.TaskList = tl.TestID
+	t.FSM.TaskList = tl.TestFsmTaskList()
 
 	if t.StubFSM != nil {
 		t.StubFSM.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
@@ -65,7 +68,7 @@ func NewTestListener(t TestConfig) *TestListener {
 		if w.ActivityInterceptor == nil {
 			w.ActivityInterceptor = t.DefaultActivityInterceptor
 		}
-		w.TaskList = w.TaskList + tl.TestID
+		w.TaskList = tl.TestWorkerTaskList(w)
 		w.AllowPanics = true
 	}
 
@@ -88,6 +91,14 @@ type TestListener struct {
 	TestID           string
 	dataType         interface{}
 	serializer       fsm.StateSerializer
+}
+
+func (tl *TestListener) TestFsmTaskList() string {
+	return tl.TestID
+}
+
+func (tl *TestListener) TestWorkerTaskList(w *activity.ActivityWorker) string {
+	return w.TaskList + tl.TestID
 }
 
 func (tl *TestListener) RegisterHistoryInterest(workflowID string) chan *swf.HistoryEvent {
