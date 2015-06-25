@@ -144,6 +144,7 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.PollForActivityTas
 	}
 
 	result, err := handler.HandlerFunc(activityTask, deserialized)
+	result, err = a.ActivityInterceptor.AfterTask(activityTask, result, err)
 	if err != nil {
 		if e, ok := err.(ActivityTaskCanceledError); ok {
 			a.ActivityInterceptor.AfterTaskCanceled(activityTask, e.details)
@@ -153,12 +154,12 @@ func (a *ActivityWorker) handleActivityTask(activityTask *swf.PollForActivityTas
 			a.fail(activityTask, errors.Annotate(err, "handler"))
 		}
 	} else {
+		a.ActivityInterceptor.AfterTaskComplete(activityTask, result)
 		a.result(activityTask, result)
 	}
 }
 
 func (a *ActivityWorker) result(activityTask *swf.PollForActivityTaskOutput, result interface{}) {
-	a.ActivityInterceptor.AfterTaskComplete(activityTask, result)
 	switch t := result.(type) {
 	case string:
 		a.done(activityTask, &t)

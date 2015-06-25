@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"log"
 
+	"sync"
+
 	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/sclasen/swfsm/activity"
 	"github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/fsm"
 	. "github.com/sclasen/swfsm/sugar"
@@ -75,7 +78,7 @@ func ShortStubState() fsm.Decider {
 }
 
 //intercept any attempts to start a workflow and launch the stub workflow instead.
-func TestInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []string) *fsm.FuncInterceptor {
+func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []string) fsm.DecisionInterceptor {
 	stubbed := make(map[string]struct{})
 	stubbedShort := make(map[string]struct{})
 	v := struct{}{}
@@ -106,6 +109,33 @@ func TestInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []st
 					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testID)}
 				}
 			}
+		},
+	}
+}
+
+func NoOpActivityInterceptor() activity.ActivityInterceptor {
+	return &activity.FuncInterceptor{}
+}
+
+// interceptor that fails the activity once per activity and returns to actual result subsequent time
+// used to test error handling and retries of activities in fsms
+func TestFailOnceActivityInterceptor() activity.ActivityInterceptor {
+	mutex := sync.Mutex{}
+	tried := map[string]bool{}
+	return &activity.FuncInterceptor{
+		AfterTaskFn: func(t *swf.PollForActivityTaskOutput, result interface{}, err error) (interface{}, error) {
+			mutex.Lock()
+			defer mutex.Unlock()
+
+			if err != nil || tried[*t.ActivityID] {
+				log.Printf("interceptor.test.fail-once at=passthrough activity-id=%q", *t.ActivityID)
+				return result, err
+			}
+
+			tried[*t.ActivityID] = true
+			msg := fmt.Sprintf("interceptor.test.fail-once at=fail activity-id=%q", *t.ActivityID)
+			log.Println(msg)
+			return nil, fmt.Errorf(msg)
 		},
 	}
 }
