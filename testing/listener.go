@@ -39,10 +39,6 @@ func NewTestListener(t TestConfig) *TestListener {
 		t.DefaultWaitTimeout = 10
 	}
 
-	if t.DefaultActivityInterceptor == nil {
-		t.DefaultActivityInterceptor = TestFailOnceActivityInterceptor()
-	}
-
 	tl := &TestListener{
 		decisionOutcomes: make(chan DecisionOutcome, 1000),
 		historyInterest:  make(map[string]chan *swf.HistoryEvent, 1000),
