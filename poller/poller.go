@@ -68,17 +68,17 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 	for {
 		select {
 		case <-stop:
-			log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=recieved-stop action=shutting-down poller=%s", pollerName)
+			log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=recieved-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
 			stopAck <- true
 			return
 		default:
 			task, err := p.Poll()
 			if err != nil {
-				log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-err  poller=%s error=%q", pollerName, err)
+				log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
 				continue
 			}
 			if task == nil {
-				log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-no-task  poller=%s", pollerName)
+				log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-no-task poller=%s task-list=%q", pollerName, p.TaskList)
 				continue
 			}
 			onTask(task)
@@ -142,17 +142,17 @@ func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 	for {
 		select {
 		case <-stop:
-			log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=recieved-stop action=shutting-down poller=%s", pollerName)
+			log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=recieved-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
 			stopAck <- true
 			return
 		default:
 			task, err := p.Poll()
 			if err != nil {
-				log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-err  poller=%s error=%q", pollerName, err)
+				log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
 				continue
 			}
 			if task == nil {
-				log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-no-task  poller=%s", pollerName)
+				log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-no-task poller=%s task-list=%q", pollerName, p.TaskList)
 				continue
 			}
 			onTask(task)
