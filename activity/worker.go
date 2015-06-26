@@ -271,7 +271,7 @@ func (h *ActivityWorker) done(resp *swf.PollForActivityTaskOutput, result *strin
 }
 
 func (h *ActivityWorker) canceled(resp *swf.PollForActivityTaskOutput, details *string) {
-	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=cancled", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
+	log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled", LS(resp.WorkflowExecution.WorkflowID), LS(resp.ActivityType.Name), LS(resp.ActivityID))
 
 	_, canceledErr := h.SWF.RespondActivityTaskCanceled(&swf.RespondActivityTaskCanceledInput{
 		TaskToken: resp.TaskToken,

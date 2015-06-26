@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	TaskGone = "Unknown activity"
+	TaskGone      = "Unknown activity"
+	ExecutionGone = "Unknown execution"
 )
 
 // AddCoordinatedHandler automatically takes care of sending back heartbeats and
@@ -54,7 +55,7 @@ func (c *coordinatedActivityAdapter) heartbeat(activityTask *swf.PollForActivity
 			if status, err := c.worker.SWF.RecordActivityTaskHeartbeat(&swf.RecordActivityTaskHeartbeatInput{
 				TaskToken: activityTask.TaskToken,
 			}); err != nil {
-				if ae, ok := err.(awserr.Error); ok && ae.Code() == ErrorTypeUnknownResourceFault && strings.Contains(ae.Message(), TaskGone) {
+				if ae, ok := err.(awserr.Error); ok && isGoneError(ae) {
 					log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-gone", LS(activityTask.WorkflowExecution.WorkflowID), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityID))
 					cancelActivity <- nil
 					return
@@ -114,4 +115,9 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 			}
 		}
 	}
+}
+
+func isGoneError(err awserr.Error) bool {
+	return err.Code() == ErrorTypeUnknownResourceFault &&
+		(strings.Contains(err.Message(), TaskGone) || strings.Contains(err.Message(), ExecutionGone))
 }
