@@ -7,10 +7,10 @@ import (
 
 	"strings"
 
-	"code.google.com/p/go-uuid/uuid"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/aws/credentials"
 	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/pborman/uuid"
 	"github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/migrator"
 )
