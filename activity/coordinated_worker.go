@@ -6,8 +6,8 @@ import (
 
 	"strings"
 
-	"github.com/awslabs/aws-sdk-go/aws/awserr"
-	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 

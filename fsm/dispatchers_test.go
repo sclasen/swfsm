@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/aws/aws-sdk-go/service/swf"
 
 	"time"
 )

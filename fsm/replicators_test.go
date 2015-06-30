@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/awslabs/aws-sdk-go/service/kinesis"
-	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/aws/aws-sdk-go/service/kinesis"
+	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )

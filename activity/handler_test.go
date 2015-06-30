@@ -3,7 +3,7 @@ package activity
 import (
 	"testing"
 
-	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/aws/aws-sdk-go/service/swf"
 )
 
 func TestHandler(t *testing.T) {

@@ -1,7 +1,7 @@
 package fsm
 
 import (
-	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/aws/aws-sdk-go/service/swf"
 )
 
 //DecisionTaskDispatcher is used by the FSM machinery to
