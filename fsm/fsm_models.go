@@ -8,9 +8,9 @@ import (
 
 	"time"
 
-	"code.google.com/p/goprotobuf/proto"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/golang/protobuf/proto"
 	"github.com/juju/errors"
 	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
