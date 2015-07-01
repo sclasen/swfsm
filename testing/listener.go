@@ -236,6 +236,104 @@ func (tl *TestListener) AwaitData(workflowID string, predicate func(*StateData) 
 	tl.AwaitDataFor(workflowID, tl.DefaultWait, predicate)
 }
 
+func (tl *TestListener) ExpectStateFor(workflowID string, waitFor time.Duration, state string, when func()) {
+	proxy := make(chan interface{})
+	go func() {
+		for {
+			proxy <- <-tl.RegisterStateInterest(workflowID)
+		}
+	}()
+	tl.expectFor(workflowID, waitFor, when, proxy, func(i interface{}) bool {
+		return i.(string) == state
+	})
+}
+
+func (tl *TestListener) ExpectState(workflowID, state string, when func()) {
+	tl.ExpectStateFor(workflowID, tl.DefaultWait, state, when)
+}
+
+func (tl *TestListener) ExpectEventFor(workflowID string, waitFor time.Duration, when func(), predicate func(*swf.HistoryEvent) bool) {
+	proxy := make(chan interface{})
+	go func() {
+		for {
+			proxy <- <-tl.RegisterHistoryInterest(workflowID)
+		}
+	}()
+	tl.expectFor(workflowID, waitFor, when, proxy, func(i interface{}) bool {
+		return predicate(i.(*swf.HistoryEvent))
+	})
+}
+
+func (tl *TestListener) ExpectEvent(workflowID string, when func(), predicate func(*swf.HistoryEvent) bool) {
+	tl.ExpectEventFor(workflowID, tl.DefaultWait, when, predicate)
+}
+
+func (tl *TestListener) ExpectDecisionFor(workflowID string, waitFor time.Duration, when func(), predicate func(*swf.Decision) bool) {
+	proxy := make(chan interface{})
+	go func() {
+		for {
+			proxy <- <-tl.RegisterDecisionInterest(workflowID)
+		}
+	}()
+	tl.expectFor(workflowID, waitFor, when, proxy, func(i interface{}) bool {
+		return predicate(i.(*swf.Decision))
+	})
+}
+
+func (tl *TestListener) ExpectDecision(workflowID string, when func(), predicate func(*swf.Decision) bool) {
+	tl.ExpectDecisionFor(workflowID, tl.DefaultWait, when, predicate)
+}
+
+func (tl *TestListener) ExpectDataFor(workflowID string, waitFor time.Duration, when func(), predicate func(*StateData) bool) {
+	proxy := make(chan interface{})
+	go func() {
+		for {
+			proxy <- <-tl.RegisterDataInterest(workflowID)
+		}
+	}()
+	tl.expectFor(workflowID, waitFor, when, proxy, func(i interface{}) bool {
+		return predicate(i.(*StateData))
+	})
+}
+
+func (tl *TestListener) ExpectData(workflowID string, when func(), predicate func(*StateData) bool) {
+	tl.ExpectDataFor(workflowID, tl.DefaultWait, when, predicate)
+}
+
+func (tl *TestListener) expectFor(workflowID string, waitFor time.Duration, when func(), interest chan interface{}, predicate func(interface{}) bool) {
+	start := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		timer := time.After(waitFor)
+		close(start)
+		for {
+			select {
+			case d := <-interest:
+				if predicate(d) {
+					tl.testAdapter.Logf("TestListener: expect for workflow=%s received-data=%+v predicate=true", workflowID, d)
+					close(done)
+					return
+				} else {
+					tl.testAdapter.Logf("TestListener: expect for workflow=%s received-data=%+v predicate=false", workflowID, d)
+				}
+			case <-timer:
+				panic(fmt.Sprintf("TestListener: timed out waiting for workflow=%s data", workflowID))
+				tl.testAdapter.Fatalf("TestListener: timed out waiting for workflow=%s data", workflowID)
+				tl.testAdapter.FailNow()
+			}
+		}
+	}()
+
+	<-start
+	tl.testAdapter.Logf("TestListener: expect data for workflow=%s at=start", workflowID)
+
+	when()
+	tl.testAdapter.Logf("TestListener: expect data for workflow=%s at=when", workflowID)
+
+	<-done
+	tl.testAdapter.Logf("TestListener: expect data for workflow=%s at=done", workflowID)
+}
+
 func (tl *TestListener) Start() {
 	tl.testAdapter.Logf("TestListener: Starting")
 	go tl.forward()
