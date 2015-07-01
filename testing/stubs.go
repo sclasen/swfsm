@@ -78,7 +78,7 @@ func ShortStubState() fsm.Decider {
 }
 
 //intercept any attempts to start a workflow and launch the stub workflow instead.
-func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []string) fsm.DecisionInterceptor {
+func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []string, interceptor fsm.DecisionInterceptor) fsm.DecisionInterceptor {
 	stubbed := make(map[string]struct{})
 	stubbedShort := make(map[string]struct{})
 	v := struct{}{}
@@ -88,6 +88,7 @@ func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkfl
 	for _, s := range stubbedShortWorkflows {
 		stubbedShort[s] = v
 	}
+
 	return &fsm.FuncInterceptor{
 		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
 			for _, d := range outcome.Decisions {
@@ -108,6 +109,10 @@ func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkfl
 				case enums.DecisionTypeScheduleActivityTask:
 					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testID)}
 				}
+			}
+
+			if interceptor != nil {
+				interceptor.AfterDecision(decision, ctx, outcome)
 			}
 		},
 	}
