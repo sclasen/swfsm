@@ -109,3 +109,34 @@ func countCompletes(in []*swf.Decision) int {
 	}
 	return count
 }
+
+func TestComposedInterceptor(t *testing.T) {
+	calledFirst := false
+	calledThird := false
+
+	c := NewComposedDecisionInterceptor(
+		&FuncInterceptor{
+			BeforeTaskFn: func(decision *swf.PollForDecisionTaskOutput) {
+				calledFirst = true
+			},
+		},
+		nil, // shouldn't blow up on nil second,
+		&FuncInterceptor{
+			BeforeTaskFn: func(decision *swf.PollForDecisionTaskOutput) {
+				calledThird = true
+			},
+		},
+	)
+
+	c.BeforeTask(nil)
+
+	if !calledFirst {
+		t.Fatalf("first not called")
+	}
+
+	if !calledThird {
+		t.Fatalf("third not called")
+	}
+
+	c.AfterDecision(nil, nil, nil) // shouldn't blow up on non-implemented methods
+}

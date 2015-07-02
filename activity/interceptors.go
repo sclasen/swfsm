@@ -56,3 +56,48 @@ func (i *FuncInterceptor) AfterTaskCanceled(activity *swf.PollForActivityTaskOut
 		i.AfterTaskCanceledFn(activity, details)
 	}
 }
+
+type ComposedDecisionInterceptor struct {
+	interceptors []ActivityInterceptor
+}
+
+func NewComposedDecisionInterceptor(interceptors ...ActivityInterceptor) ActivityInterceptor {
+	c := &ComposedDecisionInterceptor{}
+	for _, i := range interceptors {
+		if i != nil {
+			c.interceptors = append(c.interceptors, i)
+		}
+	}
+	return c
+}
+
+func (c *ComposedDecisionInterceptor) BeforeTask(t *swf.PollForActivityTaskOutput) {
+	for _, i := range c.interceptors {
+		i.BeforeTask(t)
+	}
+}
+
+func (c *ComposedDecisionInterceptor) AfterTask(t *swf.PollForActivityTaskOutput, result interface{}, err error) (interface{}, error) {
+	for _, i := range c.interceptors {
+		result, err = i.AfterTask(t, result, err)
+	}
+	return result, err
+}
+
+func (c *ComposedDecisionInterceptor) AfterTaskComplete(t *swf.PollForActivityTaskOutput, result interface{}) {
+	for _, i := range c.interceptors {
+		i.AfterTaskComplete(t, result)
+	}
+}
+
+func (c *ComposedDecisionInterceptor) AfterTaskFailed(t *swf.PollForActivityTaskOutput, err error) {
+	for _, i := range c.interceptors {
+		i.AfterTaskFailed(t, err)
+	}
+}
+
+func (c *ComposedDecisionInterceptor) AfterTaskCanceled(t *swf.PollForActivityTaskOutput, details string) {
+	for _, i := range c.interceptors {
+		i.AfterTaskCanceled(t, details)
+	}
+}
