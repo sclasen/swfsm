@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"fmt"
+
 	"github.com/awslabs/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -181,4 +183,49 @@ func TestCanceledInterceptor(t *testing.T) {
 		t.Fatalf("wong task canceled details. Got: %q", details)
 	}
 
+}
+
+func TestComposedInterceptor(t *testing.T) {
+	calledFirst := false
+	calledThird := false
+
+	c := NewComposedDecisionInterceptor(
+		&FuncInterceptor{
+			BeforeTaskFn: func(decision *swf.PollForActivityTaskOutput) {
+				calledFirst = true
+			},
+			AfterTaskFn: func(t *swf.PollForActivityTaskOutput, result interface{}, passedthrough error) (interface{}, error) {
+				return "overridden", passedthrough
+			},
+		},
+		nil, // shouldn't blow up on nil second,
+		&FuncInterceptor{
+			BeforeTaskFn: func(decision *swf.PollForActivityTaskOutput) {
+				calledThird = true
+			},
+		},
+	)
+
+	c.BeforeTask(nil)
+
+	if !calledFirst {
+		t.Fatalf("first not called")
+	}
+
+	if !calledThird {
+		t.Fatalf("third not called")
+	}
+
+	c.AfterTaskComplete(nil, nil) // shouldn't blow up on non-implemented methods
+
+	passthrough := fmt.Errorf("passthrough")
+	result, err := c.AfterTask(nil, nil, passthrough)
+
+	if result != "overridden" {
+		t.Fatalf("overridden value not returned")
+	}
+
+	if err != passthrough {
+		t.Fatalf("passed through value not returned")
+	}
 }

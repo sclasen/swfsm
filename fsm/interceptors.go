@@ -38,3 +38,35 @@ func (i *FuncInterceptor) AfterDecision(decision *swf.PollForDecisionTaskOutput,
 		i.AfterDecisionFn(decision, ctx, outcome)
 	}
 }
+
+type ComposedDecisionInterceptor struct {
+	interceptors []DecisionInterceptor
+}
+
+func NewComposedDecisionInterceptor(interceptors ...DecisionInterceptor) DecisionInterceptor {
+	c := &ComposedDecisionInterceptor{}
+	for _, i := range interceptors {
+		if i != nil {
+			c.interceptors = append(c.interceptors, i)
+		}
+	}
+	return c
+}
+
+func (c *ComposedDecisionInterceptor) BeforeTask(decision *swf.PollForDecisionTaskOutput) {
+	for _, i := range c.interceptors {
+		i.BeforeTask(decision)
+	}
+}
+
+func (c *ComposedDecisionInterceptor) BeforeDecision(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
+	for _, i := range c.interceptors {
+		i.BeforeDecision(decision, ctx, outcome)
+	}
+}
+
+func (c *ComposedDecisionInterceptor) AfterDecision(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
+	for _, i := range c.interceptors {
+		i.AfterDecision(decision, ctx, outcome)
+	}
+}
