@@ -53,7 +53,7 @@ func NewTestListener(t TestConfig) *TestListener {
 	}
 
 	t.FSM.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
-	t.FSM.DecisionInterceptor = TestDecisionInterceptor(tl.TestID, t.StubbedWorkflows, t.ShortStubbedWorkflows)
+	t.FSM.DecisionInterceptor = TestDecisionInterceptor(tl.TestID, t.StubbedWorkflows, t.ShortStubbedWorkflows, t.FSM.DecisionInterceptor)
 	t.FSM.TaskList = tl.TestFsmTaskList()
 
 	if t.StubFSM != nil {
