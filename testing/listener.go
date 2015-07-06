@@ -24,14 +24,14 @@ type TestAdapter interface {
 }
 
 type TestConfig struct {
-	Testing                    TestAdapter
-	FSM                        *fsm.FSM
-	StubFSM                    *fsm.FSM
-	Workers                    []*activity.ActivityWorker
-	StubbedWorkflows           []string
-	ShortStubbedWorkflows      []string
-	DefaultWaitTimeout         int
-	DefaultActivityInterceptor activity.ActivityInterceptor
+	Testing               TestAdapter
+	FSM                   *fsm.FSM
+	StubFSM               *fsm.FSM
+	Workers               []*activity.ActivityWorker
+	StubbedWorkflows      []string
+	ShortStubbedWorkflows []string
+	DefaultWaitTimeout    int
+	FailActivitiesOnce    bool
 }
 
 func NewTestListener(t TestConfig) *TestListener {
@@ -64,9 +64,13 @@ func NewTestListener(t TestConfig) *TestListener {
 	}
 
 	for _, w := range t.Workers {
-		if w.ActivityInterceptor == nil {
-			w.ActivityInterceptor = t.DefaultActivityInterceptor
+		if t.FailActivitiesOnce {
+			w.ActivityInterceptor = activity.NewComposedDecisionInterceptor(
+				w.ActivityInterceptor,
+				TestFailOnceActivityInterceptor(),
+			)
 		}
+
 		w.TaskList = tl.TestWorkerTaskList(w)
 		w.AllowPanics = true
 	}
