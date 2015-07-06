@@ -196,10 +196,9 @@ type TestData struct {
 	States []string
 }
 
-func (t *TestData) Tags()[]*string{
+func (t *TestData) Tags() []*string {
 	return []*string{S("tag1"), S("tag2")}
 }
-
 
 func TestMarshalledDecider(t *testing.T) {
 	typedDecider := func(f *FSMContext, h *swf.HistoryEvent, d *TestData) Outcome {
@@ -502,10 +501,9 @@ func TestContinueWorkflowDecision(t *testing.T) {
 	}
 
 	tags := cont.ContinueAsNewWorkflowExecutionDecisionAttributes.TagList
-	if len(tags) != 2 || *tags[0] != "tag1"  || *tags[1] != "tag2" {
+	if len(tags) != 2 || *tags[0] != "tag1" || *tags[1] != "tag2" {
 		t.Fatal(testData, cont)
 	}
-
 
 }
 
@@ -584,4 +582,3 @@ func testHistoryEvent(eventID int, eventType string) *swf.HistoryEvent {
 
 var testWorkflowExecution = &swf.WorkflowExecution{WorkflowID: S("workflow-id"), RunID: S("run-id")}
 var testWorkflowType = &swf.WorkflowType{Name: S("workflow-name"), Version: S("workflow-version")}
-
