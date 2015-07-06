@@ -144,6 +144,13 @@ type Serialization interface {
 	InitialState() string
 }
 
+// FSM Data types that implement this interface will have the resulting tags used by
+// FSMClient when starting workflows and by the FSMContext when calling ContinueWorkflow()
+// it is []*string since thats what SWF api takes atm.
+type Taggable interface {
+	Tags() []*string
+}
+
 // FSMContext is populated by the FSM machinery and passed to Deciders.
 type FSMContext struct {
 	serialization Serialization
@@ -317,6 +324,7 @@ func (f *FSMContext) Correlator() *EventCorrelator {
 // This decision should be used when it is appropriate to Continue your workflow.
 // You are unable to ContinueAsNew a workflow that has running activites, so you should assure there are none running before using this.
 // As such there is no need to copy over the ActivityCorrelator.
+// If the FSM Data Struct is Taggable, its tags will be used on the Continue Decisions
 func (f *FSMContext) ContinueWorkflowDecision(continuedState string, data interface{}) *swf.Decision {
 	return &swf.Decision{
 		DecisionType: aws.String(enums.DecisionTypeContinueAsNewWorkflowExecution),
@@ -327,8 +335,17 @@ func (f *FSMContext) ContinueWorkflowDecision(continuedState string, data interf
 				StateVersion: f.stateVersion,
 			},
 			)),
+			TagList: GetTagsIfTaggable(data),
 		},
 	}
+}
+
+func GetTagsIfTaggable(data interface{}) []*string {
+	var tags []*string
+	if t, ok := data.(Taggable); ok {
+		tags = t.Tags()
+	}
+	return tags
 }
 
 // CompleteWorkflowDecision will build a CompleteWorkflowExecutionDecision decision that has the expected SerializedState marshalled to json as its result.

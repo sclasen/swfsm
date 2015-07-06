@@ -261,6 +261,9 @@ func (c *client) Start(startTemplate swf.StartWorkflowExecutionInput, id string,
 	startTemplate.Domain = S(c.f.Domain)
 	startTemplate.WorkflowID = S(id)
 	startTemplate.Input = serializedInput
+	if len(startTemplate.TagList) == 0 {
+		startTemplate.TagList = GetTagsIfTaggable(input)
+	}
 	return c.c.StartWorkflowExecution(&startTemplate)
 }
 
