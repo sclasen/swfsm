@@ -196,6 +196,10 @@ type TestData struct {
 	States []string
 }
 
+func (t *TestData) Tags() []*string {
+	return []*string{S("tag1"), S("tag2")}
+}
+
 func TestMarshalledDecider(t *testing.T) {
 	typedDecider := func(f *FSMContext, h *swf.HistoryEvent, d *TestData) Outcome {
 		if d.States[0] != "marshalled" {
@@ -493,6 +497,11 @@ func TestContinueWorkflowDecision(t *testing.T) {
 	ctx.Deserialize(*cont.ContinueAsNewWorkflowExecutionDecisionAttributes.Input, serState)
 	ctx.Deserialize(serState.StateData, testData)
 	if len(testData.States) != 1 || testData.States[0] != "continuing" || serState.StateVersion != 7 || serState.StateName != "InitialState" {
+		t.Fatal(testData, cont)
+	}
+
+	tags := cont.ContinueAsNewWorkflowExecutionDecisionAttributes.TagList
+	if len(tags) != 2 || *tags[0] != "tag1" || *tags[1] != "tag2" {
 		t.Fatal(testData, cont)
 	}
 
