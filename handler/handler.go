@@ -10,6 +10,7 @@ import (
 
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/internal/apierr"
+	"log"
 )
 
 //copy of aws.SendHandler modified to use different http clients for timeouts
@@ -25,10 +26,15 @@ func SWFSendHandler(polling, heartbeat *http.Client) func(*aws.Request) {
 		if r.Service.ServiceName == "swf" {
 			switch r.Operation.Name {
 			case "PollForDecisionTask", "PollForActivityTash":
+				log.Printf("using polling client")
 				client = polling
 			case "RecordActivityTaskHeartbeat":
+				log.Printf("using heartbeat client")
 				client = heartbeat
+			default:
+				log.Printf("using std client")
 			}
+
 		}
 		var err error
 		r.HTTPResponse, err = client.Do(r.HTTPRequest)
