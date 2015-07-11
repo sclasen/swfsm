@@ -26,7 +26,7 @@ func SWFSendHandler(polling, heartbeat *http.Client) func(*aws.Request) {
 		client := r.Service.Config.HTTPClient
 		if r.Service.ServiceName == "swf" {
 			switch r.Operation.Name {
-			case "PollForDecisionTask", "PollForActivityTash":
+			case "PollForDecisionTask", "PollForActivityTask":
 				log.Printf("using polling client %s %s", r.Service.ServiceName, r.Operation.Name)
 				client = polling
 			case "RecordActivityTaskHeartbeat":
