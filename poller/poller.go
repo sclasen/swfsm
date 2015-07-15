@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
 	. "github.com/sclasen/swfsm/sugar"
 )

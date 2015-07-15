@@ -1,7 +1,7 @@
 package fsm
 
 import (
-	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/aws/aws-sdk-go/service/swf"
 )
 
 //DecisionInterceptor allows manipulation of the decision task and the outcome at key points in the task lifecycle.

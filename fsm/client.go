@@ -9,9 +9,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/aws/awserr"
-	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
 	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"

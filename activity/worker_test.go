@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/aws/credentials"
-	"github.com/awslabs/aws-sdk-go/service/swf"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/swf"
 	enum "github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/fsm"
 	"github.com/sclasen/swfsm/migrator"

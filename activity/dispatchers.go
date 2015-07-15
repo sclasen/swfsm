@@ -1,6 +1,6 @@
 package activity
 
-import "github.com/awslabs/aws-sdk-go/service/swf"
+import "github.com/aws/aws-sdk-go/service/swf"
 
 //ActivityTaskDispatcher is used by the ActivityWorker machinery to dispatch the handling of ActivityTasks.
 //Different implementations can provide different concurrency models.
