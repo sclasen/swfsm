@@ -2,6 +2,7 @@ package activity
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/swf"
