@@ -17,7 +17,6 @@ import (
 type Service struct {
 	Config            *Config
 	Handlers          Handlers
-	ManualSend        bool
 	ServiceName       string
 	APIVersion        string
 	Endpoint          string
@@ -139,6 +138,9 @@ var retryableCodes = map[string]struct{}{
 	"RequestError":                           {},
 	"ProvisionedThroughputExceededException": {},
 	"Throttling":                             {},
+	"ThrottlingException":                    {},
+	"RequestLimitExceeded":                   {},
+	"RequestThrottled":                       {},
 }
 
 // credsExpiredCodes is a collection of error codes which signify the credentials
