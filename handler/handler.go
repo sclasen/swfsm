@@ -10,8 +10,8 @@ import (
 
 	"log"
 
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/internal/apierr"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
 //copy of aws.SendHandler modified to use different http clients for timeouts
@@ -62,7 +62,7 @@ func SWFSendHandler(polling, heartbeat *http.Client) func(*aws.Request) {
 				}
 			}
 			// Catch all other request errors.
-			r.Error = apierr.New("RequestError", "send request failed", err)
+			r.Error = awserr.New("RequestError", "send request failed", err)
 			r.Retryable.Set(true) // network errors are retryable
 		}
 	}
