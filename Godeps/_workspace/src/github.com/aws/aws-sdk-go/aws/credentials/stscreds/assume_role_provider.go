@@ -6,10 +6,11 @@ package stscreds
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"time"
 )
 
 // AssumeRoler represents the minimal subset of the STS client API used by this provider.
