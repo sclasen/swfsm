@@ -517,3 +517,48 @@ func TestCancelTracking(t *testing.T) {
 		t.Fatal("expected zero attempts", c)
 	}
 }
+
+func TestChildTracking(t *testing.T) {
+	//track signal'->'workflowID => attempts
+	event := func(eventId int, payload interface{}) *swf.HistoryEvent {
+		return EventFromPayload(eventId, payload)
+	}
+
+	start := event(1, &swf.StartChildWorkflowExecutionInitiatedEventAttributes{
+		WorkflowID: S("the-workflow"),
+		WorkflowType: &swf.WorkflowType{
+			Name:    S("the-name"),
+			Version: S("the-version"),
+		},
+	})
+
+	fail := EventFromPayload(2, &swf.StartChildWorkflowExecutionFailedEventAttributes{
+		InitiatedEventID: I(1),
+	})
+
+	ok := EventFromPayload(4, &swf.ChildWorkflowExecutionStartedEventAttributes{
+		InitiatedEventID: I(3),
+	})
+
+	c := new(EventCorrelator)
+	c.Serializer = JSONStateSerializer{}
+
+	c.Track(start)
+
+	//track happens in FSM after Decider
+	info := c.ChildInfo(fail)
+	t.Log(info, c.Children, c.ChildrenAttempts)
+
+	c.Track(fail)
+	start.EventID = I(3)
+	c.Track(start)
+	if c.AttemptsForChild(info) != 1 {
+		t.Fatal("attempts not", info, c.AttemptsForChild(info), c.Children, c.ChildrenAttempts)
+	}
+	info = c.ChildInfo(ok)
+	c.Track(ok)
+
+	if c.AttemptsForChild(info) != 0 {
+		t.Fatal("expected zero attempts", c)
+	}
+}
