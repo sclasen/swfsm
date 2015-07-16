@@ -434,5 +434,3 @@ func Stay() Decider {
 		return ctx.Stay(data, ctx.EmptyDecisions())
 	}
 }
-
-

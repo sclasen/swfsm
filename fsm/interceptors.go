@@ -1,10 +1,11 @@
 package fsm
 
 import (
+	"strconv"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
-	"strconv"
 )
 
 //DecisionInterceptor allows manipulation of the decision task and the outcome at key points in the task lifecycle.
@@ -80,8 +81,8 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
 			for _, d := range outcome.Decisions {
 				if *d.DecisionType == enums.DecisionTypeCompleteWorkflowExecution ||
-				*d.DecisionType == enums.DecisionTypeCancelWorkflowExecution ||
-				*d.DecisionType == enums.DecisionTypeFailWorkflowExecution {
+					*d.DecisionType == enums.DecisionTypeCancelWorkflowExecution ||
+					*d.DecisionType == enums.DecisionTypeFailWorkflowExecution {
 					logf(ctx, "fn=managed-continuations at=terminating-decision")
 					return //we have a terminating event, dont continue
 				}
@@ -93,7 +94,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 				outcome.Decisions = append(outcome.Decisions, &swf.Decision{
 					DecisionType: S(enums.DecisionTypeStartTimer),
 					StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
-						TimerID: S(ContinueTimer),
+						TimerID:            S(ContinueTimer),
 						StartToFireTimeout: S(strconv.Itoa(workflowAgeInSec)),
 					},
 				})
@@ -103,7 +104,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 			continueTimerFired := false
 			for _, h := range decision.Events {
 				if *h.EventType == enums.EventTypeTimerFired {
-					if *h.TimerFiredEventAttributes.TimerID == ContinueTimer{
+					if *h.TimerFiredEventAttributes.TimerID == ContinueTimer {
 						continueTimerFired = true
 					}
 				}
@@ -111,14 +112,13 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 
 			historySizeExceeded := int64(historySize) > *decision.Events[len(decision.Events)-1].EventID
 
-
 			//if we pass history sizex or if we see ContinuteTimer fired
 			if continueTimerFired || historySizeExceeded {
 				logf(ctx, "fn=managed-continuations at=attempt-continue continue-timer=%t history-size=%t", continueTimerFired, historySizeExceeded)
-			//if we can safely continue
+				//if we can safely continue
 				if len(outcome.Decisions) == 0 &&
 					len(ctx.Correlator().Activities) == 0 &&
-					len(ctx.Correlator().SignalAttempts)  == 0 {
+					len(ctx.Correlator().SignalAttempts) == 0 {
 					logf(ctx, "fn=managed-continuations at=able-to-continue action=add-continue-decision")
 					outcome.Decisions = append(outcome.Decisions, ctx.ContinueWorkflowDecision(ctx.State, ctx.stateData)) //stateData safe?
 				} else {
@@ -127,7 +127,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 					outcome.Decisions = append(outcome.Decisions, &swf.Decision{
 						DecisionType: S(enums.DecisionTypeStartTimer),
 						StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
-							TimerID: S(ContinueTimer),
+							TimerID:            S(ContinueTimer),
 							StartToFireTimeout: S(strconv.Itoa(timerRetrySeconds)),
 						},
 					})
