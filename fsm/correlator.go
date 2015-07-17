@@ -20,6 +20,8 @@ type EventCorrelator struct {
 	Timers              map[string]*TimerInfo        //startedEventID -> info
 	Cancellations       map[string]*CancellationInfo //schedueledEventId -> info
 	CancelationAttempts map[string]int               //? workflowID + signalName -> attempts
+	Children            map[string]*ChildInfo
+	ChildrenAttempts    map[string]int
 	Serializer          StateSerializer
 }
 
@@ -44,6 +46,12 @@ type TimerInfo struct {
 //CancellationInfo holds the Control data and workflow that was being canceled
 type CancellationInfo struct {
 	WorkflowID string
+}
+
+//CancellationInfo holds the Control data and workflow that was being canceled
+type ChildInfo struct {
+	WorkflowID string
+	*swf.WorkflowType
 }
 
 // Track will add or remove entries based on the EventType.
@@ -88,6 +96,14 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 			TimerID: *h.TimerStartedEventAttributes.TimerID,
 		}
 	}
+
+	if a.nilSafeEq(h.EventType, enums.EventTypeStartChildWorkflowExecutionInitiated) {
+		a.Children[a.key(h.EventID)] = &ChildInfo{
+			WorkflowID:   *h.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowID,
+			WorkflowType: h.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType,
+		}
+	}
+
 }
 
 // RemoveCorrelation gcs a mapping of eventId to ActivityType. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
@@ -129,6 +145,15 @@ func (a *EventCorrelator) RemoveCorrelation(h *swf.HistoryEvent) {
 		info := a.Cancellations[key]
 		delete(a.CancelationAttempts, info.WorkflowID)
 		delete(a.Cancellations, key)
+	case enums.EventTypeStartChildWorkflowExecutionFailed:
+		a.incrementChildAttempts(h)
+		delete(a.Children, a.key(h.StartChildWorkflowExecutionFailedEventAttributes.InitiatedEventID))
+	case enums.EventTypeChildWorkflowExecutionStarted:
+		key := a.key(h.ChildWorkflowExecutionStartedEventAttributes.InitiatedEventID)
+		info := a.Children[key]
+		delete(a.ChildrenAttempts, info.WorkflowID)
+		delete(a.Children, key)
+
 	}
 }
 
@@ -152,6 +177,11 @@ func (a *EventCorrelator) TimerInfo(h *swf.HistoryEvent) *TimerInfo {
 func (a *EventCorrelator) CancellationInfo(h *swf.HistoryEvent) *CancellationInfo {
 	a.checkInit()
 	return a.Cancellations[a.getID(h)]
+}
+
+func (a *EventCorrelator) ChildInfo(h *swf.HistoryEvent) *ChildInfo {
+	a.checkInit()
+	return a.Children[a.getID(h)]
 }
 
 //AttemptsForActivity returns the number of times a given activity has been attempted.
@@ -178,6 +208,16 @@ func (a *EventCorrelator) AttemptsForCancellation(info *CancellationInfo) int {
 	return a.CancelationAttempts[info.WorkflowID]
 }
 
+//AttemptsForCancellation returns the number of times a given signal has been attempted.
+//It will return 0 if the signal has never failed, or has been completed successfully
+func (a *EventCorrelator) AttemptsForChild(info *ChildInfo) int {
+	a.checkInit()
+	if info == nil || info.WorkflowID == "" {
+		return 0
+	}
+	return a.ChildrenAttempts[info.WorkflowID]
+}
+
 func (a *EventCorrelator) checkInit() {
 	if a.Activities == nil {
 		a.Activities = make(map[string]*ActivityInfo)
@@ -199,6 +239,12 @@ func (a *EventCorrelator) checkInit() {
 	}
 	if a.CancelationAttempts == nil {
 		a.CancelationAttempts = make(map[string]int)
+	}
+	if a.Children == nil {
+		a.Children = make(map[string]*ChildInfo)
+	}
+	if a.ChildrenAttempts == nil {
+		a.ChildrenAttempts = make(map[string]int)
 	}
 }
 
@@ -261,7 +307,16 @@ func (a *EventCorrelator) getID(h *swf.HistoryEvent) (id string) {
 				id = a.key(event.ExternalInitiatedEventID)
 			}
 		}
+	case enums.EventTypeChildWorkflowExecutionStarted:
+		if h.ChildWorkflowExecutionStartedEventAttributes != nil {
+			id = a.key(h.ChildWorkflowExecutionStartedEventAttributes.InitiatedEventID)
+		}
+	case enums.EventTypeStartChildWorkflowExecutionFailed:
+		if h.StartChildWorkflowExecutionFailedEventAttributes != nil {
+			id = a.key(h.StartChildWorkflowExecutionFailedEventAttributes.InitiatedEventID)
+		}
 	}
+
 	return
 }
 
@@ -283,6 +338,14 @@ func (a *EventCorrelator) safeSignalID(h *swf.HistoryEvent) string {
 
 func (a *EventCorrelator) safeCancellationID(h *swf.HistoryEvent) string {
 	info := a.Cancellations[a.getID(h)]
+	if info != nil {
+		return info.WorkflowID
+	}
+	return ""
+}
+
+func (a *EventCorrelator) safeChildID(h *swf.HistoryEvent) string {
+	info := a.Children[a.getID(h)]
 	if info != nil {
 		return info.WorkflowID
 	}
@@ -311,6 +374,13 @@ func (a *EventCorrelator) incrementCancellationAttempts(h *swf.HistoryEvent) {
 	id := a.safeCancellationID(h)
 	if id != "" {
 		a.CancelationAttempts[id]++
+	}
+}
+
+func (a *EventCorrelator) incrementChildAttempts(h *swf.HistoryEvent) {
+	id := a.safeChildID(h)
+	if id != "" {
+		a.ChildrenAttempts[id]++
 	}
 }
 
