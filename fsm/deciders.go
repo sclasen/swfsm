@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"strconv"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
@@ -435,90 +433,4 @@ func Stay() Decider {
 		logf(ctx, "at=stay")
 		return ctx.Stay(data, ctx.EmptyDecisions())
 	}
-}
-
-//ManagedContinuations is a composable decider that will handle most of the mechanics of autmoatically continuing workflows.
-//todo, does it ever happen that we would have a decision task that previous deciders would have created a decision that
-//breaks continuation? i.e. you get decision task that has a history containing 2 signals, etc.
-//lets assume not till we find otherwise. If we are wrong, managedcontinuations probably cant happen in userspace.
-// If there are no activities present in the tracker, it will continueAsNew the workflow in response
-// to a FSM.ContinueWorkflow timer or signal. If there are activities present in the tracker, it will
-// set a new FSM.ContinueWorkflow timer, that fires in timerRetrySeconds.
-// It will also signal the workflow to continue when the workflow history grows beyond the
-// configured historySize.
-// this should be last in your decider stack, as it will signal in response to *any* event that
-// has an id > historySize
-func ManagedContinuations(historySize int, timerRetrySeconds int) Decider {
-	handleContinuationTimer := func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-		if *h.EventType == enums.EventTypeTimerFired && *h.TimerFiredEventAttributes.TimerID == ContinueTimer {
-			if len(ctx.ActivitiesInfo()) == 0 {
-				decisions := append(ctx.EmptyDecisions(), ctx.ContinueWorkflowDecision(ctx.State, data))
-				return ctx.Stay(data, decisions)
-			}
-			d := &swf.Decision{
-				DecisionType: aws.String(enums.DecisionTypeStartTimer),
-				StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
-					StartToFireTimeout: aws.String(strconv.Itoa(timerRetrySeconds)),
-					TimerID:            aws.String(ContinueTimer),
-				},
-			}
-			decisions := append(ctx.EmptyDecisions(), d)
-			return ctx.Stay(data, decisions)
-
-		}
-		return ctx.Pass()
-	}
-
-	handleContinuationSignal := func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-		if *h.EventType == enums.EventTypeWorkflowExecutionSignaled && *h.WorkflowExecutionSignaledEventAttributes.SignalName == ContinueSignal {
-
-			if len(ctx.ActivitiesInfo()) == 0 {
-				decisions := append(ctx.EmptyDecisions(), ctx.ContinueWorkflowDecision(ctx.State, data))
-				return ctx.Stay(data, decisions)
-			}
-
-			d := &swf.Decision{
-				DecisionType: aws.String(enums.DecisionTypeStartTimer),
-				StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
-					StartToFireTimeout: aws.String(strconv.Itoa(timerRetrySeconds)),
-					TimerID:            aws.String(ContinueTimer),
-				},
-			}
-			decisions := append(ctx.EmptyDecisions(), d)
-			return ctx.Stay(data, decisions)
-
-		}
-		return ctx.Pass()
-	}
-
-	signalContinuationWhenHistoryLarge := func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-		if *h.EventID > int64(historySize) {
-			d := &swf.Decision{
-				DecisionType: aws.String(enums.DecisionTypeSignalExternalWorkflowExecution),
-				SignalExternalWorkflowExecutionDecisionAttributes: &swf.SignalExternalWorkflowExecutionDecisionAttributes{
-					SignalName: aws.String(ContinueSignal),
-					WorkflowID: ctx.WorkflowID,
-					RunID:      ctx.RunID,
-				},
-			}
-			decisions := append(ctx.EmptyDecisions(), d)
-			return ctx.Stay(data, decisions)
-		}
-		return ctx.Pass()
-	}
-
-	return NewComposedDecider(
-		handleContinuationTimer,
-		handleContinuationSignal,
-		signalContinuationWhenHistoryLarge,
-	)
-
-}
-
-//RepairState is a decider that can be composed in which updates the current state data with the one recieved in the signal.
-func RepairState() Decider {
-	return OnSignalReceived(RepiarStateSignal, UpdateState(
-		func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) {
-			ctx.EventData(h, data) //deserializes the signal input into data
-		}))
 }
