@@ -436,6 +436,8 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 	}
 	//AfterDecision interceptor invocation
 	if f.DecisionInterceptor != nil {
+		context.State = outcome.State
+		context.stateData = outcome.Data
 		after := &Outcome{Data: outcome.Data, Decisions: outcome.Decisions, State: outcome.State}
 		f.DecisionInterceptor.AfterDecision(decisionTask, context, after)
 		outcome.State = after.State
