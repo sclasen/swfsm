@@ -88,9 +88,9 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 				}
 			}
 
-			//if events contains eventID 1, add start timer decision.
-			if *decision.Events[0].EventID == int64(1) {
-				logf(ctx, "fn=managed-continuations at=workflow-start")
+			//if prevStarted = 0 this is the first decision of the workflow, so start the continue timer.
+			if *decision.PreviousStartedEventID == int64(0) {
+				logf(ctx, "fn=managed-continuations at=workflow-start %d", *decision.PreviousStartedEventID)
 				outcome.Decisions = append(outcome.Decisions, &swf.Decision{
 					DecisionType: S(enums.DecisionTypeStartTimer),
 					StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
@@ -110,7 +110,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 				}
 			}
 
-			historySizeExceeded := int64(historySize) < *decision.Events[len(decision.Events)-1].EventID
+			historySizeExceeded := int64(historySize) < *decision.Events[0].EventID
 
 			//if we pass history sizex or if we see ContinuteTimer fired
 			if continueTimerFired || historySizeExceeded {

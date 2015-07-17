@@ -152,6 +152,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 				EventType: S(enums.EventTypeWorkflowExecutionStarted),
 			},
 		},
+		PreviousStartedEventID: L(0),
 	}
 
 	startOutcome := &Outcome{
@@ -177,6 +178,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 				},
 			},
 		},
+		PreviousStartedEventID: L(1),
 	}
 
 	contOutcome := &Outcome{
@@ -215,6 +217,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 				EventType: S(enums.EventTypeExternalWorkflowExecutionSignaled), //n
 			},
 		},
+		PreviousStartedEventID: L(7),
 	}
 
 	histContOutcome := &Outcome{
