@@ -140,3 +140,117 @@ func TestComposedInterceptor(t *testing.T) {
 
 	c.AfterDecision(nil, nil, nil) // shouldn't blow up on non-implemented methods
 }
+
+func TestManagedContinuationsInterceptor(t *testing.T) {
+	interceptor := ManagedContinuations(3, 1000, 10)
+
+	//test that interceptor starts the contiuation age timer on start
+	start := &swf.PollForDecisionTaskOutput{
+		Events: []*swf.HistoryEvent{
+			{
+				EventID:   L(1),
+				EventType: S(enums.EventTypeWorkflowExecutionStarted),
+			},
+		},
+	}
+
+	startOutcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{},
+	}
+
+	interceptor.AfterDecision(start, interceptorTestContext(), startOutcome)
+
+	if len(startOutcome.Decisions) != 1 || *startOutcome.Decisions[0].DecisionType != enums.DecisionTypeStartTimer {
+		t.Fatal(startOutcome.Decisions)
+	}
+
+	//test that the interceptor starts the retry timer if it is unable to continue
+	cont := &swf.PollForDecisionTaskOutput{
+		Events: []*swf.HistoryEvent{
+			{
+				EventID:   L(2),
+				EventType: S(enums.EventTypeTimerFired),
+				TimerFiredEventAttributes: &swf.TimerFiredEventAttributes{
+					TimerID: S(ContinueTimer),
+				},
+			},
+		},
+	}
+
+	contOutcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{},
+	}
+
+	ctx := interceptorTestContext()
+	ctx.eventCorrelator.checkInit()
+	ctx.eventCorrelator.Activities["1"] = &ActivityInfo{}
+
+	interceptor.AfterDecision(cont, ctx, contOutcome)
+
+	//assert the ContinueTimer was restarted
+	if len(contOutcome.Decisions) != 1 || *contOutcome.Decisions[0].DecisionType != enums.DecisionTypeStartTimer {
+		t.Fatal(contOutcome.Decisions)
+	}
+
+	delete(ctx.eventCorrelator.Activities, "1")
+	contOutcome.Decisions = []*swf.Decision{}
+
+	interceptor.AfterDecision(cont, ctx, contOutcome)
+
+	//assert that the workflow was continued
+	if len(contOutcome.Decisions) != 1 || *contOutcome.Decisions[0].DecisionType != enums.DecisionTypeContinueAsNewWorkflowExecution {
+		t.Fatal(contOutcome.Decisions)
+	}
+
+	t.Log(contOutcome.Decisions[0])
+
+	histCont := &swf.PollForDecisionTaskOutput{
+		Events: []*swf.HistoryEvent{
+			{
+				EventID:   L(10),
+				EventType: S(enums.EventTypeExternalWorkflowExecutionSignaled), //n
+			},
+		},
+	}
+
+	histContOutcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{},
+	}
+
+	ctx = interceptorTestContext()
+	ctx.eventCorrelator.checkInit()
+	ctx.eventCorrelator.Activities["1"] = &ActivityInfo{}
+
+	interceptor.AfterDecision(histCont, ctx, histContOutcome)
+
+	//assert the ContinueTimer was restarted
+	if len(histContOutcome.Decisions) != 1 || *histContOutcome.Decisions[0].DecisionType != enums.DecisionTypeStartTimer {
+		t.Fatal(histContOutcome.Decisions)
+	}
+
+	delete(ctx.eventCorrelator.Activities, "1")
+	histContOutcome.Decisions = []*swf.Decision{}
+
+	interceptor.AfterDecision(histCont, ctx, histContOutcome)
+
+	//assert that the workflow was continued
+	if len(histContOutcome.Decisions) != 1 || *histContOutcome.Decisions[0].DecisionType != enums.DecisionTypeContinueAsNewWorkflowExecution {
+		t.Fatal(histContOutcome.Decisions)
+	}
+
+	t.Log(histContOutcome.Decisions[0])
+
+}
+
+func interceptorTestContext() *FSMContext {
+	return NewFSMContext(&FSM{Serializer: &JSONStateSerializer{}},
+		swf.WorkflowType{Name: S("foo"), Version: S("1")},
+		swf.WorkflowExecution{WorkflowID: S("id"), RunID: S("runid")},
+		&EventCorrelator{}, "state", "data", 1)
+}
