@@ -75,7 +75,17 @@ func (c *ComposedDecisionInterceptor) AfterDecision(decision *swf.PollForDecisio
 	}
 }
 
-//ManagedContinuations is an interceptr that will handle most of the mechanics of autmoatically continuing workflows.
+//ManagedContinuations is an interceptor that will handle most of the mechanics of automatically continuing workflows.
+//
+//For workflows without persistent, heartbeating activities, it should do everything.
+//
+//ContinueSignal: How to continue fsms with persistent activities.
+//How it works
+//FSM in steady+activity, listens for ContinueTimer.
+//OnTimer, cancel activity, transition to continuing.
+//In continuing, OnActivityCanceled send ContinueSignal.
+//Interceptor handles ContinueSignal, if 0,0,0,0 Continue, else start ContinueTimer.
+//In continuing, OnStarted re-starts the activity, transition back to steady.
 func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySeconds int) DecisionInterceptor {
 	return &FuncInterceptor{
 		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
@@ -110,10 +120,20 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 				}
 			}
 
+			//was the ContinueSignal fired?
+			continueSignalFired := false
+			for _, h := range decision.Events {
+				if *h.EventType == enums.EventTypeWorkflowExecutionSignaled {
+					if *h.WorkflowExecutionSignaledEventAttributes.SignalName == ContinueSignal {
+						continueTimerFired = true
+					}
+				}
+			}
+
 			historySizeExceeded := int64(historySize) < *decision.Events[0].EventID
 
-			//if we pass history sizex or if we see ContinuteTimer fired
-			if continueTimerFired || historySizeExceeded {
+			//if we pass history size or if we see ContinuteTimer or ContinueSignal fired
+			if continueTimerFired || continueSignalFired || historySizeExceeded {
 				logf(ctx, "fn=managed-continuations at=attempt-continue continue-timer=%t history-size=%t", continueTimerFired, historySizeExceeded)
 				//if we can safely continue
 				decisions := len(outcome.Decisions)
