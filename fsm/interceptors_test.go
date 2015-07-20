@@ -249,6 +249,49 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 
 	t.Log(histContOutcome.Decisions[0])
 
+	//test that ContinueSignal is handled
+	sigCont := &swf.PollForDecisionTaskOutput{
+		Events: []*swf.HistoryEvent{
+			{
+				EventID:   L(10),
+				EventType: S(enums.EventTypeWorkflowExecutionSignaled),
+				WorkflowExecutionSignaledEventAttributes: &swf.WorkflowExecutionSignaledEventAttributes{
+					SignalName: S(ContinueSignal),
+				},
+			},
+		},
+		PreviousStartedEventID: L(7),
+	}
+
+	sigContOutcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{},
+	}
+
+	ctx = interceptorTestContext()
+	ctx.eventCorrelator.checkInit()
+	ctx.eventCorrelator.Activities["1"] = &ActivityInfo{}
+
+	interceptor.AfterDecision(sigCont, ctx, sigContOutcome)
+
+	//assert the ContinueTimer was restarted
+	if len(sigContOutcome.Decisions) != 1 || *sigContOutcome.Decisions[0].DecisionType != enums.DecisionTypeStartTimer {
+		t.Fatal(sigContOutcome.Decisions)
+	}
+
+	delete(ctx.eventCorrelator.Activities, "1")
+	sigContOutcome.Decisions = []*swf.Decision{}
+
+	interceptor.AfterDecision(sigCont, ctx, sigContOutcome)
+
+	//assert that the workflow was continued
+	if len(sigContOutcome.Decisions) != 1 || *sigContOutcome.Decisions[0].DecisionType != enums.DecisionTypeContinueAsNewWorkflowExecution {
+		t.Fatal(sigContOutcome.Decisions)
+	}
+
+	t.Log(sigContOutcome.Decisions[0])
+
 }
 
 func interceptorTestContext() *FSMContext {
