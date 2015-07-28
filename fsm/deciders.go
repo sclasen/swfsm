@@ -6,7 +6,6 @@ import (
 	"reflect"
 
 	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -191,11 +190,11 @@ func typeCheck(typedFunc interface{}, in []string, out []string) {
 	}
 }
 
-// OnStarted builds a composed decider that fires on enums.EventTypeWorkflowExecutionStarted.
+// OnStarted builds a composed decider that fires on swf.EventTypeWorkflowExecutionStarted.
 func OnStarted(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
-		case enums.EventTypeWorkflowExecutionStarted:
+		case swf.EventTypeWorkflowExecutionStarted:
 			logf(ctx, "at=on-started")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}
@@ -206,7 +205,7 @@ func OnStarted(deciders ...Decider) Decider {
 func OnContinueFailed(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
-		case enums.EventTypeContinueAsNewWorkflowExecutionFailed:
+		case swf.EventTypeContinueAsNewWorkflowExecutionFailed:
 			logf(ctx, "at=on-continuefailed")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}
@@ -214,11 +213,11 @@ func OnContinueFailed(deciders ...Decider) Decider {
 	}
 }
 
-// OnChildStarted builds a composed decider that fires on enums.EventTypeChildWorkflowExecutionStarted.
+// OnChildStarted builds a composed decider that fires on swf.EventTypeChildWorkflowExecutionStarted.
 func OnChildStarted(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
-		case enums.EventTypeChildWorkflowExecutionStarted:
+		case swf.EventTypeChildWorkflowExecutionStarted:
 			logf(ctx, "at=on-child-started")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}
@@ -241,7 +240,7 @@ func OnData(predicate PredicateFunc, deciders ...Decider) Decider {
 func OnSignalsReceived(signalNames []string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
-		case enums.EventTypeWorkflowExecutionSignaled:
+		case swf.EventTypeWorkflowExecutionSignaled:
 			for _, signalName := range signalNames {
 				if *h.WorkflowExecutionSignaledEventAttributes.SignalName == signalName {
 					logf(ctx, "at=on-signal-received")
@@ -262,7 +261,7 @@ func OnSignalReceived(signalName string, deciders ...Decider) Decider {
 func OnSignalSent(signalName string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
-		case enums.EventTypeExternalWorkflowExecutionSignaled:
+		case swf.EventTypeExternalWorkflowExecutionSignaled:
 			// if we find a good signal info with matching signal, we have matched workflowId and signalId so fire deciders.
 			info := ctx.SignalInfo(h)
 			if info != nil && info.SignalName == signalName {
@@ -278,7 +277,7 @@ func OnSignalSent(signalName string, deciders ...Decider) Decider {
 func OnTimerFired(timerID string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
-		case enums.EventTypeTimerFired:
+		case swf.EventTypeTimerFired:
 			if *h.TimerFiredEventAttributes.TimerID == timerID {
 				logf(ctx, "at=on-timer-fired")
 				return NewComposedDecider(deciders...)(ctx, h, data)
@@ -292,7 +291,7 @@ func OnTimerFired(timerID string, deciders ...Decider) Decider {
 func OnSignalFailed(signalName string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
-		case enums.EventTypeSignalExternalWorkflowExecutionFailed:
+		case swf.EventTypeSignalExternalWorkflowExecutionFailed:
 			// if we find a good signal info with matching signal, we have matched workflowId and signalId so fire deciders.
 			info := ctx.SignalInfo(h)
 			if info != nil && info.SignalName == signalName {
@@ -320,51 +319,51 @@ func OnActivityEvents(activityName string, eventTypes []string, deciders ...Deci
 // OnActivityStarted builds a composed decider that fires when a matching activity starts.
 func OnActivityStarted(activityName string, deciders ...Decider) Decider {
 	return OnActivityEvents(activityName, []string{
-		enums.EventTypeActivityTaskStarted,
+		swf.EventTypeActivityTaskStarted,
 	}, deciders...)
 }
 
 // OnActivityCompleted builds a composed decider that fires when a matching activity completes.
 func OnActivityCompleted(activityName string, deciders ...Decider) Decider {
 	return OnActivityEvents(activityName, []string{
-		enums.EventTypeActivityTaskCompleted,
+		swf.EventTypeActivityTaskCompleted,
 	}, deciders...)
 }
 
 // OnActivityFailed builds a composed decider that fires when a matching activity fails.
 func OnActivityFailed(activityName string, deciders ...Decider) Decider {
 	return OnActivityEvents(activityName, []string{
-		enums.EventTypeActivityTaskFailed,
+		swf.EventTypeActivityTaskFailed,
 	}, deciders...)
 }
 
 // OnActivityTimedOut builds a composed decider that fires when a matching activity times out.
 func OnActivityTimedOut(activityName string, deciders ...Decider) Decider {
 	return OnActivityEvents(activityName, []string{
-		enums.EventTypeActivityTaskTimedOut,
+		swf.EventTypeActivityTaskTimedOut,
 	}, deciders...)
 }
 
 // OnActivityCanceled builds a composed decider that fires when a matching activity is canceled.
 func OnActivityCanceled(activityName string, deciders ...Decider) Decider {
 	return OnActivityEvents(activityName, []string{
-		enums.EventTypeActivityTaskCanceled,
+		swf.EventTypeActivityTaskCanceled,
 	}, deciders...)
 }
 
 // OnActivityFailedTimedOutCanceled builds a composed decider that fires when a matching activity fails, times out, or is canceled.
 func OnActivityFailedTimedOutCanceled(activityName string, deciders ...Decider) Decider {
 	return OnActivityEvents(activityName, []string{
-		enums.EventTypeActivityTaskFailed,
-		enums.EventTypeActivityTaskTimedOut,
-		enums.EventTypeActivityTaskCanceled,
+		swf.EventTypeActivityTaskFailed,
+		swf.EventTypeActivityTaskTimedOut,
+		swf.EventTypeActivityTaskCanceled,
 	}, deciders...)
 }
 
 func OnWorkflowCancelRequested(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
-		case enums.EventTypeWorkflowExecutionCancelRequested:
+		case swf.EventTypeWorkflowExecutionCancelRequested:
 			logf(ctx, "at=on-wokrflow-execution-cancel-requested")
 			return NewComposedDecider(deciders...)(ctx, h, data)
 		}

@@ -43,7 +43,7 @@ func (p *DecisionTaskPoller) Poll() (*swf.PollForDecisionTaskOutput, error) {
 	resp, err := p.client.PollForDecisionTask(&swf.PollForDecisionTaskInput{
 		Domain:       aws.String(p.Domain),
 		Identity:     aws.String(p.Identity),
-		ReverseOrder: aws.Boolean(true),
+		ReverseOrder: aws.Bool(true),
 		TaskList:     &swf.TaskList{Name: aws.String(p.TaskList)},
 	})
 	if err != nil {

@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/sclasen/swfsm/enums/swf"
 )
 
 // EventCorrelator is a serialization-friendly struct that is automatically managed by the FSM machinery
@@ -65,27 +64,27 @@ func (a *EventCorrelator) Track(h *swf.HistoryEvent) {
 func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 	a.checkInit()
 
-	if a.nilSafeEq(h.EventType, enums.EventTypeActivityTaskScheduled) {
+	if a.nilSafeEq(h.EventType, swf.EventTypeActivityTaskScheduled) {
 		a.Activities[a.key(h.EventID)] = &ActivityInfo{
 			ActivityID:   *h.ActivityTaskScheduledEventAttributes.ActivityID,
 			ActivityType: h.ActivityTaskScheduledEventAttributes.ActivityType,
 		}
 	}
 
-	if a.nilSafeEq(h.EventType, enums.EventTypeSignalExternalWorkflowExecutionInitiated) {
+	if a.nilSafeEq(h.EventType, swf.EventTypeSignalExternalWorkflowExecutionInitiated) {
 		a.Signals[a.key(h.EventID)] = &SignalInfo{
 			SignalName: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
 			WorkflowID: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 		}
 	}
 
-	if a.nilSafeEq(h.EventType, enums.EventTypeRequestCancelExternalWorkflowExecutionInitiated) {
+	if a.nilSafeEq(h.EventType, swf.EventTypeRequestCancelExternalWorkflowExecutionInitiated) {
 		a.Cancellations[a.key(h.EventID)] = &CancellationInfo{
 			WorkflowID: *h.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 		}
 	}
 
-	if a.nilSafeEq(h.EventType, enums.EventTypeTimerStarted) {
+	if a.nilSafeEq(h.EventType, swf.EventTypeTimerStarted) {
 		control := ""
 		if h.TimerStartedEventAttributes.Control != nil {
 			control = *h.TimerStartedEventAttributes.Control
@@ -97,7 +96,7 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 		}
 	}
 
-	if a.nilSafeEq(h.EventType, enums.EventTypeStartChildWorkflowExecutionInitiated) {
+	if a.nilSafeEq(h.EventType, swf.EventTypeStartChildWorkflowExecutionInitiated) {
 		a.Children[a.key(h.EventID)] = &ChildInfo{
 			WorkflowID:   *h.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 			WorkflowType: h.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType,
@@ -113,42 +112,42 @@ func (a *EventCorrelator) RemoveCorrelation(h *swf.HistoryEvent) {
 		return
 	}
 	switch *h.EventType {
-	case enums.EventTypeActivityTaskCompleted:
+	case swf.EventTypeActivityTaskCompleted:
 		delete(a.ActivityAttempts, a.safeActivityID(h))
 		delete(a.Activities, a.key(h.ActivityTaskCompletedEventAttributes.ScheduledEventID))
-	case enums.EventTypeActivityTaskFailed:
+	case swf.EventTypeActivityTaskFailed:
 		a.incrementActivityAttempts(h)
 		delete(a.Activities, a.key(h.ActivityTaskFailedEventAttributes.ScheduledEventID))
-	case enums.EventTypeActivityTaskTimedOut:
+	case swf.EventTypeActivityTaskTimedOut:
 		a.incrementActivityAttempts(h)
 		delete(a.Activities, a.key(h.ActivityTaskTimedOutEventAttributes.ScheduledEventID))
-	case enums.EventTypeActivityTaskCanceled:
+	case swf.EventTypeActivityTaskCanceled:
 		delete(a.ActivityAttempts, a.safeActivityID(h))
 		delete(a.Activities, a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID))
-	case enums.EventTypeExternalWorkflowExecutionSignaled:
+	case swf.EventTypeExternalWorkflowExecutionSignaled:
 		key := a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)
 		info := a.Signals[key]
 		delete(a.SignalAttempts, a.signalIDFromInfo(info))
 		delete(a.Signals, key)
-	case enums.EventTypeSignalExternalWorkflowExecutionFailed:
+	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
 		a.incrementSignalAttempts(h)
 		delete(a.Signals, a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))
-	case enums.EventTypeTimerFired:
+	case swf.EventTypeTimerFired:
 		delete(a.Timers, a.key(h.TimerFiredEventAttributes.StartedEventID))
-	case enums.EventTypeTimerCanceled:
+	case swf.EventTypeTimerCanceled:
 		delete(a.Timers, a.key(h.TimerCanceledEventAttributes.StartedEventID))
-	case enums.EventTypeRequestCancelExternalWorkflowExecutionFailed:
+	case swf.EventTypeRequestCancelExternalWorkflowExecutionFailed:
 		a.incrementCancellationAttempts(h)
 		delete(a.Activities, a.key(h.RequestCancelExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))
-	case enums.EventTypeExternalWorkflowExecutionCancelRequested:
+	case swf.EventTypeExternalWorkflowExecutionCancelRequested:
 		key := a.key(h.ExternalWorkflowExecutionCancelRequestedEventAttributes.InitiatedEventID)
 		info := a.Cancellations[key]
 		delete(a.CancelationAttempts, info.WorkflowID)
 		delete(a.Cancellations, key)
-	case enums.EventTypeStartChildWorkflowExecutionFailed:
+	case swf.EventTypeStartChildWorkflowExecutionFailed:
 		a.incrementChildAttempts(h)
 		delete(a.Children, a.key(h.StartChildWorkflowExecutionFailedEventAttributes.InitiatedEventID))
-	case enums.EventTypeChildWorkflowExecutionStarted:
+	case swf.EventTypeChildWorkflowExecutionStarted:
 		key := a.key(h.ChildWorkflowExecutionStartedEventAttributes.InitiatedEventID)
 		info := a.Children[key]
 		delete(a.ChildrenAttempts, info.WorkflowID)
@@ -250,52 +249,52 @@ func (a *EventCorrelator) checkInit() {
 
 func (a *EventCorrelator) getID(h *swf.HistoryEvent) (id string) {
 	switch *h.EventType {
-	case enums.EventTypeActivityTaskCompleted:
+	case swf.EventTypeActivityTaskCompleted:
 		if h.ActivityTaskCompletedEventAttributes != nil {
 			id = a.key(h.ActivityTaskCompletedEventAttributes.ScheduledEventID)
 		}
-	case enums.EventTypeActivityTaskFailed:
+	case swf.EventTypeActivityTaskFailed:
 		if h.ActivityTaskFailedEventAttributes != nil {
 			id = a.key(h.ActivityTaskFailedEventAttributes.ScheduledEventID)
 		}
-	case enums.EventTypeActivityTaskTimedOut:
+	case swf.EventTypeActivityTaskTimedOut:
 		if h.ActivityTaskTimedOutEventAttributes != nil {
 			id = a.key(h.ActivityTaskTimedOutEventAttributes.ScheduledEventID)
 		}
-	case enums.EventTypeActivityTaskCanceled:
+	case swf.EventTypeActivityTaskCanceled:
 		if h.ActivityTaskCanceledEventAttributes != nil {
 			id = a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventID)
 		}
 	//might want to get info on started too
-	case enums.EventTypeActivityTaskStarted:
+	case swf.EventTypeActivityTaskStarted:
 		if h.ActivityTaskStartedEventAttributes != nil {
 			id = a.key(h.ActivityTaskStartedEventAttributes.ScheduledEventID)
 		}
-	case enums.EventTypeExternalWorkflowExecutionSignaled:
+	case swf.EventTypeExternalWorkflowExecutionSignaled:
 		if h.ExternalWorkflowExecutionSignaledEventAttributes != nil {
 			id = a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventID)
 		}
-	case enums.EventTypeSignalExternalWorkflowExecutionFailed:
+	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
 		if h.SignalExternalWorkflowExecutionFailedEventAttributes != nil {
 			id = a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID)
 		}
-	case enums.EventTypeRequestCancelExternalWorkflowExecutionFailed:
+	case swf.EventTypeRequestCancelExternalWorkflowExecutionFailed:
 		if h.RequestCancelExternalWorkflowExecutionFailedEventAttributes != nil {
 			id = a.key(h.RequestCancelExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID)
 		}
-	case enums.EventTypeExternalWorkflowExecutionCancelRequested:
+	case swf.EventTypeExternalWorkflowExecutionCancelRequested:
 		if h.ExternalWorkflowExecutionCancelRequestedEventAttributes != nil {
 			id = a.key(h.ExternalWorkflowExecutionCancelRequestedEventAttributes.InitiatedEventID)
 		}
-	case enums.EventTypeTimerFired:
+	case swf.EventTypeTimerFired:
 		if h.TimerFiredEventAttributes != nil {
 			id = a.key(h.TimerFiredEventAttributes.StartedEventID)
 		}
-	case enums.EventTypeTimerCanceled:
+	case swf.EventTypeTimerCanceled:
 		if h.TimerCanceledEventAttributes != nil {
 			id = a.key(h.TimerCanceledEventAttributes.StartedEventID)
 		}
-	case enums.EventTypeWorkflowExecutionSignaled:
+	case swf.EventTypeWorkflowExecutionSignaled:
 		event := h.WorkflowExecutionSignaledEventAttributes
 		if event != nil && event.SignalName != nil && event.Input != nil {
 			switch *event.SignalName {
@@ -307,11 +306,11 @@ func (a *EventCorrelator) getID(h *swf.HistoryEvent) (id string) {
 				id = a.key(event.ExternalInitiatedEventID)
 			}
 		}
-	case enums.EventTypeChildWorkflowExecutionStarted:
+	case swf.EventTypeChildWorkflowExecutionStarted:
 		if h.ChildWorkflowExecutionStartedEventAttributes != nil {
 			id = a.key(h.ChildWorkflowExecutionStartedEventAttributes.InitiatedEventID)
 		}
-	case enums.EventTypeStartChildWorkflowExecutionFailed:
+	case swf.EventTypeStartChildWorkflowExecutionFailed:
 		if h.StartChildWorkflowExecutionFailedEventAttributes != nil {
 			id = a.key(h.StartChildWorkflowExecutionFailedEventAttributes.InitiatedEventID)
 		}

@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
-	"github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/poller"
 	s "github.com/sclasen/swfsm/sugar"
 )
@@ -544,15 +543,15 @@ func (f *FSM) EventData(event *swf.HistoryEvent, eventData interface{}) {
 	if eventData != nil {
 		var serialized string
 		switch *event.EventType {
-		case enums.EventTypeActivityTaskCompleted:
+		case swf.EventTypeActivityTaskCompleted:
 			serialized = *event.ActivityTaskCompletedEventAttributes.Result
-		case enums.EventTypeChildWorkflowExecutionFailed:
+		case swf.EventTypeChildWorkflowExecutionFailed:
 			serialized = *event.ActivityTaskFailedEventAttributes.Details
-		case enums.EventTypeWorkflowExecutionCompleted:
+		case swf.EventTypeWorkflowExecutionCompleted:
 			serialized = *event.WorkflowExecutionCompletedEventAttributes.Result
-		case enums.EventTypeChildWorkflowExecutionCompleted:
+		case swf.EventTypeChildWorkflowExecutionCompleted:
 			serialized = *event.ChildWorkflowExecutionCompletedEventAttributes.Result
-		case enums.EventTypeWorkflowExecutionSignaled:
+		case swf.EventTypeWorkflowExecutionSignaled:
 			switch *event.WorkflowExecutionSignaledEventAttributes.SignalName {
 			case ActivityStartedSignal, ActivityUpdatedSignal:
 				state := new(SerializedActivityState)
@@ -563,9 +562,9 @@ func (f *FSM) EventData(event *swf.HistoryEvent, eventData interface{}) {
 			default:
 				serialized = *event.WorkflowExecutionSignaledEventAttributes.Input
 			}
-		case enums.EventTypeWorkflowExecutionStarted:
+		case swf.EventTypeWorkflowExecutionStarted:
 			serialized = *event.WorkflowExecutionStartedEventAttributes.Input
-		case enums.EventTypeWorkflowExecutionContinuedAsNew:
+		case swf.EventTypeWorkflowExecutionContinuedAsNew:
 			serialized = *event.WorkflowExecutionContinuedAsNewEventAttributes.Input
 		}
 		if serialized != "" {
@@ -601,7 +600,7 @@ func (f *FSM) statefulHistoryEventToSerializedState(event *swf.HistoryEvent) (*S
 		state := &SerializedState{}
 		err := f.systemSerializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, state)
 		return state, err
-	} else if *event.EventType == enums.EventTypeWorkflowExecutionStarted {
+	} else if *event.EventType == swf.EventTypeWorkflowExecutionStarted {
 		state := &SerializedState{}
 		//If the workflow is continued, we expect a full SerializedState as Input
 		if event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunID != nil {
@@ -656,10 +655,10 @@ func (f *FSM) findLastEvents(prevStarted int64, events []*swf.HistoryEvent) []*s
 			return lastEvents
 		}
 		switch *event.EventType {
-		case enums.EventTypeDecisionTaskCompleted, enums.EventTypeDecisionTaskScheduled,
-			enums.EventTypeDecisionTaskStarted:
+		case swf.EventTypeDecisionTaskCompleted, swf.EventTypeDecisionTaskScheduled,
+			swf.EventTypeDecisionTaskStarted:
 			//no-op, dont even process these?
-		case enums.EventTypeMarkerRecorded:
+		case swf.EventTypeMarkerRecorded:
 			if !f.isStateMarker(event) && !f.isCorrelatorMarker(event) {
 				lastEvents = append(lastEvents, event)
 			}
@@ -722,7 +721,7 @@ func (f *FSM) recordMarker(markerName string, details interface{}) (*swf.Decisio
 
 func (f *FSM) recordStringMarker(markerName string, details string) *swf.Decision {
 	return &swf.Decision{
-		DecisionType: aws.String(enums.DecisionTypeRecordMarker),
+		DecisionType: aws.String(swf.DecisionTypeRecordMarker),
 		RecordMarkerDecisionAttributes: &swf.RecordMarkerDecisionAttributes{
 			MarkerName: aws.String(markerName),
 			Details:    aws.String(details),
@@ -740,15 +739,15 @@ func (f *FSM) Stop() {
 }
 
 func (f *FSM) isStateMarker(e *swf.HistoryEvent) bool {
-	return *e.EventType == enums.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == StateMarker
+	return *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == StateMarker
 }
 
 func (f *FSM) isCorrelatorMarker(e *swf.HistoryEvent) bool {
-	return *e.EventType == enums.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == CorrelatorMarker
+	return *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == CorrelatorMarker
 }
 
 func (f *FSM) isErrorMarker(e *swf.HistoryEvent) bool {
-	return *e.EventType == enums.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == ErrorMarker
+	return *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == ErrorMarker
 }
 
 // EmptyDecisions is a helper method to give you an empty decisions array for use in your Deciders.

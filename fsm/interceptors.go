@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -90,9 +89,9 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 	return &FuncInterceptor{
 		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
 			for _, d := range outcome.Decisions {
-				if *d.DecisionType == enums.DecisionTypeCompleteWorkflowExecution ||
-					*d.DecisionType == enums.DecisionTypeCancelWorkflowExecution ||
-					*d.DecisionType == enums.DecisionTypeFailWorkflowExecution {
+				if *d.DecisionType == swf.DecisionTypeCompleteWorkflowExecution ||
+					*d.DecisionType == swf.DecisionTypeCancelWorkflowExecution ||
+					*d.DecisionType == swf.DecisionTypeFailWorkflowExecution {
 					logf(ctx, "fn=managed-continuations at=terminating-decision")
 					return //we have a terminating event, dont continue
 				}
@@ -102,7 +101,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 			if *decision.PreviousStartedEventID == int64(0) {
 				logf(ctx, "fn=managed-continuations at=workflow-start %d", *decision.PreviousStartedEventID)
 				outcome.Decisions = append(outcome.Decisions, &swf.Decision{
-					DecisionType: S(enums.DecisionTypeStartTimer),
+					DecisionType: S(swf.DecisionTypeStartTimer),
 					StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
 						TimerID:            S(ContinueTimer),
 						StartToFireTimeout: S(strconv.Itoa(workflowAgeInSec)),
@@ -113,7 +112,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 			//was the ContinueTimer fired?
 			continueTimerFired := false
 			for _, h := range decision.Events {
-				if *h.EventType == enums.EventTypeTimerFired {
+				if *h.EventType == swf.EventTypeTimerFired {
 					if *h.TimerFiredEventAttributes.TimerID == ContinueTimer {
 						continueTimerFired = true
 					}
@@ -123,7 +122,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 			//was the ContinueSignal fired?
 			continueSignalFired := false
 			for _, h := range decision.Events {
-				if *h.EventType == enums.EventTypeWorkflowExecutionSignaled {
+				if *h.EventType == swf.EventTypeWorkflowExecutionSignaled {
 					if *h.WorkflowExecutionSignaledEventAttributes.SignalName == ContinueSignal {
 						continueTimerFired = true
 					}
@@ -147,7 +146,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 					//re-start the timer for timerRetrySecs
 					logf(ctx, "fn=managed-continuations at=unable-to-continue decisions=%d activities=%d signals=%d children=%d action=start-continue-timer-retry", decisions, activities, signals, children)
 					outcome.Decisions = append(outcome.Decisions, &swf.Decision{
-						DecisionType: S(enums.DecisionTypeStartTimer),
+						DecisionType: S(swf.DecisionTypeStartTimer),
 						StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
 							TimerID:            S(ContinueTimer),
 							StartToFireTimeout: S(strconv.Itoa(timerRetrySeconds)),

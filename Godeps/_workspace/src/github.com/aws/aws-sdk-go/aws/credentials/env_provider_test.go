@@ -1,10 +1,9 @@
 package credentials
 
 import (
+	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEnvProviderRetrieve(t *testing.T) {

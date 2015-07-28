@@ -7,7 +7,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/sclasen/swfsm/enums/swf"
 	s "github.com/sclasen/swfsm/sugar"
 )
 
@@ -63,7 +62,7 @@ func ExampleComposedDecider() {
 	//first, you would have one of these typed DecisionFuncs for each activity decision type you create.
 	fooActivityDecision := func(ctx *FSMContext, h *swf.HistoryEvent, data *TestingType) *swf.Decision {
 		return &swf.Decision{
-			DecisionType: aws.String(enums.DecisionTypeScheduleActivityTask),
+			DecisionType: aws.String(swf.DecisionTypeScheduleActivityTask),
 			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 				ActivityType: &swf.ActivityType{Name: aws.String("foo-activity"), Version: aws.String("1")},
 			},
@@ -72,7 +71,7 @@ func ExampleComposedDecider() {
 
 	barActivityDecision := func(ctx *FSMContext, h *swf.HistoryEvent, data *TestingType) *swf.Decision {
 		return &swf.Decision{
-			DecisionType: aws.String(enums.DecisionTypeScheduleActivityTask),
+			DecisionType: aws.String(swf.DecisionTypeScheduleActivityTask),
 			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 				ActivityType: &swf.ActivityType{Name: aws.String("bar-activity"), Version: aws.String("1")},
 			},
@@ -91,7 +90,7 @@ func ExampleComposedDecider() {
 		typedDecisionFn := typedFuncs.DecisionFunc(activityFn)
 		return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 			switch *h.EventType {
-			case enums.EventTypeActivityTaskFailed, enums.EventTypeActivityTaskTimedOut, enums.EventTypeActivityTaskCanceled:
+			case swf.EventTypeActivityTaskFailed, swf.EventTypeActivityTaskTimedOut, swf.EventTypeActivityTaskCanceled:
 				if *ctx.ActivityInfo(h).Name == activityName {
 					decisions := ctx.EmptyDecisions()
 					retry := typedDecisionFn(ctx, h, data)
@@ -145,7 +144,7 @@ func TestOnStarted(t *testing.T) {
 	for _, et := range s.SWFHistoryEventTypes() {
 		ctx := deciderTestContext()
 		switch et {
-		case enums.EventTypeWorkflowExecutionStarted:
+		case swf.EventTypeWorkflowExecutionStarted:
 			event := s.EventFromPayload(129, &swf.WorkflowExecutionStartedEventAttributes{})
 			data := new(TestData)
 			outcome := composedDecider(ctx, event, data)
@@ -174,7 +173,7 @@ func TestOnChildStarted(t *testing.T) {
 	for _, et := range s.SWFHistoryEventTypes() {
 		ctx := deciderTestContext()
 		switch et {
-		case enums.EventTypeChildWorkflowExecutionStarted:
+		case swf.EventTypeChildWorkflowExecutionStarted:
 			event := s.EventFromPayload(129, &swf.ChildWorkflowExecutionStartedEventAttributes{})
 			data := new(TestData)
 			outcome := composedDecider(ctx, event, data)

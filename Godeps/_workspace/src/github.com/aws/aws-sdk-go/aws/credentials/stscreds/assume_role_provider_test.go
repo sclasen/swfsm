@@ -1,12 +1,11 @@
 package stscreds
 
 import (
-	"testing"
-	"time"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/stretchr/testify/assert"
+	"testing"
+	"time"
 )
 
 type stubSTS struct {

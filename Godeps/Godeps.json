@@ -7,43 +7,43 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/aws",
-			"Comment": "v0.6.0-118-gab3fca4",
-			"Rev": "ab3fca49fe03f5228c3ea7e711a49f8940d570fc"
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/endpoints",
-			"Comment": "v0.6.0-118-gab3fca4",
-			"Rev": "ab3fca49fe03f5228c3ea7e711a49f8940d570fc"
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/json/jsonutil",
-			"Comment": "v0.6.0-118-gab3fca4",
-			"Rev": "ab3fca49fe03f5228c3ea7e711a49f8940d570fc"
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/jsonrpc",
-			"Comment": "v0.6.0-118-gab3fca4",
-			"Rev": "ab3fca49fe03f5228c3ea7e711a49f8940d570fc"
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/rest",
-			"Comment": "v0.6.0-118-gab3fca4",
-			"Rev": "ab3fca49fe03f5228c3ea7e711a49f8940d570fc"
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/internal/signer/v4",
-			"Comment": "v0.6.0-118-gab3fca4",
-			"Rev": "ab3fca49fe03f5228c3ea7e711a49f8940d570fc"
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/kinesis",
-			"Comment": "v0.6.0-118-gab3fca4",
-			"Rev": "ab3fca49fe03f5228c3ea7e711a49f8940d570fc"
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/swf",
-			"Comment": "v0.6.0-118-gab3fca4",
-			"Rev": "ab3fca49fe03f5228c3ea7e711a49f8940d570fc"
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",

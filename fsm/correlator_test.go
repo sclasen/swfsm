@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -22,7 +21,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			testData.States = append(testData.States, "start")
 			serialized := f.Serialize(testData)
 			decision := &swf.Decision{
-				DecisionType: S(enums.DecisionTypeScheduleActivityTask),
+				DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 				ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 					ActivityID:   S(testActivityInfo.ActivityID),
 					ActivityType: testActivityInfo.ActivityType,
@@ -41,7 +40,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			testData.States = append(testData.States, "working")
 			serialized := f.Serialize(testData)
 			var decisions = f.EmptyDecisions()
-			if *lastEvent.EventType == enums.EventTypeActivityTaskCompleted {
+			if *lastEvent.EventType == swf.EventTypeActivityTaskCompleted {
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
 				log.Printf("----->>>>> %+v %+v", trackedActivityInfo, testActivityInfo)
 				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
@@ -51,14 +50,14 @@ func TestTrackPendingActivities(t *testing.T) {
 				}
 				timeoutSeconds := "5" //swf uses stringy numbers in many places
 				decision := &swf.Decision{
-					DecisionType: S(enums.DecisionTypeStartTimer),
+					DecisionType: S(swf.DecisionTypeStartTimer),
 					StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
 						StartToFireTimeout: S(timeoutSeconds),
 						TimerID:            S("timeToComplete"),
 					},
 				}
 				return f.Goto("done", testData, []*swf.Decision{decision})
-			} else if *lastEvent.EventType == enums.EventTypeActivityTaskFailed {
+			} else if *lastEvent.EventType == swf.EventTypeActivityTaskFailed {
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
 				log.Printf("----->>>>> %+v %+v %+v", trackedActivityInfo, testActivityInfo, f.ActivitiesInfo())
 				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
@@ -67,7 +66,7 @@ func TestTrackPendingActivities(t *testing.T) {
 					)
 				}
 				decision := &swf.Decision{
-					DecisionType: S(enums.DecisionTypeScheduleActivityTask),
+					DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 					ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 						ActivityID:   S(testActivityInfo.ActivityID),
 						ActivityType: testActivityInfo.ActivityType,
@@ -86,7 +85,7 @@ func TestTrackPendingActivities(t *testing.T) {
 		Name: "done",
 		Decider: typedFuncs.Decider(func(f *FSMContext, lastEvent *swf.HistoryEvent, testData *TestData) Outcome {
 			decisions := f.EmptyDecisions()
-			if *lastEvent.EventType == enums.EventTypeTimerFired {
+			if *lastEvent.EventType == swf.EventTypeTimerFired {
 				testData.States = append(testData.States, "done")
 				serialized := f.Serialize(testData)
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
@@ -94,7 +93,7 @@ func TestTrackPendingActivities(t *testing.T) {
 					t.Fatalf("pending activity not being cleared\nGot:\n%+v", trackedActivityInfo)
 				}
 				decision := &swf.Decision{
-					DecisionType: S(enums.DecisionTypeCompleteWorkflowExecution),
+					DecisionType: S(swf.DecisionTypeCompleteWorkflowExecution),
 					CompleteWorkflowExecutionDecisionAttributes: &swf.CompleteWorkflowExecutionDecisionAttributes{
 						Result: S(serialized),
 					},
@@ -228,7 +227,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			},
 		},
 		{
-			EventType: S(enums.EventTypeTimerStarted),
+			EventType: S(swf.EventTypeTimerStarted),
 			EventID:   I(12),
 			TimerStartedEventAttributes: &swf.TimerStartedEventAttributes{
 				TimerID: S("foo"),

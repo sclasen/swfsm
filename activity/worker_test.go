@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/swf"
-	enum "github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/fsm"
 	"github.com/sclasen/swfsm/migrator"
 	. "github.com/sclasen/swfsm/sugar"
@@ -234,7 +233,7 @@ func (w *WorkerFSM) activity(ctx *fsm.FSMContext, name string, input interface{}
 		serialized = S(ctx.Serialize(input))
 	}
 	return &swf.Decision{
-		DecisionType: S(enum.DecisionTypeScheduleActivityTask),
+		DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 		ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 			ActivityID:             S(name),
 			ActivityType:           &swf.ActivityType{Name: S(name), Version: S(name)},
@@ -256,7 +255,7 @@ func TestTypedActivityWorker(t *testing.T) {
 
 	config := &aws.Config{
 		Credentials: credentials.NewEnvCredentials(),
-		Region:      "us-east-1",
+		Region:      aws.String("us-east-1"),
 	}
 
 	client := swf.New(config)
@@ -422,7 +421,7 @@ func TestBackoff(t *testing.T) {
 	history := &swf.GetWorkflowExecutionHistoryOutput{
 		Events: []*swf.HistoryEvent{
 			{
-				EventType: S(enum.EventTypeMarkerRecorded),
+				EventType: S(swf.EventTypeMarkerRecorded),
 				MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
 					MarkerName: S(fsm.CorrelatorMarker),
 					Details:    S(s),

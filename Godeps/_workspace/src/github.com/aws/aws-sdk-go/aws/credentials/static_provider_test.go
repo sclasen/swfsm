@@ -1,9 +1,8 @@
 package credentials
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestStaticProviderGet(t *testing.T) {
