@@ -37,7 +37,7 @@ func SWFSendHandler(polling, heartbeat *http.Client) func(*aws.Request) {
 				}
 				client = heartbeat
 			default:
-				if r.Service.Config.LogLevel.AtLeast(aws.LogDebug){
+				if r.Service.Config.LogLevel.AtLeast(aws.LogDebug) {
 					log.Printf("using std client %s %s", r.Service.ServiceName, r.Operation.Name)
 				}
 			}
@@ -63,7 +63,7 @@ func SWFSendHandler(polling, heartbeat *http.Client) func(*aws.Request) {
 			}
 			// Catch all other request errors.
 			r.Error = awserr.New("RequestError", "send request failed", err)
-			r.Retryable = aws.Bool(true)// network errors are retryable
+			r.Retryable = aws.Bool(true) // network errors are retryable
 		}
 	}
 }
