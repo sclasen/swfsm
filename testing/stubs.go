@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/activity"
-	"github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/fsm"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -92,7 +91,7 @@ func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkfl
 		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
 			for _, d := range outcome.Decisions {
 				switch *d.DecisionType {
-				case enums.DecisionTypeStartChildWorkflowExecution:
+				case swf.DecisionTypeStartChildWorkflowExecution:
 					if _, ok := stubbed[*d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name]; ok {
 						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name = S(StubWorkflow)
 						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Version = S(StubVersion)
@@ -105,7 +104,7 @@ func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkfl
 						d.StartChildWorkflowExecutionDecisionAttributes.ExecutionStartToCloseTimeout = S("360")
 						d.StartChildWorkflowExecutionDecisionAttributes.TaskList = ShortStubTaskList
 					}
-				case enums.DecisionTypeScheduleActivityTask:
+				case swf.DecisionTypeScheduleActivityTask:
 					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testID)}
 				}
 			}

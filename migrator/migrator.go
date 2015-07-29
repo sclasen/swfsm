@@ -9,8 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/swf"
-	kenums "github.com/sclasen/swfsm/enums/kinesis"
-	enums "github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -125,7 +123,7 @@ func (d *DomainMigrator) isRegisteredNotDeprecated(rd swf.RegisterDomainInput) b
 
 	}
 
-	return *desc.DomainInfo.Status == enums.RegistrationStatusRegistered
+	return *desc.DomainInfo.Status == swf.RegistrationStatusRegistered
 }
 
 func (d *DomainMigrator) register(rd swf.RegisterDomainInput) {
@@ -147,7 +145,7 @@ func (d *DomainMigrator) isDeprecated(domain *string) bool {
 		return false
 	}
 
-	return *desc.DomainInfo.Status == enums.RegistrationStatusDeprecated
+	return *desc.DomainInfo.Status == swf.RegistrationStatusDeprecated
 }
 
 func (d *DomainMigrator) deprecate(dd swf.DeprecateDomainInput) {
@@ -203,7 +201,7 @@ func (w *WorkflowTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterWorkflow
 
 	}
 
-	return *desc.TypeInfo.Status == enums.RegistrationStatusRegistered
+	return *desc.TypeInfo.Status == swf.RegistrationStatusRegistered
 }
 
 func (w *WorkflowTypeMigrator) register(rd swf.RegisterWorkflowTypeInput) {
@@ -224,7 +222,7 @@ func (w *WorkflowTypeMigrator) isDeprecated(domain *string, name *string, versio
 		return false
 	}
 
-	return *desc.TypeInfo.Status == enums.RegistrationStatusDeprecated
+	return *desc.TypeInfo.Status == swf.RegistrationStatusDeprecated
 }
 
 func (w *WorkflowTypeMigrator) deprecate(dd swf.DeprecateWorkflowTypeInput) {
@@ -280,7 +278,7 @@ func (a *ActivityTypeMigrator) isRegisteredNotDeprecated(rd swf.RegisterActivity
 
 	}
 
-	return *desc.TypeInfo.Status == enums.RegistrationStatusRegistered
+	return *desc.TypeInfo.Status == swf.RegistrationStatusRegistered
 }
 
 func (a *ActivityTypeMigrator) register(rd swf.RegisterActivityTypeInput) {
@@ -301,7 +299,7 @@ func (a *ActivityTypeMigrator) isDeprecated(domain *string, name *string, versio
 		return false
 	}
 
-	return *desc.TypeInfo.Status == enums.RegistrationStatusDeprecated
+	return *desc.TypeInfo.Status == swf.RegistrationStatusDeprecated
 }
 
 func (a *ActivityTypeMigrator) deprecate(dd swf.DeprecateActivityTypeInput) {
@@ -373,8 +371,8 @@ func (s *StreamMigrator) describe(st kinesis.CreateStreamInput) (*kinesis.Descri
 func (s *StreamMigrator) awaitActive(stream *string, atMostSeconds int) {
 
 	waited := 0
-	status := kenums.StreamStatusCreating
-	for status != kenums.StreamStatusActive {
+	status := kinesis.StreamStatusCreating
+	for status != kinesis.StreamStatusActive {
 		desc, err := s.Client.DescribeStream(&kinesis.DescribeStreamInput{
 			StreamName: stream,
 		})

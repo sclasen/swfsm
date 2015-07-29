@@ -7,7 +7,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -48,7 +47,7 @@ func TestKinesisReplication(t *testing.T) {
 	fsm.AddInitialState(&FSMState{
 		Name: "initial",
 		Decider: func(f *FSMContext, h *swf.HistoryEvent, d interface{}) Outcome {
-			if *h.EventType == enums.EventTypeWorkflowExecutionStarted {
+			if *h.EventType == swf.EventTypeWorkflowExecutionStarted {
 				return f.Goto("done", d, f.EmptyDecisions())
 			}
 			t.Fatal("unexpected")

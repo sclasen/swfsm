@@ -23,7 +23,7 @@ func TestMigrateDomains(t *testing.T) {
 
 	config := &aws.Config{
 		Credentials: credentials.NewEnvCredentials(),
-		Region:      "us-east-1",
+		Region:      aws.String("us-east-1"),
 	}
 	client := swf.New(config)
 
@@ -65,7 +65,7 @@ func TestMigrateWorkflowTypes(t *testing.T) {
 	createDomain()
 	config := &aws.Config{
 		Credentials: credentials.NewEnvCredentials(),
-		Region:      "us-east-1",
+		Region:      aws.String("us-east-1"),
 	}
 	client := swf.New(config)
 
@@ -114,7 +114,7 @@ func TestMigrateActivityTypes(t *testing.T) {
 	createDomain()
 	config := &aws.Config{
 		Credentials: credentials.NewEnvCredentials(),
-		Region:      "us-east-1",
+		Region:      aws.String("us-east-1"),
 	}
 	client := swf.New(config)
 	activity := fmt.Sprintf("test-activity-%d", time.Now().UnixNano())
@@ -161,7 +161,7 @@ func TestMigrateStreams(t *testing.T) {
 
 	config := &aws.Config{
 		Credentials: credentials.NewEnvCredentials(),
-		Region:      "us-east-1",
+		Region:      aws.String("us-east-1"),
 	}
 	client := kinesis.New(config)
 
@@ -169,7 +169,7 @@ func TestMigrateStreams(t *testing.T) {
 		Streams: []kinesis.CreateStreamInput{
 			kinesis.CreateStreamInput{
 				StreamName: aws.String(testDomain),
-				ShardCount: aws.Long(1),
+				ShardCount: aws.Int64(1),
 			},
 		},
 		Client:  client,
@@ -184,7 +184,7 @@ func TestMigrateStreams(t *testing.T) {
 func createDomain() {
 	config := &aws.Config{
 		Credentials: credentials.NewEnvCredentials(),
-		Region:      "us-east-1",
+		Region:      aws.String("us-east-1"),
 	}
 	client := swf.New(config)
 	req := swf.RegisterDomainInput{

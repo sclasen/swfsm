@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/pborman/uuid"
-	"github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/migrator"
 )
 
@@ -23,7 +22,7 @@ func TestClient(t *testing.T) {
 
 	config := &aws.Config{
 		Credentials: credentials.NewEnvCredentials(),
-		Region:      "us-east-1",
+		Region:      aws.String("us-east-1"),
 	}
 	client := swf.New(config)
 
@@ -65,7 +64,7 @@ func TestClient(t *testing.T) {
 
 	fsm.AddInitialState(&FSMState{Name: "initial",
 		Decider: func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-			if *h.EventType == enums.EventTypeWorkflowExecutionSignaled {
+			if *h.EventType == swf.EventTypeWorkflowExecutionSignaled {
 				d := data.(*TestData)
 				d.States = append(d.States, *h.WorkflowExecutionSignaledEventAttributes.SignalName)
 			}
@@ -135,7 +134,7 @@ func TestClient(t *testing.T) {
 		t.Fatalf("snapshots[0].Event.Name: %s ", name)
 	}
 
-	if Type := snapshots[0].Event.Type; Type != enums.EventTypeWorkflowExecutionStarted {
+	if Type := snapshots[0].Event.Type; Type != swf.EventTypeWorkflowExecutionStarted {
 		t.Fatalf("snapshots[0].Event.Type: %s ", Type)
 	}
 

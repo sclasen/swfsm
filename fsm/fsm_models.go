@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/golang/protobuf/proto"
 	"github.com/juju/errors"
-	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -216,7 +215,7 @@ func (f *FSMContext) Pass() Outcome {
 
 // CompleteWorkflow is a helper func to easily create a CompleteOutcome that sends a CompleteWorkflow decision.
 func (f *FSMContext) CompleteWorkflow(data interface{}, decisions ...*swf.Decision) Outcome {
-	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != enums.DecisionTypeCompleteWorkflowExecution {
+	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != swf.DecisionTypeCompleteWorkflowExecution {
 		decisions = append(decisions, f.CompleteWorkflowDecision(data))
 	}
 	return Outcome{
@@ -228,7 +227,7 @@ func (f *FSMContext) CompleteWorkflow(data interface{}, decisions ...*swf.Decisi
 
 // ContinueWorkflow is a helper func to easily create a CompleteOutcome that sends a ContinueWorklfow decision.
 func (f *FSMContext) ContinueWorkflow(data interface{}, decisions ...*swf.Decision) Outcome {
-	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != enums.DecisionTypeContinueAsNewWorkflowExecution {
+	if len(decisions) == 0 || *decisions[len(decisions)-1].DecisionType != swf.DecisionTypeContinueAsNewWorkflowExecution {
 		decisions = append(decisions, f.ContinueWorkflowDecision(f.State, data))
 	}
 	return Outcome{
@@ -241,7 +240,7 @@ func (f *FSMContext) ContinueWorkflow(data interface{}, decisions ...*swf.Decisi
 // CancelWorkflow is a helper func to easily create a CompleteOutcome that sends a ContinueWorklfow decision.
 func (f *FSMContext) CancelWorkflow(data interface{}, details *string) Outcome {
 	d := &swf.Decision{
-		DecisionType: S(enums.DecisionTypeCancelWorkflowExecution),
+		DecisionType: S(swf.DecisionTypeCancelWorkflowExecution),
 		CancelWorkflowExecutionDecisionAttributes: &swf.CancelWorkflowExecutionDecisionAttributes{
 			Details: details,
 		},
@@ -327,7 +326,7 @@ func (f *FSMContext) Correlator() *EventCorrelator {
 // If the FSM Data Struct is Taggable, its tags will be used on the Continue Decisions
 func (f *FSMContext) ContinueWorkflowDecision(continuedState string, data interface{}) *swf.Decision {
 	return &swf.Decision{
-		DecisionType: aws.String(enums.DecisionTypeContinueAsNewWorkflowExecution),
+		DecisionType: aws.String(swf.DecisionTypeContinueAsNewWorkflowExecution),
 		ContinueAsNewWorkflowExecutionDecisionAttributes: &swf.ContinueAsNewWorkflowExecutionDecisionAttributes{
 			Input: aws.String(f.Serialize(SerializedState{
 				StateName:    continuedState,
@@ -352,7 +351,7 @@ func GetTagsIfTaggable(data interface{}) []*string {
 // This decision should be used when it is appropriate to Complete your workflow.
 func (f *FSMContext) CompleteWorkflowDecision(data interface{}) *swf.Decision {
 	return &swf.Decision{
-		DecisionType: aws.String(enums.DecisionTypeCompleteWorkflowExecution),
+		DecisionType: aws.String(swf.DecisionTypeCompleteWorkflowExecution),
 		CompleteWorkflowExecutionDecisionAttributes: &swf.CompleteWorkflowExecutionDecisionAttributes{
 			Result: aws.String(f.Serialize(data)),
 		},

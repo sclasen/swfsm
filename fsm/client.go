@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
-	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -128,7 +127,7 @@ func (c *client) listIds(executionInfosFunc func() (*swf.WorkflowExecutionInfos,
 func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 	open, err := c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
 		Domain:          S(c.f.Domain),
-		MaximumPageSize: aws.Long(1),
+		MaximumPageSize: aws.Int64(1),
 		StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
 		ExecutionFilter: &swf.WorkflowExecutionFilter{
 			WorkflowID: S(id),
@@ -149,7 +148,7 @@ func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 	} else {
 		closed, err := c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
 			Domain:          S(c.f.Domain),
-			MaximumPageSize: aws.Long(1),
+			MaximumPageSize: aws.Int64(1),
 			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
 			ExecutionFilter: &swf.WorkflowExecutionFilter{
 				WorkflowID: S(id),
@@ -183,7 +182,7 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 		history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
 			Domain:       S(c.f.Domain),
 			Execution:    execution,
-			ReverseOrder: aws.Boolean(true),
+			ReverseOrder: aws.Bool(true),
 		})
 
 		if err != nil {
@@ -287,7 +286,7 @@ func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
 	history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
 		Domain:       S(c.f.Domain),
 		Execution:    execution,
-		ReverseOrder: aws.Boolean(true),
+		ReverseOrder: aws.Bool(true),
 	})
 
 	if err != nil {
@@ -298,60 +297,60 @@ func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
 	for _, historyEvent := range history.Events {
 		// TODO: how to deal with failure events?
 		switch EventType := *historyEvent.EventType; EventType {
-		case enums.EventTypeWorkflowExecutionStarted:
+		case swf.EventTypeWorkflowExecutionStarted:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:  EventType,
 				Name:  "start",
 				Input: c.tryDeserialize(historyEvent.WorkflowExecutionStartedEventAttributes.Input),
 			}
-		case enums.EventTypeWorkflowExecutionSignaled:
+		case swf.EventTypeWorkflowExecutionSignaled:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:  EventType,
 				Name:  *historyEvent.WorkflowExecutionSignaledEventAttributes.SignalName,
 				Input: c.tryDeserialize(historyEvent.WorkflowExecutionSignaledEventAttributes.Input),
 			}
-		case enums.EventTypeActivityTaskScheduled:
+		case swf.EventTypeActivityTaskScheduled:
 			if snapshot.Event != nil && snapshot.Event.Input == c.pointerScheduledEventID(historyEvent.EventID) {
 				snapshot.Event.Name = *historyEvent.ActivityTaskScheduledEventAttributes.ActivityType.Name
 				snapshot.Event.Version = *historyEvent.ActivityTaskScheduledEventAttributes.ActivityType.Version
 				snapshot.Event.Input = c.tryDeserialize(historyEvent.ActivityTaskScheduledEventAttributes.Input)
 			}
-		case enums.EventTypeActivityTaskCompleted:
+		case swf.EventTypeActivityTaskCompleted:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
 				Input:  c.pointerScheduledEventID(historyEvent.ActivityTaskCompletedEventAttributes.ScheduledEventID),
 				Output: c.tryDeserialize(historyEvent.ActivityTaskCompletedEventAttributes.Result),
 			}
-		case enums.EventTypeStartChildWorkflowExecutionInitiated:
+		case swf.EventTypeStartChildWorkflowExecutionInitiated:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
 				Name:   *historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType.Name,
 				Input:  c.tryDeserialize(historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.Input),
 				Target: *historyEvent.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 			}
-		case enums.EventTypeSignalExternalWorkflowExecutionInitiated:
+		case swf.EventTypeSignalExternalWorkflowExecutionInitiated:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
 				Name:   *historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
 				Input:  c.tryDeserialize(historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input),
 				Target: *historyEvent.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 			}
-		case enums.EventTypeRequestCancelExternalWorkflowExecutionInitiated:
+		case swf.EventTypeRequestCancelExternalWorkflowExecutionInitiated:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
 				Target: *historyEvent.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 			}
-		case enums.EventTypeTimerStarted:
+		case swf.EventTypeTimerStarted:
 			if snapshot.Event != nil && snapshot.Event.Input == c.pointerStartedEventID(historyEvent.EventID) {
 				snapshot.Event.Input = *historyEvent.TimerStartedEventAttributes.StartToFireTimeout
 			}
-		case enums.EventTypeTimerFired:
+		case swf.EventTypeTimerFired:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:  EventType,
 				Name:  *historyEvent.TimerFiredEventAttributes.TimerID,
 				Input: c.pointerStartedEventID(historyEvent.TimerFiredEventAttributes.StartedEventID),
 			}
-		case enums.EventTypeWorkflowExecutionCancelRequested:
+		case swf.EventTypeWorkflowExecutionCancelRequested:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type: EventType,
 			}

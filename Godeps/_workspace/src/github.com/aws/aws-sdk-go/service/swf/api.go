@@ -1595,7 +1595,7 @@ type metadataActivityTaskCancelRequestedEventAttributes struct {
 
 // String returns the string representation
 func (s ActivityTaskCancelRequestedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -1632,7 +1632,7 @@ type metadataActivityTaskCanceledEventAttributes struct {
 
 // String returns the string representation
 func (s ActivityTaskCanceledEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -1664,7 +1664,7 @@ type metadataActivityTaskCompletedEventAttributes struct {
 
 // String returns the string representation
 func (s ActivityTaskCompletedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -1699,7 +1699,7 @@ type metadataActivityTaskFailedEventAttributes struct {
 
 // String returns the string representation
 func (s ActivityTaskFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -1769,7 +1769,7 @@ type metadataActivityTaskScheduledEventAttributes struct {
 
 // String returns the string representation
 func (s ActivityTaskScheduledEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -1797,7 +1797,7 @@ type metadataActivityTaskStartedEventAttributes struct {
 
 // String returns the string representation
 func (s ActivityTaskStartedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -1822,7 +1822,7 @@ type ActivityTaskTimedOutEventAttributes struct {
 	StartedEventID *int64 `locationName:"startedEventId" type:"long" required:"true"`
 
 	// The type of the timeout that caused this event.
-	TimeoutType *string `locationName:"timeoutType" type:"string" required:"true"`
+	TimeoutType *string `locationName:"timeoutType" type:"string" required:"true" enum:"ActivityTaskTimeoutType"`
 
 	metadataActivityTaskTimedOutEventAttributes `json:"-" xml:"-"`
 }
@@ -1833,7 +1833,7 @@ type metadataActivityTaskTimedOutEventAttributes struct {
 
 // String returns the string representation
 func (s ActivityTaskTimedOutEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -1864,7 +1864,7 @@ type metadataActivityType struct {
 
 // String returns the string representation
 func (s ActivityType) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -1940,7 +1940,7 @@ type metadataActivityTypeConfiguration struct {
 
 // String returns the string representation
 func (s ActivityTypeConfiguration) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -1963,7 +1963,7 @@ type ActivityTypeInfo struct {
 	Description *string `locationName:"description" type:"string"`
 
 	// The current status of the activity type.
-	Status *string `locationName:"status" type:"string" required:"true"`
+	Status *string `locationName:"status" type:"string" required:"true" enum:"RegistrationStatus"`
 
 	metadataActivityTypeInfo `json:"-" xml:"-"`
 }
@@ -1974,7 +1974,7 @@ type metadataActivityTypeInfo struct {
 
 // String returns the string representation
 func (s ActivityTypeInfo) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2010,7 +2010,7 @@ type metadataCancelTimerDecisionAttributes struct {
 
 // String returns the string representation
 func (s CancelTimerDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2026,7 +2026,7 @@ type CancelTimerFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"CancelTimerFailedCause"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision task
 	// that resulted in the CancelTimer decision to cancel this timer. This information
@@ -2046,7 +2046,7 @@ type metadataCancelTimerFailedEventAttributes struct {
 
 // String returns the string representation
 func (s CancelTimerFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2082,7 +2082,7 @@ type metadataCancelWorkflowExecutionDecisionAttributes struct {
 
 // String returns the string representation
 func (s CancelWorkflowExecutionDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2098,7 +2098,7 @@ type CancelWorkflowExecutionFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"CancelWorkflowExecutionFailedCause"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision task
 	// that resulted in the CancelWorkflowExecution decision for this cancellation
@@ -2115,7 +2115,7 @@ type metadataCancelWorkflowExecutionFailedEventAttributes struct {
 
 // String returns the string representation
 func (s CancelWorkflowExecutionFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2154,7 +2154,7 @@ type metadataChildWorkflowExecutionCanceledEventAttributes struct {
 
 // String returns the string representation
 func (s ChildWorkflowExecutionCanceledEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2193,7 +2193,7 @@ type metadataChildWorkflowExecutionCompletedEventAttributes struct {
 
 // String returns the string representation
 func (s ChildWorkflowExecutionCompletedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2235,7 +2235,7 @@ type metadataChildWorkflowExecutionFailedEventAttributes struct {
 
 // String returns the string representation
 func (s ChildWorkflowExecutionFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2266,7 +2266,7 @@ type metadataChildWorkflowExecutionStartedEventAttributes struct {
 
 // String returns the string representation
 func (s ChildWorkflowExecutionStartedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2302,7 +2302,7 @@ type metadataChildWorkflowExecutionTerminatedEventAttributes struct {
 
 // String returns the string representation
 func (s ChildWorkflowExecutionTerminatedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2325,7 +2325,7 @@ type ChildWorkflowExecutionTimedOutEventAttributes struct {
 
 	// The type of the timeout that caused the child workflow execution to time
 	// out.
-	TimeoutType *string `locationName:"timeoutType" type:"string" required:"true"`
+	TimeoutType *string `locationName:"timeoutType" type:"string" required:"true" enum:"WorkflowExecutionTimeoutType"`
 
 	// The child workflow execution that timed out.
 	WorkflowExecution *WorkflowExecution `locationName:"workflowExecution" type:"structure" required:"true"`
@@ -2342,7 +2342,7 @@ type metadataChildWorkflowExecutionTimedOutEventAttributes struct {
 
 // String returns the string representation
 func (s ChildWorkflowExecutionTimedOutEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2355,7 +2355,7 @@ func (s ChildWorkflowExecutionTimedOutEventAttributes) GoString() string {
 type CloseStatusFilter struct {
 	// Required. The close status that must match the close status of an execution
 	// for it to meet the criteria of this filter.
-	Status *string `locationName:"status" type:"string" required:"true"`
+	Status *string `locationName:"status" type:"string" required:"true" enum:"CloseStatus"`
 
 	metadataCloseStatusFilter `json:"-" xml:"-"`
 }
@@ -2366,7 +2366,7 @@ type metadataCloseStatusFilter struct {
 
 // String returns the string representation
 func (s CloseStatusFilter) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2403,7 +2403,7 @@ type metadataCompleteWorkflowExecutionDecisionAttributes struct {
 
 // String returns the string representation
 func (s CompleteWorkflowExecutionDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2419,7 +2419,7 @@ type CompleteWorkflowExecutionFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"CompleteWorkflowExecutionFailedCause"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision task
 	// that resulted in the CompleteWorkflowExecution decision to complete this
@@ -2436,7 +2436,7 @@ type metadataCompleteWorkflowExecutionFailedEventAttributes struct {
 
 // String returns the string representation
 func (s CompleteWorkflowExecutionFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2479,7 +2479,7 @@ type ContinueAsNewWorkflowExecutionDecisionAttributes struct {
 	// workflow type or through this parameter. If neither this parameter is set
 	// nor a default child policy was specified at registration time then a fault
 	// will be returned.
-	ChildPolicy *string `locationName:"childPolicy" type:"string"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" enum:"ChildPolicy"`
 
 	// If set, specifies the total duration for this workflow execution. This overrides
 	// the defaultExecutionStartToCloseTimeout specified when registering the workflow
@@ -2541,7 +2541,7 @@ type metadataContinueAsNewWorkflowExecutionDecisionAttributes struct {
 
 // String returns the string representation
 func (s ContinueAsNewWorkflowExecutionDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2557,7 +2557,7 @@ type ContinueAsNewWorkflowExecutionFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"ContinueAsNewWorkflowExecutionFailedCause"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision task
 	// that resulted in the ContinueAsNewWorkflowExecution decision that started
@@ -2574,7 +2574,7 @@ type metadataContinueAsNewWorkflowExecutionFailedEventAttributes struct {
 
 // String returns the string representation
 func (s ContinueAsNewWorkflowExecutionFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2636,7 +2636,7 @@ type metadataCountClosedWorkflowExecutionsInput struct {
 
 // String returns the string representation
 func (s CountClosedWorkflowExecutionsInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2681,7 +2681,7 @@ type metadataCountOpenWorkflowExecutionsInput struct {
 
 // String returns the string representation
 func (s CountOpenWorkflowExecutionsInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2705,7 +2705,7 @@ type metadataCountPendingActivityTasksInput struct {
 
 // String returns the string representation
 func (s CountPendingActivityTasksInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2729,7 +2729,7 @@ type metadataCountPendingDecisionTasksInput struct {
 
 // String returns the string representation
 func (s CountPendingDecisionTasksInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2858,7 +2858,7 @@ type Decision struct {
 	ContinueAsNewWorkflowExecutionDecisionAttributes *ContinueAsNewWorkflowExecutionDecisionAttributes `locationName:"continueAsNewWorkflowExecutionDecisionAttributes" type:"structure"`
 
 	// Specifies the type of the decision.
-	DecisionType *string `locationName:"decisionType" type:"string" required:"true"`
+	DecisionType *string `locationName:"decisionType" type:"string" required:"true" enum:"DecisionType"`
 
 	// Provides details of the FailWorkflowExecution decision. It is not set for
 	// other decision types.
@@ -2901,7 +2901,7 @@ type metadataDecision struct {
 
 // String returns the string representation
 func (s Decision) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2933,7 +2933,7 @@ type metadataDecisionTaskCompletedEventAttributes struct {
 
 // String returns the string representation
 func (s DecisionTaskCompletedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -2972,7 +2972,7 @@ type metadataDecisionTaskScheduledEventAttributes struct {
 
 // String returns the string representation
 func (s DecisionTaskScheduledEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3000,7 +3000,7 @@ type metadataDecisionTaskStartedEventAttributes struct {
 
 // String returns the string representation
 func (s DecisionTaskStartedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3021,7 +3021,7 @@ type DecisionTaskTimedOutEventAttributes struct {
 	StartedEventID *int64 `locationName:"startedEventId" type:"long" required:"true"`
 
 	// The type of timeout that expired before the decision task could be completed.
-	TimeoutType *string `locationName:"timeoutType" type:"string" required:"true"`
+	TimeoutType *string `locationName:"timeoutType" type:"string" required:"true" enum:"DecisionTaskTimeoutType"`
 
 	metadataDecisionTaskTimedOutEventAttributes `json:"-" xml:"-"`
 }
@@ -3032,7 +3032,7 @@ type metadataDecisionTaskTimedOutEventAttributes struct {
 
 // String returns the string representation
 func (s DecisionTaskTimedOutEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3056,7 +3056,7 @@ type metadataDeprecateActivityTypeInput struct {
 
 // String returns the string representation
 func (s DeprecateActivityTypeInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3074,7 +3074,7 @@ type metadataDeprecateActivityTypeOutput struct {
 
 // String returns the string representation
 func (s DeprecateActivityTypeOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3095,7 +3095,7 @@ type metadataDeprecateDomainInput struct {
 
 // String returns the string representation
 func (s DeprecateDomainInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3113,7 +3113,7 @@ type metadataDeprecateDomainOutput struct {
 
 // String returns the string representation
 func (s DeprecateDomainOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3137,7 +3137,7 @@ type metadataDeprecateWorkflowTypeInput struct {
 
 // String returns the string representation
 func (s DeprecateWorkflowTypeInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3155,7 +3155,7 @@ type metadataDeprecateWorkflowTypeOutput struct {
 
 // String returns the string representation
 func (s DeprecateWorkflowTypeOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3180,7 +3180,7 @@ type metadataDescribeActivityTypeInput struct {
 
 // String returns the string representation
 func (s DescribeActivityTypeInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3213,7 +3213,7 @@ type metadataDescribeActivityTypeOutput struct {
 
 // String returns the string representation
 func (s DescribeActivityTypeOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3234,7 +3234,7 @@ type metadataDescribeDomainInput struct {
 
 // String returns the string representation
 func (s DescribeDomainInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3259,7 +3259,7 @@ type metadataDescribeDomainOutput struct {
 
 // String returns the string representation
 func (s DescribeDomainOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3283,7 +3283,7 @@ type metadataDescribeWorkflowExecutionInput struct {
 
 // String returns the string representation
 func (s DescribeWorkflowExecutionInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3323,7 +3323,7 @@ type metadataDescribeWorkflowExecutionOutput struct {
 
 // String returns the string representation
 func (s DescribeWorkflowExecutionOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3347,7 +3347,7 @@ type metadataDescribeWorkflowTypeInput struct {
 
 // String returns the string representation
 func (s DescribeWorkflowTypeInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3380,7 +3380,7 @@ type metadataDescribeWorkflowTypeOutput struct {
 
 // String returns the string representation
 func (s DescribeWorkflowTypeOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3402,7 +3402,7 @@ type metadataDomainConfiguration struct {
 
 // String returns the string representation
 func (s DomainConfiguration) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3424,7 +3424,7 @@ type DomainInfo struct {
 	// this domain for registering types and creating new workflow executions.
 	//  DEPRECATED: The domain was deprecated using DeprecateDomain, but is still
 	// in use. You should not create new workflow executions in this domain.
-	Status *string `locationName:"status" type:"string" required:"true"`
+	Status *string `locationName:"status" type:"string" required:"true" enum:"RegistrationStatus"`
 
 	metadataDomainInfo `json:"-" xml:"-"`
 }
@@ -3435,7 +3435,7 @@ type metadataDomainInfo struct {
 
 // String returns the string representation
 func (s DomainInfo) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3464,7 +3464,7 @@ type metadataExecutionTimeFilter struct {
 
 // String returns the string representation
 func (s ExecutionTimeFilter) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3492,7 +3492,7 @@ type metadataExternalWorkflowExecutionCancelRequestedEventAttributes struct {
 
 // String returns the string representation
 func (s ExternalWorkflowExecutionCancelRequestedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3520,7 +3520,7 @@ type metadataExternalWorkflowExecutionSignaledEventAttributes struct {
 
 // String returns the string representation
 func (s ExternalWorkflowExecutionSignaledEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3559,7 +3559,7 @@ type metadataFailWorkflowExecutionDecisionAttributes struct {
 
 // String returns the string representation
 func (s FailWorkflowExecutionDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3575,7 +3575,7 @@ type FailWorkflowExecutionFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"FailWorkflowExecutionFailedCause"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision task
 	// that resulted in the FailWorkflowExecution decision to fail this execution.
@@ -3592,7 +3592,7 @@ type metadataFailWorkflowExecutionFailedEventAttributes struct {
 
 // String returns the string representation
 func (s FailWorkflowExecutionFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3637,7 +3637,7 @@ type metadataGetWorkflowExecutionHistoryInput struct {
 
 // String returns the string representation
 func (s GetWorkflowExecutionHistoryInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3669,7 +3669,7 @@ type metadataGetWorkflowExecutionHistoryOutput struct {
 
 // String returns the string representation
 func (s GetWorkflowExecutionHistoryOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -3846,7 +3846,7 @@ type HistoryEvent struct {
 	EventTimestamp *time.Time `locationName:"eventTimestamp" type:"timestamp" timestampFormat:"unix" required:"true"`
 
 	// The type of the history event.
-	EventType *string `locationName:"eventType" type:"string" required:"true"`
+	EventType *string `locationName:"eventType" type:"string" required:"true" enum:"EventType"`
 
 	// If the event is of type ExternalWorkflowExecutionCancelRequested then this
 	// member is set and provides detailed information about the event. It is not
@@ -3981,7 +3981,7 @@ type metadataHistoryEvent struct {
 
 // String returns the string representation
 func (s HistoryEvent) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4014,7 +4014,7 @@ type ListActivityTypesInput struct {
 	NextPageToken *string `locationName:"nextPageToken" type:"string"`
 
 	// Specifies the registration status of the activity types to list.
-	RegistrationStatus *string `locationName:"registrationStatus" type:"string" required:"true"`
+	RegistrationStatus *string `locationName:"registrationStatus" type:"string" required:"true" enum:"RegistrationStatus"`
 
 	// When set to true, returns the results in reverse order. By default, the results
 	// are returned in ascending alphabetical order by name of the activity types.
@@ -4029,7 +4029,7 @@ type metadataListActivityTypesInput struct {
 
 // String returns the string representation
 func (s ListActivityTypesInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4059,7 +4059,7 @@ type metadataListActivityTypesOutput struct {
 
 // String returns the string representation
 func (s ListActivityTypesOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4146,7 +4146,7 @@ type metadataListClosedWorkflowExecutionsInput struct {
 
 // String returns the string representation
 func (s ListClosedWorkflowExecutionsInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4173,7 +4173,7 @@ type ListDomainsInput struct {
 	NextPageToken *string `locationName:"nextPageToken" type:"string"`
 
 	// Specifies the registration status of the domains to list.
-	RegistrationStatus *string `locationName:"registrationStatus" type:"string" required:"true"`
+	RegistrationStatus *string `locationName:"registrationStatus" type:"string" required:"true" enum:"RegistrationStatus"`
 
 	// When set to true, returns the results in reverse order. By default, the results
 	// are returned in ascending alphabetical order by name of the domains.
@@ -4188,7 +4188,7 @@ type metadataListDomainsInput struct {
 
 // String returns the string representation
 func (s ListDomainsInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4218,7 +4218,7 @@ type metadataListDomainsOutput struct {
 
 // String returns the string representation
 func (s ListDomainsOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4283,7 +4283,7 @@ type metadataListOpenWorkflowExecutionsInput struct {
 
 // String returns the string representation
 func (s ListOpenWorkflowExecutionsInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4316,7 +4316,7 @@ type ListWorkflowTypesInput struct {
 	NextPageToken *string `locationName:"nextPageToken" type:"string"`
 
 	// Specifies the registration status of the workflow types to list.
-	RegistrationStatus *string `locationName:"registrationStatus" type:"string" required:"true"`
+	RegistrationStatus *string `locationName:"registrationStatus" type:"string" required:"true" enum:"RegistrationStatus"`
 
 	// When set to true, returns the results in reverse order. By default the results
 	// are returned in ascending alphabetical order of the name of the workflow
@@ -4332,7 +4332,7 @@ type metadataListWorkflowTypesInput struct {
 
 // String returns the string representation
 func (s ListWorkflowTypesInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4362,7 +4362,7 @@ type metadataListWorkflowTypesOutput struct {
 
 // String returns the string representation
 func (s ListWorkflowTypesOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4393,7 +4393,7 @@ type metadataMarkerRecordedEventAttributes struct {
 
 // String returns the string representation
 func (s MarkerRecordedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4419,7 +4419,7 @@ type metadataPendingTaskCount struct {
 
 // String returns the string representation
 func (s PendingTaskCount) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4453,7 +4453,7 @@ type metadataPollForActivityTaskInput struct {
 
 // String returns the string representation
 func (s PollForActivityTaskInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4493,7 +4493,7 @@ type metadataPollForActivityTaskOutput struct {
 
 // String returns the string representation
 func (s PollForActivityTaskOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4553,7 +4553,7 @@ type metadataPollForDecisionTaskInput struct {
 
 // String returns the string representation
 func (s PollForDecisionTaskInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4605,7 +4605,7 @@ type metadataPollForDecisionTaskOutput struct {
 
 // String returns the string representation
 func (s PollForDecisionTaskOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4633,7 +4633,7 @@ type metadataRecordActivityTaskHeartbeatInput struct {
 
 // String returns the string representation
 func (s RecordActivityTaskHeartbeatInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4655,7 +4655,7 @@ type metadataRecordActivityTaskHeartbeatOutput struct {
 
 // String returns the string representation
 func (s RecordActivityTaskHeartbeatOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4694,7 +4694,7 @@ type metadataRecordMarkerDecisionAttributes struct {
 
 // String returns the string representation
 func (s RecordMarkerDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4710,7 +4710,7 @@ type RecordMarkerFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"RecordMarkerFailedCause"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision task
 	// that resulted in the RecordMarkerFailed decision for this cancellation request.
@@ -4730,7 +4730,7 @@ type metadataRecordMarkerFailedEventAttributes struct {
 
 // String returns the string representation
 func (s RecordMarkerFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4823,7 +4823,7 @@ type metadataRegisterActivityTypeInput struct {
 
 // String returns the string representation
 func (s RegisterActivityTypeInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4841,7 +4841,7 @@ type metadataRegisterActivityTypeOutput struct {
 
 // String returns the string representation
 func (s RegisterActivityTypeOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4884,7 +4884,7 @@ type metadataRegisterDomainInput struct {
 
 // String returns the string representation
 func (s RegisterDomainInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4902,7 +4902,7 @@ type metadataRegisterDomainOutput struct {
 
 // String returns the string representation
 func (s RegisterDomainOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -4924,7 +4924,7 @@ type RegisterWorkflowTypeInput struct {
 	// event in its history. It is up to the decider to take appropriate actions
 	// when it receives an execution history with this event. ABANDON: no action
 	// will be taken. The child executions will continue to run.
-	DefaultChildPolicy *string `locationName:"defaultChildPolicy" type:"string"`
+	DefaultChildPolicy *string `locationName:"defaultChildPolicy" type:"string" enum:"ChildPolicy"`
 
 	// If set, specifies the default maximum duration for executions of this workflow
 	// type. You can override this default when starting an execution through the
@@ -4995,7 +4995,7 @@ type metadataRegisterWorkflowTypeInput struct {
 
 // String returns the string representation
 func (s RegisterWorkflowTypeInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5013,7 +5013,7 @@ type metadataRegisterWorkflowTypeOutput struct {
 
 // String returns the string representation
 func (s RegisterWorkflowTypeOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5049,7 +5049,7 @@ type metadataRequestCancelActivityTaskDecisionAttributes struct {
 
 // String returns the string representation
 func (s RequestCancelActivityTaskDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5068,7 +5068,7 @@ type RequestCancelActivityTaskFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"RequestCancelActivityTaskFailedCause"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision task
 	// that resulted in the RequestCancelActivityTask decision for this cancellation
@@ -5085,7 +5085,7 @@ type metadataRequestCancelActivityTaskFailedEventAttributes struct {
 
 // String returns the string representation
 func (s RequestCancelActivityTaskFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5128,7 +5128,7 @@ type metadataRequestCancelExternalWorkflowExecutionDecisionAttributes struct {
 
 // String returns the string representation
 func (s RequestCancelExternalWorkflowExecutionDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5144,7 +5144,7 @@ type RequestCancelExternalWorkflowExecutionFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"RequestCancelExternalWorkflowExecutionFailedCause"`
 
 	Control *string `locationName:"control" type:"string"`
 
@@ -5176,7 +5176,7 @@ type metadataRequestCancelExternalWorkflowExecutionFailedEventAttributes struct 
 
 // String returns the string representation
 func (s RequestCancelExternalWorkflowExecutionFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5211,7 +5211,7 @@ type metadataRequestCancelExternalWorkflowExecutionInitiatedEventAttributes stru
 
 // String returns the string representation
 func (s RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5238,7 +5238,7 @@ type metadataRequestCancelWorkflowExecutionInput struct {
 
 // String returns the string representation
 func (s RequestCancelWorkflowExecutionInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5256,7 +5256,7 @@ type metadataRequestCancelWorkflowExecutionOutput struct {
 
 // String returns the string representation
 func (s RequestCancelWorkflowExecutionOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5284,7 +5284,7 @@ type metadataRespondActivityTaskCanceledInput struct {
 
 // String returns the string representation
 func (s RespondActivityTaskCanceledInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5302,7 +5302,7 @@ type metadataRespondActivityTaskCanceledOutput struct {
 
 // String returns the string representation
 func (s RespondActivityTaskCanceledOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5331,7 +5331,7 @@ type metadataRespondActivityTaskCompletedInput struct {
 
 // String returns the string representation
 func (s RespondActivityTaskCompletedInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5349,7 +5349,7 @@ type metadataRespondActivityTaskCompletedOutput struct {
 
 // String returns the string representation
 func (s RespondActivityTaskCompletedOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5380,7 +5380,7 @@ type metadataRespondActivityTaskFailedInput struct {
 
 // String returns the string representation
 func (s RespondActivityTaskFailedInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5398,7 +5398,7 @@ type metadataRespondActivityTaskFailedOutput struct {
 
 // String returns the string representation
 func (s RespondActivityTaskFailedOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5430,7 +5430,7 @@ type metadataRespondDecisionTaskCompletedInput struct {
 
 // String returns the string representation
 func (s RespondDecisionTaskCompletedInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5448,7 +5448,7 @@ type metadataRespondDecisionTaskCompletedOutput struct {
 
 // String returns the string representation
 func (s RespondDecisionTaskCompletedOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5574,7 +5574,7 @@ type metadataScheduleActivityTaskDecisionAttributes struct {
 
 // String returns the string representation
 func (s ScheduleActivityTaskDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5596,7 +5596,7 @@ type ScheduleActivityTaskFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"ScheduleActivityTaskFailedCause"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision that
 	// resulted in the scheduling of this activity task. This information can be
@@ -5613,7 +5613,7 @@ type metadataScheduleActivityTaskFailedEventAttributes struct {
 
 // String returns the string representation
 func (s ScheduleActivityTaskFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5664,7 +5664,7 @@ type metadataSignalExternalWorkflowExecutionDecisionAttributes struct {
 
 // String returns the string representation
 func (s SignalExternalWorkflowExecutionDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5680,7 +5680,7 @@ type SignalExternalWorkflowExecutionFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"SignalExternalWorkflowExecutionFailedCause"`
 
 	Control *string `locationName:"control" type:"string"`
 
@@ -5713,7 +5713,7 @@ type metadataSignalExternalWorkflowExecutionFailedEventAttributes struct {
 
 // String returns the string representation
 func (s SignalExternalWorkflowExecutionFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5754,7 +5754,7 @@ type metadataSignalExternalWorkflowExecutionInitiatedEventAttributes struct {
 
 // String returns the string representation
 func (s SignalExternalWorkflowExecutionInitiatedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5788,7 +5788,7 @@ type metadataSignalWorkflowExecutionInput struct {
 
 // String returns the string representation
 func (s SignalWorkflowExecutionInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5806,7 +5806,7 @@ type metadataSignalWorkflowExecutionOutput struct {
 
 // String returns the string representation
 func (s SignalWorkflowExecutionOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5850,7 +5850,7 @@ type StartChildWorkflowExecutionDecisionAttributes struct {
 	// workflow type or through this parameter. If neither this parameter is set
 	// nor a default child policy was specified at registration time then a fault
 	// will be returned.
-	ChildPolicy *string `locationName:"childPolicy" type:"string"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" enum:"ChildPolicy"`
 
 	// Optional. Data attached to the event that can be used by the decider in subsequent
 	// workflow tasks. This data is not sent to the child workflow execution.
@@ -5933,7 +5933,7 @@ type metadataStartChildWorkflowExecutionDecisionAttributes struct {
 
 // String returns the string representation
 func (s StartChildWorkflowExecutionDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -5949,7 +5949,7 @@ type StartChildWorkflowExecutionFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"StartChildWorkflowExecutionFailedCause"`
 
 	Control *string `locationName:"control" type:"string"`
 
@@ -5981,7 +5981,7 @@ type metadataStartChildWorkflowExecutionFailedEventAttributes struct {
 
 // String returns the string representation
 func (s StartChildWorkflowExecutionFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6002,7 +6002,7 @@ type StartChildWorkflowExecutionInitiatedEventAttributes struct {
 	// event in its history. It is up to the decider to take appropriate actions
 	// when it receives an execution history with this event. ABANDON: no action
 	// will be taken. The child executions will continue to run.
-	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true" enum:"ChildPolicy"`
 
 	// Optional. Data attached to the event that can be used by the decider in subsequent
 	// decision tasks. This data is not sent to the activity.
@@ -6062,7 +6062,7 @@ type metadataStartChildWorkflowExecutionInitiatedEventAttributes struct {
 
 // String returns the string representation
 func (s StartChildWorkflowExecutionInitiatedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6113,7 +6113,7 @@ type metadataStartTimerDecisionAttributes struct {
 
 // String returns the string representation
 func (s StartTimerDecisionAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6129,7 +6129,7 @@ type StartTimerFailedEventAttributes struct {
 	// If cause is set to OPERATION_NOT_PERMITTED, the decision failed because
 	// it lacked sufficient permissions. For details and example IAM policies, see
 	// Using IAM to Manage Access to Amazon SWF Workflows (http://docs.aws.amazon.com/amazonswf/latest/developerguide/swf-dev-iam.html).
-	Cause *string `locationName:"cause" type:"string" required:"true"`
+	Cause *string `locationName:"cause" type:"string" required:"true" enum:"StartTimerFailedCause"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision task
 	// that resulted in the StartTimer decision for this activity task. This information
@@ -6149,7 +6149,7 @@ type metadataStartTimerFailedEventAttributes struct {
 
 // String returns the string representation
 func (s StartTimerFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6174,7 +6174,7 @@ type StartWorkflowExecutionInput struct {
 	// workflow type or through this parameter. If neither this parameter is set
 	// nor a default child policy was specified at registration time then a fault
 	// will be returned.
-	ChildPolicy *string `locationName:"childPolicy" type:"string"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" enum:"ChildPolicy"`
 
 	// The name of the domain in which the workflow execution is created.
 	Domain *string `locationName:"domain" type:"string" required:"true"`
@@ -6267,7 +6267,7 @@ type metadataStartWorkflowExecutionInput struct {
 
 // String returns the string representation
 func (s StartWorkflowExecutionInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6290,7 +6290,7 @@ type metadataStartWorkflowExecutionOutput struct {
 
 // String returns the string representation
 func (s StartWorkflowExecutionOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6313,7 +6313,7 @@ type metadataTagFilter struct {
 
 // String returns the string representation
 func (s TagFilter) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6335,7 +6335,7 @@ type metadataTaskList struct {
 
 // String returns the string representation
 func (s TaskList) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6360,7 +6360,7 @@ type TerminateWorkflowExecutionInput struct {
 	// workflow type or through this parameter. If neither this parameter is set
 	// nor a default child policy was specified at registration time then a fault
 	// will be returned.
-	ChildPolicy *string `locationName:"childPolicy" type:"string"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" enum:"ChildPolicy"`
 
 	// Optional. Details for terminating the workflow execution.
 	Details *string `locationName:"details" type:"string"`
@@ -6386,7 +6386,7 @@ type metadataTerminateWorkflowExecutionInput struct {
 
 // String returns the string representation
 func (s TerminateWorkflowExecutionInput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6404,7 +6404,7 @@ type metadataTerminateWorkflowExecutionOutput struct {
 
 // String returns the string representation
 func (s TerminateWorkflowExecutionOutput) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6437,7 +6437,7 @@ type metadataTimerCanceledEventAttributes struct {
 
 // String returns the string representation
 func (s TimerCanceledEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6464,7 +6464,7 @@ type metadataTimerFiredEventAttributes struct {
 
 // String returns the string representation
 func (s TimerFiredEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6502,7 +6502,7 @@ type metadataTimerStartedEventAttributes struct {
 
 // String returns the string representation
 func (s TimerStartedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6527,7 +6527,7 @@ type metadataWorkflowExecution struct {
 
 // String returns the string representation
 func (s WorkflowExecution) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6540,7 +6540,7 @@ type WorkflowExecutionCancelRequestedEventAttributes struct {
 	// If set, indicates that the request to cancel the workflow execution was automatically
 	// generated, and specifies the cause. This happens if the parent workflow execution
 	// times out or is terminated, and the child policy is set to cancel child executions.
-	Cause *string `locationName:"cause" type:"string"`
+	Cause *string `locationName:"cause" type:"string" enum:"WorkflowExecutionCancelRequestedCause"`
 
 	// The id of the RequestCancelExternalWorkflowExecutionInitiated event corresponding
 	// to the RequestCancelExternalWorkflowExecution decision to cancel this workflow
@@ -6561,7 +6561,7 @@ type metadataWorkflowExecutionCancelRequestedEventAttributes struct {
 
 // String returns the string representation
 func (s WorkflowExecutionCancelRequestedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6589,7 +6589,7 @@ type metadataWorkflowExecutionCanceledEventAttributes struct {
 
 // String returns the string representation
 func (s WorkflowExecutionCanceledEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6617,7 +6617,7 @@ type metadataWorkflowExecutionCompletedEventAttributes struct {
 
 // String returns the string representation
 func (s WorkflowExecutionCompletedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6641,7 +6641,7 @@ type WorkflowExecutionConfiguration struct {
 	// event in its history. It is up to the decider to take appropriate actions
 	// when it receives an execution history with this event. ABANDON: no action
 	// will be taken. The child executions will continue to run.
-	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true" enum:"ChildPolicy"`
 
 	// The total duration for this workflow execution.
 	//
@@ -6676,7 +6676,7 @@ type metadataWorkflowExecutionConfiguration struct {
 
 // String returns the string representation
 func (s WorkflowExecutionConfiguration) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6697,7 +6697,7 @@ type WorkflowExecutionContinuedAsNewEventAttributes struct {
 	// event in its history. It is up to the decider to take appropriate actions
 	// when it receives an execution history with this event. ABANDON: no action
 	// will be taken. The child executions will continue to run.
-	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true" enum:"ChildPolicy"`
 
 	// The id of the DecisionTaskCompleted event corresponding to the decision task
 	// that resulted in the ContinueAsNewWorkflowExecution decision that started
@@ -6743,7 +6743,7 @@ type metadataWorkflowExecutionContinuedAsNewEventAttributes struct {
 
 // String returns the string representation
 func (s WorkflowExecutionContinuedAsNewEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6770,7 +6770,7 @@ type metadataWorkflowExecutionCount struct {
 
 // String returns the string representation
 func (s WorkflowExecutionCount) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6801,7 +6801,7 @@ type metadataWorkflowExecutionFailedEventAttributes struct {
 
 // String returns the string representation
 func (s WorkflowExecutionFailedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6823,7 +6823,7 @@ type metadataWorkflowExecutionFilter struct {
 
 // String returns the string representation
 func (s WorkflowExecutionFilter) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6846,7 +6846,7 @@ type WorkflowExecutionInfo struct {
 	// not complete in the alloted time and was automatically timed out.  CONTINUED_AS_NEW:
 	// the execution is logically continued. This means the current execution was
 	// completed and a new execution was started to carry on the workflow.
-	CloseStatus *string `locationName:"closeStatus" type:"string"`
+	CloseStatus *string `locationName:"closeStatus" type:"string" enum:"CloseStatus"`
 
 	// The time when the workflow execution was closed. Set only if the execution
 	// status is CLOSED.
@@ -6856,7 +6856,7 @@ type WorkflowExecutionInfo struct {
 	Execution *WorkflowExecution `locationName:"execution" type:"structure" required:"true"`
 
 	// The current status of the execution.
-	ExecutionStatus *string `locationName:"executionStatus" type:"string" required:"true"`
+	ExecutionStatus *string `locationName:"executionStatus" type:"string" required:"true" enum:"ExecutionStatus"`
 
 	// If this workflow execution is a child of another execution then contains
 	// the workflow execution that started this execution.
@@ -6882,7 +6882,7 @@ type metadataWorkflowExecutionInfo struct {
 
 // String returns the string representation
 func (s WorkflowExecutionInfo) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6912,7 +6912,7 @@ type metadataWorkflowExecutionInfos struct {
 
 // String returns the string representation
 func (s WorkflowExecutionInfos) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6946,7 +6946,7 @@ type metadataWorkflowExecutionOpenCounts struct {
 
 // String returns the string representation
 func (s WorkflowExecutionOpenCounts) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -6985,7 +6985,7 @@ type metadataWorkflowExecutionSignaledEventAttributes struct {
 
 // String returns the string representation
 func (s WorkflowExecutionSignaledEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -7006,7 +7006,7 @@ type WorkflowExecutionStartedEventAttributes struct {
 	// event in its history. It is up to the decider to take appropriate actions
 	// when it receives an execution history with this event. ABANDON: no action
 	// will be taken. The child executions will continue to run.
-	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true" enum:"ChildPolicy"`
 
 	// If this workflow execution was started due to a ContinueAsNewWorkflowExecution
 	// decision, then it contains the runId of the previous workflow execution that
@@ -7061,7 +7061,7 @@ type metadataWorkflowExecutionStartedEventAttributes struct {
 
 // String returns the string representation
 func (s WorkflowExecutionStartedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -7074,7 +7074,7 @@ type WorkflowExecutionTerminatedEventAttributes struct {
 	// If set, indicates that the workflow execution was automatically terminated,
 	// and specifies the cause. This happens if the parent workflow execution times
 	// out or is terminated and the child policy is set to terminate child executions.
-	Cause *string `locationName:"cause" type:"string"`
+	Cause *string `locationName:"cause" type:"string" enum:"WorkflowExecutionTerminatedCause"`
 
 	// The policy used for the child workflow executions of this workflow execution.
 	//
@@ -7085,7 +7085,7 @@ type WorkflowExecutionTerminatedEventAttributes struct {
 	// event in its history. It is up to the decider to take appropriate actions
 	// when it receives an execution history with this event. ABANDON: no action
 	// will be taken. The child executions will continue to run.
-	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true" enum:"ChildPolicy"`
 
 	// The details provided for the termination (if any).
 	Details *string `locationName:"details" type:"string"`
@@ -7102,7 +7102,7 @@ type metadataWorkflowExecutionTerminatedEventAttributes struct {
 
 // String returns the string representation
 func (s WorkflowExecutionTerminatedEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -7121,10 +7121,10 @@ type WorkflowExecutionTimedOutEventAttributes struct {
 	// event in its history. It is up to the decider to take appropriate actions
 	// when it receives an execution history with this event. ABANDON: no action
 	// will be taken. The child executions will continue to run.
-	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true"`
+	ChildPolicy *string `locationName:"childPolicy" type:"string" required:"true" enum:"ChildPolicy"`
 
 	// The type of timeout that caused this event.
-	TimeoutType *string `locationName:"timeoutType" type:"string" required:"true"`
+	TimeoutType *string `locationName:"timeoutType" type:"string" required:"true" enum:"WorkflowExecutionTimeoutType"`
 
 	metadataWorkflowExecutionTimedOutEventAttributes `json:"-" xml:"-"`
 }
@@ -7135,7 +7135,7 @@ type metadataWorkflowExecutionTimedOutEventAttributes struct {
 
 // String returns the string representation
 func (s WorkflowExecutionTimedOutEventAttributes) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -7166,7 +7166,7 @@ type metadataWorkflowType struct {
 
 // String returns the string representation
 func (s WorkflowType) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -7189,7 +7189,7 @@ type WorkflowTypeConfiguration struct {
 	// event in its history. It is up to the decider to take appropriate actions
 	// when it receives an execution history with this event. ABANDON: no action
 	// will be taken. The child executions will continue to run.
-	DefaultChildPolicy *string `locationName:"defaultChildPolicy" type:"string"`
+	DefaultChildPolicy *string `locationName:"defaultChildPolicy" type:"string" enum:"ChildPolicy"`
 
 	// Optional. The default maximum duration, specified when registering the workflow
 	// type, for executions of this workflow type. This default can be overridden
@@ -7240,7 +7240,7 @@ type metadataWorkflowTypeConfiguration struct {
 
 // String returns the string representation
 func (s WorkflowTypeConfiguration) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -7266,7 +7266,7 @@ type metadataWorkflowTypeFilter struct {
 
 // String returns the string representation
 func (s WorkflowTypeFilter) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
@@ -7287,7 +7287,7 @@ type WorkflowTypeInfo struct {
 	Description *string `locationName:"description" type:"string"`
 
 	// The current status of the workflow type.
-	Status *string `locationName:"status" type:"string" required:"true"`
+	Status *string `locationName:"status" type:"string" required:"true" enum:"RegistrationStatus"`
 
 	// The workflow type this information is about.
 	WorkflowType *WorkflowType `locationName:"workflowType" type:"structure" required:"true"`
@@ -7301,10 +7301,347 @@ type metadataWorkflowTypeInfo struct {
 
 // String returns the string representation
 func (s WorkflowTypeInfo) String() string {
-	return awsutil.StringValue(s)
+	return awsutil.Prettify(s)
 }
 
 // GoString returns the string representation
 func (s WorkflowTypeInfo) GoString() string {
 	return s.String()
 }
+
+const (
+	// @enum ActivityTaskTimeoutType
+	ActivityTaskTimeoutTypeStartToClose = "START_TO_CLOSE"
+	// @enum ActivityTaskTimeoutType
+	ActivityTaskTimeoutTypeScheduleToStart = "SCHEDULE_TO_START"
+	// @enum ActivityTaskTimeoutType
+	ActivityTaskTimeoutTypeScheduleToClose = "SCHEDULE_TO_CLOSE"
+	// @enum ActivityTaskTimeoutType
+	ActivityTaskTimeoutTypeHeartbeat = "HEARTBEAT"
+)
+
+const (
+	// @enum CancelTimerFailedCause
+	CancelTimerFailedCauseTimerIdUnknown = "TIMER_ID_UNKNOWN"
+	// @enum CancelTimerFailedCause
+	CancelTimerFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum CancelWorkflowExecutionFailedCause
+	CancelWorkflowExecutionFailedCauseUnhandledDecision = "UNHANDLED_DECISION"
+	// @enum CancelWorkflowExecutionFailedCause
+	CancelWorkflowExecutionFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum ChildPolicy
+	ChildPolicyTerminate = "TERMINATE"
+	// @enum ChildPolicy
+	ChildPolicyRequestCancel = "REQUEST_CANCEL"
+	// @enum ChildPolicy
+	ChildPolicyAbandon = "ABANDON"
+)
+
+const (
+	// @enum CloseStatus
+	CloseStatusCompleted = "COMPLETED"
+	// @enum CloseStatus
+	CloseStatusFailed = "FAILED"
+	// @enum CloseStatus
+	CloseStatusCanceled = "CANCELED"
+	// @enum CloseStatus
+	CloseStatusTerminated = "TERMINATED"
+	// @enum CloseStatus
+	CloseStatusContinuedAsNew = "CONTINUED_AS_NEW"
+	// @enum CloseStatus
+	CloseStatusTimedOut = "TIMED_OUT"
+)
+
+const (
+	// @enum CompleteWorkflowExecutionFailedCause
+	CompleteWorkflowExecutionFailedCauseUnhandledDecision = "UNHANDLED_DECISION"
+	// @enum CompleteWorkflowExecutionFailedCause
+	CompleteWorkflowExecutionFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum ContinueAsNewWorkflowExecutionFailedCause
+	ContinueAsNewWorkflowExecutionFailedCauseUnhandledDecision = "UNHANDLED_DECISION"
+	// @enum ContinueAsNewWorkflowExecutionFailedCause
+	ContinueAsNewWorkflowExecutionFailedCauseWorkflowTypeDeprecated = "WORKFLOW_TYPE_DEPRECATED"
+	// @enum ContinueAsNewWorkflowExecutionFailedCause
+	ContinueAsNewWorkflowExecutionFailedCauseWorkflowTypeDoesNotExist = "WORKFLOW_TYPE_DOES_NOT_EXIST"
+	// @enum ContinueAsNewWorkflowExecutionFailedCause
+	ContinueAsNewWorkflowExecutionFailedCauseDefaultExecutionStartToCloseTimeoutUndefined = "DEFAULT_EXECUTION_START_TO_CLOSE_TIMEOUT_UNDEFINED"
+	// @enum ContinueAsNewWorkflowExecutionFailedCause
+	ContinueAsNewWorkflowExecutionFailedCauseDefaultTaskStartToCloseTimeoutUndefined = "DEFAULT_TASK_START_TO_CLOSE_TIMEOUT_UNDEFINED"
+	// @enum ContinueAsNewWorkflowExecutionFailedCause
+	ContinueAsNewWorkflowExecutionFailedCauseDefaultTaskListUndefined = "DEFAULT_TASK_LIST_UNDEFINED"
+	// @enum ContinueAsNewWorkflowExecutionFailedCause
+	ContinueAsNewWorkflowExecutionFailedCauseDefaultChildPolicyUndefined = "DEFAULT_CHILD_POLICY_UNDEFINED"
+	// @enum ContinueAsNewWorkflowExecutionFailedCause
+	ContinueAsNewWorkflowExecutionFailedCauseContinueAsNewWorkflowExecutionRateExceeded = "CONTINUE_AS_NEW_WORKFLOW_EXECUTION_RATE_EXCEEDED"
+	// @enum ContinueAsNewWorkflowExecutionFailedCause
+	ContinueAsNewWorkflowExecutionFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum DecisionTaskTimeoutType
+	DecisionTaskTimeoutTypeStartToClose = "START_TO_CLOSE"
+)
+
+const (
+	// @enum DecisionType
+	DecisionTypeScheduleActivityTask = "ScheduleActivityTask"
+	// @enum DecisionType
+	DecisionTypeRequestCancelActivityTask = "RequestCancelActivityTask"
+	// @enum DecisionType
+	DecisionTypeCompleteWorkflowExecution = "CompleteWorkflowExecution"
+	// @enum DecisionType
+	DecisionTypeFailWorkflowExecution = "FailWorkflowExecution"
+	// @enum DecisionType
+	DecisionTypeCancelWorkflowExecution = "CancelWorkflowExecution"
+	// @enum DecisionType
+	DecisionTypeContinueAsNewWorkflowExecution = "ContinueAsNewWorkflowExecution"
+	// @enum DecisionType
+	DecisionTypeRecordMarker = "RecordMarker"
+	// @enum DecisionType
+	DecisionTypeStartTimer = "StartTimer"
+	// @enum DecisionType
+	DecisionTypeCancelTimer = "CancelTimer"
+	// @enum DecisionType
+	DecisionTypeSignalExternalWorkflowExecution = "SignalExternalWorkflowExecution"
+	// @enum DecisionType
+	DecisionTypeRequestCancelExternalWorkflowExecution = "RequestCancelExternalWorkflowExecution"
+	// @enum DecisionType
+	DecisionTypeStartChildWorkflowExecution = "StartChildWorkflowExecution"
+)
+
+const (
+	// @enum EventType
+	EventTypeWorkflowExecutionStarted = "WorkflowExecutionStarted"
+	// @enum EventType
+	EventTypeWorkflowExecutionCancelRequested = "WorkflowExecutionCancelRequested"
+	// @enum EventType
+	EventTypeWorkflowExecutionCompleted = "WorkflowExecutionCompleted"
+	// @enum EventType
+	EventTypeCompleteWorkflowExecutionFailed = "CompleteWorkflowExecutionFailed"
+	// @enum EventType
+	EventTypeWorkflowExecutionFailed = "WorkflowExecutionFailed"
+	// @enum EventType
+	EventTypeFailWorkflowExecutionFailed = "FailWorkflowExecutionFailed"
+	// @enum EventType
+	EventTypeWorkflowExecutionTimedOut = "WorkflowExecutionTimedOut"
+	// @enum EventType
+	EventTypeWorkflowExecutionCanceled = "WorkflowExecutionCanceled"
+	// @enum EventType
+	EventTypeCancelWorkflowExecutionFailed = "CancelWorkflowExecutionFailed"
+	// @enum EventType
+	EventTypeWorkflowExecutionContinuedAsNew = "WorkflowExecutionContinuedAsNew"
+	// @enum EventType
+	EventTypeContinueAsNewWorkflowExecutionFailed = "ContinueAsNewWorkflowExecutionFailed"
+	// @enum EventType
+	EventTypeWorkflowExecutionTerminated = "WorkflowExecutionTerminated"
+	// @enum EventType
+	EventTypeDecisionTaskScheduled = "DecisionTaskScheduled"
+	// @enum EventType
+	EventTypeDecisionTaskStarted = "DecisionTaskStarted"
+	// @enum EventType
+	EventTypeDecisionTaskCompleted = "DecisionTaskCompleted"
+	// @enum EventType
+	EventTypeDecisionTaskTimedOut = "DecisionTaskTimedOut"
+	// @enum EventType
+	EventTypeActivityTaskScheduled = "ActivityTaskScheduled"
+	// @enum EventType
+	EventTypeScheduleActivityTaskFailed = "ScheduleActivityTaskFailed"
+	// @enum EventType
+	EventTypeActivityTaskStarted = "ActivityTaskStarted"
+	// @enum EventType
+	EventTypeActivityTaskCompleted = "ActivityTaskCompleted"
+	// @enum EventType
+	EventTypeActivityTaskFailed = "ActivityTaskFailed"
+	// @enum EventType
+	EventTypeActivityTaskTimedOut = "ActivityTaskTimedOut"
+	// @enum EventType
+	EventTypeActivityTaskCanceled = "ActivityTaskCanceled"
+	// @enum EventType
+	EventTypeActivityTaskCancelRequested = "ActivityTaskCancelRequested"
+	// @enum EventType
+	EventTypeRequestCancelActivityTaskFailed = "RequestCancelActivityTaskFailed"
+	// @enum EventType
+	EventTypeWorkflowExecutionSignaled = "WorkflowExecutionSignaled"
+	// @enum EventType
+	EventTypeMarkerRecorded = "MarkerRecorded"
+	// @enum EventType
+	EventTypeRecordMarkerFailed = "RecordMarkerFailed"
+	// @enum EventType
+	EventTypeTimerStarted = "TimerStarted"
+	// @enum EventType
+	EventTypeStartTimerFailed = "StartTimerFailed"
+	// @enum EventType
+	EventTypeTimerFired = "TimerFired"
+	// @enum EventType
+	EventTypeTimerCanceled = "TimerCanceled"
+	// @enum EventType
+	EventTypeCancelTimerFailed = "CancelTimerFailed"
+	// @enum EventType
+	EventTypeStartChildWorkflowExecutionInitiated = "StartChildWorkflowExecutionInitiated"
+	// @enum EventType
+	EventTypeStartChildWorkflowExecutionFailed = "StartChildWorkflowExecutionFailed"
+	// @enum EventType
+	EventTypeChildWorkflowExecutionStarted = "ChildWorkflowExecutionStarted"
+	// @enum EventType
+	EventTypeChildWorkflowExecutionCompleted = "ChildWorkflowExecutionCompleted"
+	// @enum EventType
+	EventTypeChildWorkflowExecutionFailed = "ChildWorkflowExecutionFailed"
+	// @enum EventType
+	EventTypeChildWorkflowExecutionTimedOut = "ChildWorkflowExecutionTimedOut"
+	// @enum EventType
+	EventTypeChildWorkflowExecutionCanceled = "ChildWorkflowExecutionCanceled"
+	// @enum EventType
+	EventTypeChildWorkflowExecutionTerminated = "ChildWorkflowExecutionTerminated"
+	// @enum EventType
+	EventTypeSignalExternalWorkflowExecutionInitiated = "SignalExternalWorkflowExecutionInitiated"
+	// @enum EventType
+	EventTypeSignalExternalWorkflowExecutionFailed = "SignalExternalWorkflowExecutionFailed"
+	// @enum EventType
+	EventTypeExternalWorkflowExecutionSignaled = "ExternalWorkflowExecutionSignaled"
+	// @enum EventType
+	EventTypeRequestCancelExternalWorkflowExecutionInitiated = "RequestCancelExternalWorkflowExecutionInitiated"
+	// @enum EventType
+	EventTypeRequestCancelExternalWorkflowExecutionFailed = "RequestCancelExternalWorkflowExecutionFailed"
+	// @enum EventType
+	EventTypeExternalWorkflowExecutionCancelRequested = "ExternalWorkflowExecutionCancelRequested"
+)
+
+const (
+	// @enum ExecutionStatus
+	ExecutionStatusOpen = "OPEN"
+	// @enum ExecutionStatus
+	ExecutionStatusClosed = "CLOSED"
+)
+
+const (
+	// @enum FailWorkflowExecutionFailedCause
+	FailWorkflowExecutionFailedCauseUnhandledDecision = "UNHANDLED_DECISION"
+	// @enum FailWorkflowExecutionFailedCause
+	FailWorkflowExecutionFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum RecordMarkerFailedCause
+	RecordMarkerFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum RegistrationStatus
+	RegistrationStatusRegistered = "REGISTERED"
+	// @enum RegistrationStatus
+	RegistrationStatusDeprecated = "DEPRECATED"
+)
+
+const (
+	// @enum RequestCancelActivityTaskFailedCause
+	RequestCancelActivityTaskFailedCauseActivityIdUnknown = "ACTIVITY_ID_UNKNOWN"
+	// @enum RequestCancelActivityTaskFailedCause
+	RequestCancelActivityTaskFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum RequestCancelExternalWorkflowExecutionFailedCause
+	RequestCancelExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution = "UNKNOWN_EXTERNAL_WORKFLOW_EXECUTION"
+	// @enum RequestCancelExternalWorkflowExecutionFailedCause
+	RequestCancelExternalWorkflowExecutionFailedCauseRequestCancelExternalWorkflowExecutionRateExceeded = "REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_RATE_EXCEEDED"
+	// @enum RequestCancelExternalWorkflowExecutionFailedCause
+	RequestCancelExternalWorkflowExecutionFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseActivityTypeDeprecated = "ACTIVITY_TYPE_DEPRECATED"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseActivityTypeDoesNotExist = "ACTIVITY_TYPE_DOES_NOT_EXIST"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseActivityIdAlreadyInUse = "ACTIVITY_ID_ALREADY_IN_USE"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseOpenActivitiesLimitExceeded = "OPEN_ACTIVITIES_LIMIT_EXCEEDED"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseActivityCreationRateExceeded = "ACTIVITY_CREATION_RATE_EXCEEDED"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseDefaultScheduleToCloseTimeoutUndefined = "DEFAULT_SCHEDULE_TO_CLOSE_TIMEOUT_UNDEFINED"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseDefaultTaskListUndefined = "DEFAULT_TASK_LIST_UNDEFINED"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseDefaultScheduleToStartTimeoutUndefined = "DEFAULT_SCHEDULE_TO_START_TIMEOUT_UNDEFINED"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseDefaultStartToCloseTimeoutUndefined = "DEFAULT_START_TO_CLOSE_TIMEOUT_UNDEFINED"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseDefaultHeartbeatTimeoutUndefined = "DEFAULT_HEARTBEAT_TIMEOUT_UNDEFINED"
+	// @enum ScheduleActivityTaskFailedCause
+	ScheduleActivityTaskFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum SignalExternalWorkflowExecutionFailedCause
+	SignalExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution = "UNKNOWN_EXTERNAL_WORKFLOW_EXECUTION"
+	// @enum SignalExternalWorkflowExecutionFailedCause
+	SignalExternalWorkflowExecutionFailedCauseSignalExternalWorkflowExecutionRateExceeded = "SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_RATE_EXCEEDED"
+	// @enum SignalExternalWorkflowExecutionFailedCause
+	SignalExternalWorkflowExecutionFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseWorkflowTypeDoesNotExist = "WORKFLOW_TYPE_DOES_NOT_EXIST"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseWorkflowTypeDeprecated = "WORKFLOW_TYPE_DEPRECATED"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseOpenChildrenLimitExceeded = "OPEN_CHILDREN_LIMIT_EXCEEDED"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseOpenWorkflowsLimitExceeded = "OPEN_WORKFLOWS_LIMIT_EXCEEDED"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseChildCreationRateExceeded = "CHILD_CREATION_RATE_EXCEEDED"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseWorkflowAlreadyRunning = "WORKFLOW_ALREADY_RUNNING"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseDefaultExecutionStartToCloseTimeoutUndefined = "DEFAULT_EXECUTION_START_TO_CLOSE_TIMEOUT_UNDEFINED"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseDefaultTaskListUndefined = "DEFAULT_TASK_LIST_UNDEFINED"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseDefaultTaskStartToCloseTimeoutUndefined = "DEFAULT_TASK_START_TO_CLOSE_TIMEOUT_UNDEFINED"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseDefaultChildPolicyUndefined = "DEFAULT_CHILD_POLICY_UNDEFINED"
+	// @enum StartChildWorkflowExecutionFailedCause
+	StartChildWorkflowExecutionFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum StartTimerFailedCause
+	StartTimerFailedCauseTimerIdAlreadyInUse = "TIMER_ID_ALREADY_IN_USE"
+	// @enum StartTimerFailedCause
+	StartTimerFailedCauseOpenTimersLimitExceeded = "OPEN_TIMERS_LIMIT_EXCEEDED"
+	// @enum StartTimerFailedCause
+	StartTimerFailedCauseTimerCreationRateExceeded = "TIMER_CREATION_RATE_EXCEEDED"
+	// @enum StartTimerFailedCause
+	StartTimerFailedCauseOperationNotPermitted = "OPERATION_NOT_PERMITTED"
+)
+
+const (
+	// @enum WorkflowExecutionCancelRequestedCause
+	WorkflowExecutionCancelRequestedCauseChildPolicyApplied = "CHILD_POLICY_APPLIED"
+)
+
+const (
+	// @enum WorkflowExecutionTerminatedCause
+	WorkflowExecutionTerminatedCauseChildPolicyApplied = "CHILD_POLICY_APPLIED"
+	// @enum WorkflowExecutionTerminatedCause
+	WorkflowExecutionTerminatedCauseEventLimitExceeded = "EVENT_LIMIT_EXCEEDED"
+	// @enum WorkflowExecutionTerminatedCause
+	WorkflowExecutionTerminatedCauseOperatorInitiated = "OPERATOR_INITIATED"
+)
+
+const (
+	// @enum WorkflowExecutionTimeoutType
+	WorkflowExecutionTimeoutTypeStartToClose = "START_TO_CLOSE"
+)

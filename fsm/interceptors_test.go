@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -87,7 +86,7 @@ func dedupeCompletes(in []*swf.Decision) []*swf.Decision {
 	complete := false
 	for i := len(in) - 1; i >= 0; i-- {
 		d := in[i]
-		if *d.DecisionType == enums.DecisionTypeCompleteWorkflowExecution {
+		if *d.DecisionType == swf.DecisionTypeCompleteWorkflowExecution {
 			if !complete {
 				complete = true
 				out = append([]*swf.Decision{d}, out...)
@@ -103,7 +102,7 @@ func dedupeCompletes(in []*swf.Decision) []*swf.Decision {
 func countCompletes(in []*swf.Decision) int {
 	count := 0
 	for _, d := range in {
-		if *d.DecisionType == enums.DecisionTypeCompleteWorkflowExecution {
+		if *d.DecisionType == swf.DecisionTypeCompleteWorkflowExecution {
 			count++
 		}
 	}
@@ -149,7 +148,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 		Events: []*swf.HistoryEvent{
 			{
 				EventID:   L(1),
-				EventType: S(enums.EventTypeWorkflowExecutionStarted),
+				EventType: S(swf.EventTypeWorkflowExecutionStarted),
 			},
 		},
 		PreviousStartedEventID: L(0),
@@ -163,7 +162,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 
 	interceptor.AfterDecision(start, interceptorTestContext(), startOutcome)
 
-	if len(startOutcome.Decisions) != 1 || *startOutcome.Decisions[0].DecisionType != enums.DecisionTypeStartTimer {
+	if len(startOutcome.Decisions) != 1 || *startOutcome.Decisions[0].DecisionType != swf.DecisionTypeStartTimer {
 		t.Fatal(startOutcome.Decisions)
 	}
 
@@ -172,7 +171,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 		Events: []*swf.HistoryEvent{
 			{
 				EventID:   L(2),
-				EventType: S(enums.EventTypeTimerFired),
+				EventType: S(swf.EventTypeTimerFired),
 				TimerFiredEventAttributes: &swf.TimerFiredEventAttributes{
 					TimerID: S(ContinueTimer),
 				},
@@ -194,7 +193,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	interceptor.AfterDecision(cont, ctx, contOutcome)
 
 	//assert the ContinueTimer was restarted
-	if len(contOutcome.Decisions) != 1 || *contOutcome.Decisions[0].DecisionType != enums.DecisionTypeStartTimer {
+	if len(contOutcome.Decisions) != 1 || *contOutcome.Decisions[0].DecisionType != swf.DecisionTypeStartTimer {
 		t.Fatal(contOutcome.Decisions)
 	}
 
@@ -204,7 +203,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	interceptor.AfterDecision(cont, ctx, contOutcome)
 
 	//assert that the workflow was continued
-	if len(contOutcome.Decisions) != 1 || *contOutcome.Decisions[0].DecisionType != enums.DecisionTypeContinueAsNewWorkflowExecution {
+	if len(contOutcome.Decisions) != 1 || *contOutcome.Decisions[0].DecisionType != swf.DecisionTypeContinueAsNewWorkflowExecution {
 		t.Fatal(contOutcome.Decisions)
 	}
 
@@ -214,7 +213,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 		Events: []*swf.HistoryEvent{
 			{
 				EventID:   L(10),
-				EventType: S(enums.EventTypeExternalWorkflowExecutionSignaled), //n
+				EventType: S(swf.EventTypeExternalWorkflowExecutionSignaled), //n
 			},
 		},
 		PreviousStartedEventID: L(7),
@@ -233,7 +232,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	interceptor.AfterDecision(histCont, ctx, histContOutcome)
 
 	//assert the ContinueTimer was restarted
-	if len(histContOutcome.Decisions) != 1 || *histContOutcome.Decisions[0].DecisionType != enums.DecisionTypeStartTimer {
+	if len(histContOutcome.Decisions) != 1 || *histContOutcome.Decisions[0].DecisionType != swf.DecisionTypeStartTimer {
 		t.Fatal(histContOutcome.Decisions)
 	}
 
@@ -243,7 +242,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	interceptor.AfterDecision(histCont, ctx, histContOutcome)
 
 	//assert that the workflow was continued
-	if len(histContOutcome.Decisions) != 1 || *histContOutcome.Decisions[0].DecisionType != enums.DecisionTypeContinueAsNewWorkflowExecution {
+	if len(histContOutcome.Decisions) != 1 || *histContOutcome.Decisions[0].DecisionType != swf.DecisionTypeContinueAsNewWorkflowExecution {
 		t.Fatal(histContOutcome.Decisions)
 	}
 
@@ -254,7 +253,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 		Events: []*swf.HistoryEvent{
 			{
 				EventID:   L(10),
-				EventType: S(enums.EventTypeWorkflowExecutionSignaled),
+				EventType: S(swf.EventTypeWorkflowExecutionSignaled),
 				WorkflowExecutionSignaledEventAttributes: &swf.WorkflowExecutionSignaledEventAttributes{
 					SignalName: S(ContinueSignal),
 				},
@@ -276,7 +275,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	interceptor.AfterDecision(sigCont, ctx, sigContOutcome)
 
 	//assert the ContinueTimer was restarted
-	if len(sigContOutcome.Decisions) != 1 || *sigContOutcome.Decisions[0].DecisionType != enums.DecisionTypeStartTimer {
+	if len(sigContOutcome.Decisions) != 1 || *sigContOutcome.Decisions[0].DecisionType != swf.DecisionTypeStartTimer {
 		t.Fatal(sigContOutcome.Decisions)
 	}
 
@@ -286,7 +285,7 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	interceptor.AfterDecision(sigCont, ctx, sigContOutcome)
 
 	//assert that the workflow was continued
-	if len(sigContOutcome.Decisions) != 1 || *sigContOutcome.Decisions[0].DecisionType != enums.DecisionTypeContinueAsNewWorkflowExecution {
+	if len(sigContOutcome.Decisions) != 1 || *sigContOutcome.Decisions[0].DecisionType != swf.DecisionTypeContinueAsNewWorkflowExecution {
 		t.Fatal(sigContOutcome.Decisions)
 	}
 

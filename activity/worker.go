@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
-	enum "github.com/sclasen/swfsm/enums/swf"
 	"github.com/sclasen/swfsm/fsm"
 	"github.com/sclasen/swfsm/poller"
 	. "github.com/sclasen/swfsm/sugar"
@@ -180,11 +179,11 @@ func (h *ActivityWorker) fail(task *swf.PollForActivityTaskOutput, err error) {
 		hist, err := h.SWF.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
 			Domain:       S(h.Domain),
 			Execution:    task.WorkflowExecution,
-			ReverseOrder: aws.Boolean(true),
+			ReverseOrder: aws.Bool(true),
 		})
 		if err == nil {
 			for _, e := range hist.Events {
-				if *e.EventType == enum.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == fsm.CorrelatorMarker {
+				if *e.EventType == swf.EventTypeMarkerRecorded && *e.MarkerRecordedEventAttributes.MarkerName == fsm.CorrelatorMarker {
 					correlator := new(fsm.EventCorrelator)
 					err := h.Serializer.Deserialize(*e.MarkerRecordedEventAttributes.Details, correlator)
 					if err == nil {

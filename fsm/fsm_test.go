@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/golang/protobuf/proto"
-	"github.com/sclasen/swfsm/enums/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -31,7 +30,7 @@ func TestFSM(t *testing.T) {
 			testData.States = append(testData.States, "start")
 			serialized := f.Serialize(testData)
 			decision := &swf.Decision{
-				DecisionType: S(enums.DecisionTypeScheduleActivityTask),
+				DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 				ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 					ActivityID:   S(testActivityInfo.ActivityID),
 					ActivityType: testActivityInfo.ActivityType,
@@ -51,17 +50,17 @@ func TestFSM(t *testing.T) {
 			testData.States = append(testData.States, "working")
 			serialized := f.Serialize(testData)
 			var decisions = f.EmptyDecisions()
-			if *lastEvent.EventType == enums.EventTypeActivityTaskCompleted {
+			if *lastEvent.EventType == swf.EventTypeActivityTaskCompleted {
 				decision := &swf.Decision{
-					DecisionType: aws.String(enums.DecisionTypeCompleteWorkflowExecution),
+					DecisionType: aws.String(swf.DecisionTypeCompleteWorkflowExecution),
 					CompleteWorkflowExecutionDecisionAttributes: &swf.CompleteWorkflowExecutionDecisionAttributes{
 						Result: S(serialized),
 					},
 				}
 				decisions = append(decisions, decision)
-			} else if *lastEvent.EventType == enums.EventTypeActivityTaskFailed {
+			} else if *lastEvent.EventType == swf.EventTypeActivityTaskFailed {
 				decision := &swf.Decision{
-					DecisionType: aws.String(enums.DecisionTypeScheduleActivityTask),
+					DecisionType: aws.String(swf.DecisionTypeScheduleActivityTask),
 					ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
 						ActivityID:   S(testActivityInfo.ActivityID),
 						ActivityType: testActivityInfo.ActivityType,
@@ -307,8 +306,8 @@ func ExampleFSM() {
 	waitForSignal := func(f *FSMContext, h *swf.HistoryEvent, d *StateData) Outcome {
 		decisions := f.EmptyDecisions()
 		switch *h.EventType {
-		case enums.EventTypeWorkflowExecutionStarted, enums.EventTypeWorkflowExecutionSignaled:
-			if *h.EventType == enums.EventTypeWorkflowExecutionSignaled && *h.WorkflowExecutionSignaledEventAttributes.SignalName == "hello" {
+		case swf.EventTypeWorkflowExecutionStarted, swf.EventTypeWorkflowExecutionSignaled:
+			if *h.EventType == swf.EventTypeWorkflowExecutionSignaled && *h.WorkflowExecutionSignaledEventAttributes.SignalName == "hello" {
 				hello := &Hello{}
 				f.EventData(h, &Hello{})
 				d.Count++
@@ -316,7 +315,7 @@ func ExampleFSM() {
 			}
 			timeoutSeconds := "5" //swf uses stringy numbers in many places
 			timerDecision := &swf.Decision{
-				DecisionType: S(enums.DecisionTypeStartTimer),
+				DecisionType: S(swf.DecisionTypeStartTimer),
 				StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
 					StartToFireTimeout: S(timeoutSeconds),
 					TimerID:            S("timeToSignal"),
@@ -333,12 +332,12 @@ func ExampleFSM() {
 	waitForTimer := func(f *FSMContext, h *swf.HistoryEvent, d *StateData) Outcome {
 		decisions := f.EmptyDecisions()
 		switch *h.EventType {
-		case enums.EventTypeTimerFired:
+		case swf.EventTypeTimerFired:
 			//every time the timer fires, signal the workflow with a Hello
 			message := strconv.FormatInt(time.Now().Unix(), 10)
 			signalInput := &Hello{message}
 			signalDecision := &swf.Decision{
-				DecisionType: S(enums.DecisionTypeSignalExternalWorkflowExecution),
+				DecisionType: S(swf.DecisionTypeSignalExternalWorkflowExecution),
 				SignalExternalWorkflowExecutionDecisionAttributes: &swf.SignalExternalWorkflowExecutionDecisionAttributes{
 					SignalName: S("hello"),
 					Input:      S(f.Serialize(signalInput)),
@@ -367,7 +366,7 @@ func ExampleFSM() {
 	setTimer := typed.DecisionFunc(func(f *FSMContext, h *swf.HistoryEvent, d *StateData) *swf.Decision {
 		timeoutSeconds := "5" //swf uses stringy numbers in many places
 		return &swf.Decision{
-			DecisionType: S(enums.DecisionTypeStartTimer),
+			DecisionType: S(swf.DecisionTypeStartTimer),
 			StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
 				StartToFireTimeout: S(timeoutSeconds),
 				TimerID:            S("timeToSignal"),
@@ -379,7 +378,7 @@ func ExampleFSM() {
 		message := strconv.FormatInt(time.Now().Unix(), 10)
 		signalInput := &Hello{message}
 		return &swf.Decision{
-			DecisionType: S(enums.DecisionTypeSignalExternalWorkflowExecution),
+			DecisionType: S(swf.DecisionTypeSignalExternalWorkflowExecution),
 			SignalExternalWorkflowExecutionDecisionAttributes: &swf.SignalExternalWorkflowExecutionDecisionAttributes{
 				SignalName: S("hello"),
 				Input:      S(f.Serialize(signalInput)),
@@ -439,7 +438,7 @@ func TestContinuedWorkflows(t *testing.T) {
 	fsm.AddInitialState(&FSMState{
 		Name: "ok",
 		Decider: func(f *FSMContext, h *swf.HistoryEvent, d interface{}) Outcome {
-			if *h.EventType == enums.EventTypeWorkflowExecutionStarted && d.(*TestData).States[0] == "continuing" {
+			if *h.EventType == swf.EventTypeWorkflowExecutionStarted && d.(*TestData).States[0] == "continuing" {
 				return f.Stay(d, nil)
 			}
 			panic("broken")
@@ -455,7 +454,7 @@ func TestContinuedWorkflows(t *testing.T) {
 
 	serializedState := fsm.Serialize(state)
 	resp := testDecisionTask(4, []*swf.HistoryEvent{&swf.HistoryEvent{
-		EventType: S(enums.EventTypeWorkflowExecutionStarted),
+		EventType: S(swf.EventTypeWorkflowExecutionStarted),
 		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
 			Input: S(serializedState),
 			ContinuedExecutionRunID: S("someRunId"),
@@ -528,7 +527,7 @@ func TestCompleteState(t *testing.T) {
 		t.Fatal(outcome)
 	}
 
-	if *outcome.Decisions[0].DecisionType != enums.DecisionTypeCompleteWorkflowExecution {
+	if *outcome.Decisions[0].DecisionType != swf.DecisionTypeCompleteWorkflowExecution {
 		t.Fatal(outcome)
 	}
 }
