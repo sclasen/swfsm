@@ -385,7 +385,7 @@ func (s *StreamMigrator) awaitActive(stream *string, atMostSeconds int) {
 		time.Sleep(1 * time.Second)
 		waited++
 		if waited >= atMostSeconds {
-			log.Printf("component=kinesis-migrator fn=awaitActive streal=%s  at=error error=exeeeded-max-wait", *stream)
+			log.Printf("component=kinesis-migrator fn=awaitActive stream=%s at=error error=exeeeded-max-wait", *stream)
 			panic("waited too long")
 		}
 	}
