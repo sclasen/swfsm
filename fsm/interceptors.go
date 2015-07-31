@@ -145,13 +145,15 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 				} else {
 					//re-start the timer for timerRetrySecs
 					logf(ctx, "fn=managed-continuations at=unable-to-continue decisions=%d activities=%d signals=%d children=%d action=start-continue-timer-retry", decisions, activities, signals, children)
-					outcome.Decisions = append(outcome.Decisions, &swf.Decision{
-						DecisionType: S(swf.DecisionTypeStartTimer),
-						StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
-							TimerID:            S(ContinueTimer),
-							StartToFireTimeout: S(strconv.Itoa(timerRetrySeconds)),
-						},
-					})
+					if continueTimerFired || !ctx.Correlator().TimerScheduled(ContinueTimer) {
+						outcome.Decisions = append(outcome.Decisions, &swf.Decision{
+							DecisionType: S(swf.DecisionTypeStartTimer),
+							StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+								TimerID:            S(ContinueTimer),
+								StartToFireTimeout: S(strconv.Itoa(timerRetrySeconds)),
+							},
+						})
+					}
 				}
 			}
 		},
