@@ -133,7 +133,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 
 			//if we pass history size or if we see ContinuteTimer or ContinueSignal fired
 			if continueTimerFired || continueSignalFired || historySizeExceeded {
-				logf(ctx, "fn=managed-continuations at=attempt-continue continue-timer=%t history-size=%t", continueTimerFired, historySizeExceeded)
+				logf(ctx, "fn=managed-continuations at=attempt-continue continue-timer=%t continue-signal=%t history-size=%t", continueTimerFired, continueSignalFired, historySizeExceeded)
 				//if we can safely continue
 				decisions := len(outcome.Decisions)
 				activities := len(ctx.Correlator().Activities)
