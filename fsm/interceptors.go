@@ -124,7 +124,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 			for _, h := range decision.Events {
 				if *h.EventType == swf.EventTypeWorkflowExecutionSignaled {
 					if *h.WorkflowExecutionSignaledEventAttributes.SignalName == ContinueSignal {
-						continueTimerFired = true
+						continueSignalFired = true
 					}
 				}
 			}

@@ -173,7 +173,7 @@ func (a *EventCorrelator) TimerInfo(h *swf.HistoryEvent) *TimerInfo {
 	return a.Timers[a.getID(h)]
 }
 
-func (a *EventCorrelator)TimerScheduled(timerID string) bool {
+func (a *EventCorrelator) TimerScheduled(timerID string) bool {
 	a.checkInit()
 	for _, i := range a.Timers {
 		if i.TimerID == timerID {
