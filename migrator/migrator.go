@@ -1,14 +1,13 @@
 package migrator
 
 import (
-	"log"
-
 	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/swf"
+	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -80,7 +79,7 @@ func ParallelMigrate(migrators ...func()) {
 		select {
 		case <-done:
 		case e := <-fail:
-			log.Panicf("migrator failed: %v", e)
+			Log.Panicf("migrator failed: %v", e)
 		}
 	}
 }
@@ -96,18 +95,18 @@ type DomainMigrator struct {
 func (d *DomainMigrator) Migrate() { //add parallel migrations to all Migrate!
 	for _, dd := range d.DeprecatedDomains {
 		if d.isDeprecated(dd.Name) {
-			log.Printf("action=migrate at=deprecate-domain domain=%s status=previously-deprecated", LS(dd.Name))
+			Log.Printf("action=migrate at=deprecate-domain domain=%s status=previously-deprecated", LS(dd.Name))
 		} else {
 			d.deprecate(dd)
-			log.Printf("action=migrate at=deprecate-domain domain=%s status=deprecated", LS(dd.Name))
+			Log.Printf("action=migrate at=deprecate-domain domain=%s status=deprecated", LS(dd.Name))
 		}
 	}
 	for _, r := range d.RegisteredDomains {
 		if d.isRegisteredNotDeprecated(r) {
-			log.Printf("action=migrate at=register-domain domain=%s status=previously-registered", LS(r.Name))
+			Log.Printf("action=migrate at=register-domain domain=%s status=previously-registered", LS(r.Name))
 		} else {
 			d.register(r)
-			log.Printf("action=migrate at=register-domain domain=%s status=registered", LS(r.Name))
+			Log.Printf("action=migrate at=register-domain domain=%s status=registered", LS(r.Name))
 		}
 	}
 }
@@ -141,7 +140,7 @@ func (d *DomainMigrator) register(rd swf.RegisterDomainInput) {
 func (d *DomainMigrator) isDeprecated(domain *string) bool {
 	desc, err := d.describe(domain)
 	if err != nil {
-		log.Printf("action=migrate at=is-dep domain=%s error=%s", LS(domain), err.Error())
+		Log.Printf("action=migrate at=is-dep domain=%s error=%s", LS(domain), err.Error())
 		return false
 	}
 
@@ -174,18 +173,18 @@ type WorkflowTypeMigrator struct {
 func (w *WorkflowTypeMigrator) Migrate() {
 	for _, dd := range w.DeprecatedWorkflowTypes {
 		if w.isDeprecated(dd.Domain, dd.WorkflowType.Name, dd.WorkflowType.Version) {
-			log.Printf("action=migrate at=deprecate-workflow domain=%s workflow=%s version=%s status=previously-deprecated", LS(dd.Domain), LS(dd.WorkflowType.Name), LS(dd.WorkflowType.Version))
+			Log.Printf("action=migrate at=deprecate-workflow domain=%s workflow=%s version=%s status=previously-deprecated", LS(dd.Domain), LS(dd.WorkflowType.Name), LS(dd.WorkflowType.Version))
 		} else {
 			w.deprecate(dd)
-			log.Printf("action=migrate at=deprecate-workflow domain=%s  workflow=%s version=%s status=deprecate", LS(dd.Domain), LS(dd.WorkflowType.Name), LS(dd.WorkflowType.Version))
+			Log.Printf("action=migrate at=deprecate-workflow domain=%s  workflow=%s version=%s status=deprecate", LS(dd.Domain), LS(dd.WorkflowType.Name), LS(dd.WorkflowType.Version))
 		}
 	}
 	for _, r := range w.RegisteredWorkflowTypes {
 		if w.isRegisteredNotDeprecated(r) {
-			log.Printf("action=migrate at=register-workflow domain=%s workflow=%s version=%s status=previously-registered", LS(r.Domain), LS(r.Name), LS(r.Version))
+			Log.Printf("action=migrate at=register-workflow domain=%s workflow=%s version=%s status=previously-registered", LS(r.Domain), LS(r.Name), LS(r.Version))
 		} else {
 			w.register(r)
-			log.Printf("action=migrate at=register-workflow domain=%s  workflow=%s version=%s status=registered", LS(r.Domain), LS(r.Name), LS(r.Version))
+			Log.Printf("action=migrate at=register-workflow domain=%s  workflow=%s version=%s status=registered", LS(r.Domain), LS(r.Name), LS(r.Version))
 		}
 	}
 }
@@ -218,7 +217,7 @@ func (w *WorkflowTypeMigrator) register(rd swf.RegisterWorkflowTypeInput) {
 func (w *WorkflowTypeMigrator) isDeprecated(domain *string, name *string, version *string) bool {
 	desc, err := w.describe(domain, name, version)
 	if err != nil {
-		log.Printf("action=migrate at=is-dep domain=%s workflow=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
+		Log.Printf("action=migrate at=is-dep domain=%s workflow=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
 		return false
 	}
 
@@ -251,18 +250,18 @@ type ActivityTypeMigrator struct {
 func (a *ActivityTypeMigrator) Migrate() {
 	for _, d := range a.DeprecatedActivityTypes {
 		if a.isDeprecated(d.Domain, d.ActivityType.Name, d.ActivityType.Version) {
-			log.Printf("action=migrate at=deprecate-activity domain=%s activity=%s version=%s status=previously-deprecated", LS(d.Domain), LS(d.ActivityType.Name), LS(d.ActivityType.Version))
+			Log.Printf("action=migrate at=deprecate-activity domain=%s activity=%s version=%s status=previously-deprecated", LS(d.Domain), LS(d.ActivityType.Name), LS(d.ActivityType.Version))
 		} else {
 			a.deprecate(d)
-			log.Printf("action=migrate at=depreacate-activity domain=%s activity=%s version=%s status=deprecated", LS(d.Domain), LS(d.ActivityType.Name), LS(d.ActivityType.Version))
+			Log.Printf("action=migrate at=depreacate-activity domain=%s activity=%s version=%s status=deprecated", LS(d.Domain), LS(d.ActivityType.Name), LS(d.ActivityType.Version))
 		}
 	}
 	for _, r := range a.RegisteredActivityTypes {
 		if a.isRegisteredNotDeprecated(r) {
-			log.Printf("action=migrate at=register-activity domain=%s activity=%s version=%s status=previously-registered", LS(r.Domain), LS(r.Name), LS(r.Version))
+			Log.Printf("action=migrate at=register-activity domain=%s activity=%s version=%s status=previously-registered", LS(r.Domain), LS(r.Name), LS(r.Version))
 		} else {
 			a.register(r)
-			log.Printf("action=migrate at=register-activity domain=%s activity=%s version=%s status=registered", LS(r.Domain), LS(r.Name), LS(r.Version))
+			Log.Printf("action=migrate at=register-activity domain=%s activity=%s version=%s status=registered", LS(r.Domain), LS(r.Name), LS(r.Version))
 		}
 	}
 }
@@ -295,7 +294,7 @@ func (a *ActivityTypeMigrator) register(rd swf.RegisterActivityTypeInput) {
 func (a *ActivityTypeMigrator) isDeprecated(domain *string, name *string, version *string) bool {
 	desc, err := a.describe(domain, name, version)
 	if err != nil {
-		log.Printf("action=migrate at=is-dep domain=%s activity=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
+		Log.Printf("action=migrate at=is-dep domain=%s activity=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
 		return false
 	}
 
@@ -328,10 +327,10 @@ type StreamMigrator struct {
 func (s *StreamMigrator) Migrate() {
 	for _, st := range s.Streams {
 		if s.isCreated(st) {
-			log.Printf("action=migrate at=create-stream stream=%s status=previously-created", LS(st.StreamName))
+			Log.Printf("action=migrate at=create-stream stream=%s status=previously-created", LS(st.StreamName))
 		} else {
 			s.create(st)
-			log.Printf("action=migrate at=create-stream stream=%s status=created", LS(st.StreamName))
+			Log.Printf("action=migrate at=create-stream stream=%s status=created", LS(st.StreamName))
 		}
 		s.awaitActive(st.StreamName, s.Timeout)
 	}
@@ -377,15 +376,15 @@ func (s *StreamMigrator) awaitActive(stream *string, atMostSeconds int) {
 			StreamName: stream,
 		})
 		if err != nil {
-			log.Printf("component=kinesis-migrator fn=awaitActive at=describe-error error=%s", err)
+			Log.Printf("component=kinesis-migrator fn=awaitActive at=describe-error error=%s", err)
 			panicWithError(err)
 		}
-		log.Printf("component=kinesis-migrator fn=awaitActive stream=%s at=describe status=%s", *stream, *desc.StreamDescription.StreamStatus)
+		Log.Printf("component=kinesis-migrator fn=awaitActive stream=%s at=describe status=%s", *stream, *desc.StreamDescription.StreamStatus)
 		status = *desc.StreamDescription.StreamStatus
 		time.Sleep(1 * time.Second)
 		waited++
 		if waited >= atMostSeconds {
-			log.Printf("component=kinesis-migrator fn=awaitActive stream=%s at=error error=exeeeded-max-wait", *stream)
+			Log.Printf("component=kinesis-migrator fn=awaitActive stream=%s at=error error=exeeeded-max-wait", *stream)
 			panic("waited too long")
 		}
 	}

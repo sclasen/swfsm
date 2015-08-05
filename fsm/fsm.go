@@ -2,12 +2,12 @@ package fsm
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	. "github.com/sclasen/swfsm/log"
 	"github.com/sclasen/swfsm/poller"
 	s "github.com/sclasen/swfsm/sugar"
 )
@@ -544,7 +544,7 @@ func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event *swf.H
 				}
 			}
 		} else {
-			log.Printf("at=panic-safe-decide-allowing-panic fsm-allow-panics=%t", f.allowPanics)
+			Log.Printf("at=panic-safe-decide-allowing-panic fsm-allow-panics=%t", f.allowPanics)
 		}
 	}()
 	anOutcome = context.Decide(event, data, state.Decider)
@@ -594,12 +594,12 @@ func (f *FSM) EventData(event *swf.HistoryEvent, eventData interface{}) {
 
 func (f *FSM) log(format string, data ...interface{}) {
 	actualFormat := fmt.Sprintf("component=FSM name=%s %s", f.Name, format)
-	log.Printf(actualFormat, data...)
+	Log.Printf(actualFormat, data...)
 }
 
 func (f *FSM) clog(ctx *FSMContext, format string, data ...interface{}) {
 	actualFormat := fmt.Sprintf("component=FSM name=%s type=%s id=%s %s", f.Name, *ctx.WorkflowType.Name, *ctx.WorkflowID, format)
-	log.Printf(actualFormat, data...)
+	Log.Printf(actualFormat, data...)
 }
 
 func (f *FSM) findSerializedState(events []*swf.HistoryEvent) (*SerializedState, error) {

@@ -2,7 +2,6 @@ package migrator
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -11,13 +10,14 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/swf"
+	. "github.com/sclasen/swfsm/log"
 )
 
 var testDomain = fmt.Sprintf("test-domain-%d", time.Now().UnixNano())
 
 func TestMigrateDomains(t *testing.T) {
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
+		Log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
 
@@ -59,7 +59,7 @@ func TestMigrateDomains(t *testing.T) {
 
 func TestMigrateWorkflowTypes(t *testing.T) {
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
+		Log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
 	createDomain()
@@ -108,7 +108,7 @@ func TestMigrateWorkflowTypes(t *testing.T) {
 func TestMigrateActivityTypes(t *testing.T) {
 
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
+		Log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
 	createDomain()
@@ -155,7 +155,7 @@ func TestMigrateActivityTypes(t *testing.T) {
 
 func TestMigrateStreams(t *testing.T) {
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
+		Log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
 

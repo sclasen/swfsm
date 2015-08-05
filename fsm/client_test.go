@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"log"
 	"os"
 	"testing"
 
@@ -11,12 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/pborman/uuid"
+	. "github.com/sclasen/swfsm/log"
 	"github.com/sclasen/swfsm/migrator"
 )
 
 func TestClient(t *testing.T) {
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
+		Log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
 

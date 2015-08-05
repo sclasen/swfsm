@@ -2,7 +2,6 @@ package activity
 
 import (
 	"errors"
-	"log"
 	"math/rand"
 	"os"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/fsm"
+	. "github.com/sclasen/swfsm/log"
 	"github.com/sclasen/swfsm/migrator"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -141,19 +141,19 @@ type MockActivities struct{}
 
 func (m MockActivities) Task1(task *swf.PollForActivityTaskOutput, in *Input1) (*Output1, error) {
 	if rand.Intn(10) < 4 {
-		log.Printf("TASK 1 OK")
+		Log.Printf("TASK 1 OK")
 		return &Output1{Data: in.Data}, nil
 	}
-	log.Printf("TASK 1 FAIL")
+	Log.Printf("TASK 1 FAIL")
 	return nil, errors.New("FAILED")
 }
 
 func (m MockActivities) Task2(task *swf.PollForActivityTaskOutput, in *Input2) (*Output2, error) {
 	if rand.Intn(10) < 4 {
-		log.Printf("TASK 2 OK")
+		Log.Printf("TASK 2 OK")
 		return &Output2{Data2: in.Data2}, nil
 	}
-	log.Printf("TASK 2 FAIL")
+	Log.Printf("TASK 2 FAIL")
 	return nil, errors.New("FAILED")
 }
 
@@ -249,7 +249,7 @@ func (w *WorkerFSM) activity(ctx *fsm.FSMContext, name string, input interface{}
 
 func TestTypedActivityWorker(t *testing.T) {
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-		log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
+		Log.Printf("WARNING: NO AWS CREDS SPECIFIED, SKIPPING MIGRATIONS TEST")
 		return
 	}
 
