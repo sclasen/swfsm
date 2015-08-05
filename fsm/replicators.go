@@ -1,12 +1,11 @@
 package fsm
 
 import (
-	"log"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	. "github.com/sclasen/swfsm/log"
 )
 
 //ReplicationHandler can be configured on an FSM and will be called when a DecisionTask is successfully completed.
@@ -40,7 +39,7 @@ func (f *KinesisReplication) Handler(ctx *FSMContext, decisionTask *swf.PollForD
 	}
 	stateToReplicate, err := ctx.Serializer().Serialize(state)
 	if err != nil {
-		log.Printf("component=kinesis-replication at=serialize-state-failed error=%q", err.Error())
+		Log.Printf("component=kinesis-replication at=serialize-state-failed error=%q", err.Error())
 		return errors.Trace(err)
 	}
 
@@ -56,9 +55,9 @@ func (f *KinesisReplication) Handler(ctx *FSMContext, decisionTask *swf.PollForD
 	resp, err := f.KinesisReplicator(*ctx.WorkflowType.Name, *decisionTask.WorkflowExecution.WorkflowID, put)
 
 	if err != nil {
-		log.Printf("component=kinesis-replication  at=replicate-state-failed error=%q", err.Error())
+		Log.Printf("component=kinesis-replication  at=replicate-state-failed error=%q", err.Error())
 	} else {
-		log.Printf("component=kinesis-replication at=replicated-state shard=%s sequence=%s", *resp.ShardID, *resp.SequenceNumber)
+		Log.Printf("component=kinesis-replication at=replicated-state shard=%s sequence=%s", *resp.ShardID, *resp.SequenceNumber)
 	}
 	return errors.Trace(err)
 }

@@ -2,13 +2,13 @@ package testing
 
 import (
 	"fmt"
-	"log"
 
 	"sync"
 
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/activity"
 	"github.com/sclasen/swfsm/fsm"
+	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -50,7 +50,7 @@ func StubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 
 func StubState() fsm.Decider {
 	return func(ctx *fsm.FSMContext, h *swf.HistoryEvent, data interface{}) fsm.Outcome {
-		log.Printf("at=stub-event event=%+v", PrettyHistoryEvent(h))
+		Log.Printf("at=stub-event event=%+v", PrettyHistoryEvent(h))
 		return ctx.Stay(data, ctx.EmptyDecisions())
 	}
 }
@@ -71,7 +71,7 @@ func ShortStubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 
 func ShortStubState() fsm.Decider {
 	return func(ctx *fsm.FSMContext, h *swf.HistoryEvent, data interface{}) fsm.Outcome {
-		log.Printf("at=short-stub-event event=%+v", PrettyHistoryEvent(h))
+		Log.Printf("at=short-stub-event event=%+v", PrettyHistoryEvent(h))
 		return ctx.CompleteWorkflow(data)
 	}
 }
@@ -127,13 +127,13 @@ func TestFailOnceActivityInterceptor() activity.ActivityInterceptor {
 			defer mutex.Unlock()
 
 			if err != nil || tried[*t.ActivityID] {
-				log.Printf("interceptor.test.fail-once at=passthrough activity-id=%q", *t.ActivityID)
+				Log.Printf("interceptor.test.fail-once at=passthrough activity-id=%q", *t.ActivityID)
 				return result, err
 			}
 
 			tried[*t.ActivityID] = true
 			msg := fmt.Sprintf("interceptor.test.fail-once at=fail activity-id=%q", *t.ActivityID)
-			log.Println(msg)
+			Log.Println(msg)
 			return nil, fmt.Errorf(msg)
 		},
 	}

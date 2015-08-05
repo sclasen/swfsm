@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"log"
 	"strconv"
 	"testing"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/golang/protobuf/proto"
+	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -229,7 +229,7 @@ func TestPanicRecovery(t *testing.T) {
 	if err == nil {
 		t.Fatal("fatallz")
 	} else {
-		log.Println(err)
+		Log.Println(err)
 	}
 }
 
@@ -243,7 +243,7 @@ func TestProtobufSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	log.Println(serialized)
+	Log.Println(serialized)
 
 	deserialized := new(ConfigVar)
 	err = ser.Deserialize(serialized, deserialized)
@@ -461,10 +461,10 @@ func TestContinuedWorkflows(t *testing.T) {
 		},
 	}})
 
-	log.Printf("%+v", resp)
+	Log.Printf("%+v", resp)
 	_, decisions, updatedState, _ := fsm.Tick(resp)
 
-	log.Println(updatedState)
+	Log.Println(updatedState)
 
 	if updatedState.StateVersion != 24 {
 		t.Fatal("StateVersion !=24 ", updatedState.StateVersion)

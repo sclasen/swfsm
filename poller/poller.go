@@ -1,12 +1,12 @@
 package poller
 
 import (
-	"log"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -47,15 +47,15 @@ func (p *DecisionTaskPoller) Poll() (*swf.PollForDecisionTaskOutput, error) {
 		TaskList:     &swf.TaskList{Name: aws.String(p.TaskList)},
 	})
 	if err != nil {
-		log.Printf("component=DecisionTaskPoller at=error error=%s", err.Error())
+		Log.Printf("component=DecisionTaskPoller at=error error=%s", err.Error())
 		return nil, errors.Trace(err)
 	}
 	if resp.TaskToken != nil {
-		log.Printf("component=DecisionTaskPoller at=decision-task-received workflow=%s", LS(resp.WorkflowType.Name))
+		Log.Printf("component=DecisionTaskPoller at=decision-task-received workflow=%s", LS(resp.WorkflowType.Name))
 		p.logTaskLatency(resp)
 		return resp, nil
 	}
-	log.Println("component=DecisionTaskPoller at=decision-task-empty-response")
+	Log.Println("component=DecisionTaskPoller at=decision-task-empty-response")
 	return nil, nil
 }
 
@@ -68,17 +68,17 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 	for {
 		select {
 		case <-stop:
-			log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=received-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
+			Log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=received-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
 			stopAck <- true
 			return
 		default:
 			task, err := p.Poll()
 			if err != nil {
-				log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
+				Log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
 				continue
 			}
 			if task == nil {
-				log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-no-task poller=%s task-list=%q", pollerName, p.TaskList)
+				Log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-no-task poller=%s task-list=%q", pollerName, p.TaskList)
 				continue
 			}
 			onTask(task)
@@ -90,7 +90,7 @@ func (p *DecisionTaskPoller) logTaskLatency(resp *swf.PollForDecisionTaskOutput)
 	for _, e := range resp.Events {
 		if e.EventID == resp.StartedEventID {
 			elapsed := time.Since(*e.EventTimestamp)
-			log.Printf("component=DecisionTaskPoller at=decision-task-latency latency=%s workflow=%s", elapsed, LS(resp.WorkflowType.Name))
+			Log.Printf("component=DecisionTaskPoller at=decision-task-latency latency=%s workflow=%s", elapsed, LS(resp.WorkflowType.Name))
 		}
 	}
 }
@@ -122,14 +122,14 @@ func (p *ActivityTaskPoller) Poll() (*swf.PollForActivityTaskOutput, error) {
 		TaskList: &swf.TaskList{Name: aws.String(p.TaskList)},
 	})
 	if err != nil {
-		log.Printf("component=ActivityTaskPoller at=error error=%s", err.Error())
+		Log.Printf("component=ActivityTaskPoller at=error error=%s", err.Error())
 		return nil, errors.Trace(err)
 	}
 	if resp.TaskToken != nil {
-		log.Printf("component=ActivityTaskPoller at=activity-task-received activity=%s", LS(resp.ActivityType.Name))
+		Log.Printf("component=ActivityTaskPoller at=activity-task-received activity=%s", LS(resp.ActivityType.Name))
 		return resp, nil
 	}
-	log.Println("component=ActivityTaskPoller at=activity-task-empty-response")
+	Log.Println("component=ActivityTaskPoller at=activity-task-empty-response")
 	return nil, nil
 }
 
@@ -142,17 +142,17 @@ func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 	for {
 		select {
 		case <-stop:
-			log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=received-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
+			Log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=received-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
 			stopAck <- true
 			return
 		default:
 			task, err := p.Poll()
 			if err != nil {
-				log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
+				Log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
 				continue
 			}
 			if task == nil {
-				log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-no-task poller=%s task-list=%q", pollerName, p.TaskList)
+				Log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-no-task poller=%s task-list=%q", pollerName, p.TaskList)
 				continue
 			}
 			onTask(task)
@@ -185,15 +185,15 @@ func NewShutdownManager() *ShutdownManager {
 
 //StopPollers blocks until it is able to stop all the registered pollers, which can take up to 60 seconds.
 func (p *ShutdownManager) StopPollers() {
-	log.Printf("component=PollerShutdownManager at=stop-pollers")
+	Log.Printf("component=PollerShutdownManager at=stop-pollers")
 	for _, r := range p.registeredPollers {
-		log.Printf("component=PollerShutdownManager at=sending-stop name=%s", r.name)
+		Log.Printf("component=PollerShutdownManager at=sending-stop name=%s", r.name)
 		r.stopChannel <- true
 	}
 	for _, r := range p.registeredPollers {
-		log.Printf("component=PollerShutdownManager at=awaiting-stop-ack name=%s", r.name)
+		Log.Printf("component=PollerShutdownManager at=awaiting-stop-ack name=%s", r.name)
 		<-r.stopAckChannel
-		log.Printf("component=PollerShutdownManager at=stop-ack name=%s", r.name)
+		Log.Printf("component=PollerShutdownManager at=stop-ack name=%s", r.name)
 	}
 }
 

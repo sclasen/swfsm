@@ -2,7 +2,6 @@ package fsm
 
 import (
 	"fmt"
-	"log"
 
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -104,9 +104,9 @@ func (c *client) listIds(executionInfosFunc func() (*swf.WorkflowExecutionInfos,
 
 	if err != nil {
 		if ae, ok := err.(awserr.Error); ok {
-			log.Printf("component=client fn=listIds at=list-infos-func error-type=%s message=%s", ae.Code(), ae.Message())
+			Log.Printf("component=client fn=listIds at=list-infos-func error-type=%s message=%s", ae.Code(), ae.Message())
 		} else {
-			log.Printf("component=client fn=listIds at=list-infos-func error=%s", err)
+			Log.Printf("component=client fn=listIds at=list-infos-func error=%s", err)
 		}
 		return []string{}, "", err
 	}
@@ -136,9 +136,9 @@ func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 
 	if err != nil {
 		if ae, ok := err.(awserr.Error); ok {
-			log.Printf("component=client fn=findExecution at=list-open error-type=%s message=%s", ae.Code(), ae.Message())
+			Log.Printf("component=client fn=findExecution at=list-open error-type=%s message=%s", ae.Code(), ae.Message())
 		} else {
-			log.Printf("component=client fn=findExecution at=list-open error=%s", err)
+			Log.Printf("component=client fn=findExecution at=list-open error=%s", err)
 		}
 		return nil, err
 	}
@@ -157,9 +157,9 @@ func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 
 		if err != nil {
 			if ae, ok := err.(awserr.Error); ok {
-				log.Printf("component=client fn=findExecution at=list-closed error-type=%s message=%s", ae.Code(), ae.Message())
+				Log.Printf("component=client fn=findExecution at=list-closed error-type=%s message=%s", ae.Code(), ae.Message())
 			} else {
-				log.Printf("component=client fn=findExecution at=list-closed error=%s", err)
+				Log.Printf("component=client fn=findExecution at=list-closed error=%s", err)
 			}
 			return nil, err
 		}
@@ -187,9 +187,9 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 
 		if err != nil {
 			if ae, ok := err.(awserr.Error); ok {
-				log.Printf("component=client fn=GetState at=get-history error-type=%s message=%s", ae.Code(), ae.Message())
+				Log.Printf("component=client fn=GetState at=get-history error-type=%s message=%s", ae.Code(), ae.Message())
 			} else {
-				log.Printf("component=client fn=GetState at=get-history error=%s", err)
+				Log.Printf("component=client fn=GetState at=get-history error=%s", err)
 			}
 			return "", nil, err
 		}
@@ -197,14 +197,14 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 		serialized, err := c.f.findSerializedState(history.Events)
 
 		if err != nil {
-			log.Printf("component=client fn=GetState at=find-serialized-state error=%s", err)
+			Log.Printf("component=client fn=GetState at=find-serialized-state error=%s", err)
 			return "", nil, err
 		}
 
 		data := c.f.zeroStateData()
 		err = c.f.Serializer.Deserialize(serialized.StateData, data)
 		if err != nil {
-			log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%s", err)
+			Log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%s", err)
 			return "", nil, err
 		}
 
@@ -392,7 +392,7 @@ func (c *client) tryDeserialize(serialized *string) interface{} {
 	if err == nil {
 		return tryMap
 	}
-	log.Printf("component=client fn=trySystemDeserialize at=deserialize-map error=%s", err)
+	Log.Printf("component=client fn=trySystemDeserialize at=deserialize-map error=%s", err)
 
 	return *serialized
 }

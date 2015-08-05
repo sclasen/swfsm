@@ -2,12 +2,12 @@ package fsm
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/swf"
+	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -42,7 +42,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			var decisions = f.EmptyDecisions()
 			if *lastEvent.EventType == swf.EventTypeActivityTaskCompleted {
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
-				log.Printf("----->>>>> %+v %+v", trackedActivityInfo, testActivityInfo)
+				Log.Printf("----->>>>> %+v %+v", trackedActivityInfo, testActivityInfo)
 				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
 					t.Fatalf("pending activity not being tracked\nExpected:\n%+v\nGot:\n%+v",
 						testActivityInfo, trackedActivityInfo,
@@ -59,7 +59,7 @@ func TestTrackPendingActivities(t *testing.T) {
 				return f.Goto("done", testData, []*swf.Decision{decision})
 			} else if *lastEvent.EventType == swf.EventTypeActivityTaskFailed {
 				trackedActivityInfo := f.ActivityInfo(lastEvent)
-				log.Printf("----->>>>> %+v %+v %+v", trackedActivityInfo, testActivityInfo, f.ActivitiesInfo())
+				Log.Printf("----->>>>> %+v %+v %+v", trackedActivityInfo, testActivityInfo, f.ActivitiesInfo())
 				if !reflect.DeepEqual(*trackedActivityInfo, testActivityInfo) {
 					t.Fatalf("pending activity not being tracked\nExpected:\n%+v\nGot:\n%+v",
 						testActivityInfo, trackedActivityInfo,
@@ -349,8 +349,8 @@ func TestCountActivityAttemtps(t *testing.T) {
 	c.Track(start(3))
 	info := c.ActivityInfo(timeout)
 	c.Track(timeout)
-	log.Println("=====")
-	log.Printf("%+v", c.ActivityAttempts)
+	Log.Println("=====")
+	Log.Printf("%+v", c.ActivityAttempts)
 	if c.AttemptsForActivity(info) != 2 {
 		t.Fatal(PrettyHistoryEvent(start(1)), PrettyHistoryEvent(fail), PrettyHistoryEvent(timeout), c)
 	}
