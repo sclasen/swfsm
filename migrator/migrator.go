@@ -385,7 +385,7 @@ func (s *StreamMigrator) awaitActive(stream *string, atMostSeconds int) {
 		time.Sleep(1 * time.Second)
 		waited++
 		if waited >= atMostSeconds {
-			log.Printf("component=kinesis-migrator fn=awaitActive streal=%s  at=error error=exeeeded-max-wait", *stream)
+			log.Printf("component=kinesis-migrator fn=awaitActive stream=%s at=error error=exeeeded-max-wait", *stream)
 			panic("waited too long")
 		}
 	}
@@ -393,7 +393,7 @@ func (s *StreamMigrator) awaitActive(stream *string, atMostSeconds int) {
 
 func panicWithError(err error) {
 	if ae, ok := err.(awserr.RequestFailure); ok {
-		panic(fmt.Sprintf("aws error while migrating type=%s message=%s code=%s request-id=%s", ae.Code(), ae.Message(), ae.Code, ae.RequestID()))
+		panic(fmt.Sprintf("aws error while migrating type=%q message=%q code=%d request-id=%q", ae.Code(), ae.Message(), ae.StatusCode(), ae.RequestID()))
 	}
 
 	panic(err)

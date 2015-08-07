@@ -236,7 +236,7 @@ func OnData(predicate PredicateFunc, deciders ...Decider) Decider {
 	}
 }
 
-// OnSignalsReceived builds a composed decider that fires on when one of the matching signal is recieved.
+// OnSignalsReceived builds a composed decider that fires on when one of the matching signal is received.
 func OnSignalsReceived(signalNames []string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
@@ -252,12 +252,12 @@ func OnSignalsReceived(signalNames []string, deciders ...Decider) Decider {
 	}
 }
 
-// OnSignalReceived builds a composed decider that fires on when a matching signal is recieved.
+// OnSignalReceived builds a composed decider that fires on when a matching signal is received.
 func OnSignalReceived(signalName string, deciders ...Decider) Decider {
 	return OnSignalsReceived([]string{signalName}, deciders...)
 }
 
-// OnSignalSent builds a composed decider that fires on when a matching signal is recieved.
+// OnSignalSent builds a composed decider that fires on when a matching signal is received.
 func OnSignalSent(signalName string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {

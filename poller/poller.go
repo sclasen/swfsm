@@ -51,7 +51,7 @@ func (p *DecisionTaskPoller) Poll() (*swf.PollForDecisionTaskOutput, error) {
 		return nil, errors.Trace(err)
 	}
 	if resp.TaskToken != nil {
-		log.Printf("component=DecisionTaskPoller at=decision-task-recieved workflow=%s", LS(resp.WorkflowType.Name))
+		log.Printf("component=DecisionTaskPoller at=decision-task-received workflow=%s", LS(resp.WorkflowType.Name))
 		p.logTaskLatency(resp)
 		return resp, nil
 	}
@@ -68,7 +68,7 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 	for {
 		select {
 		case <-stop:
-			log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=recieved-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
+			log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=received-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
 			stopAck <- true
 			return
 		default:
@@ -126,7 +126,7 @@ func (p *ActivityTaskPoller) Poll() (*swf.PollForActivityTaskOutput, error) {
 		return nil, errors.Trace(err)
 	}
 	if resp.TaskToken != nil {
-		log.Printf("component=ActivityTaskPoller at=activity-task-recieved activity=%s", LS(resp.ActivityType.Name))
+		log.Printf("component=ActivityTaskPoller at=activity-task-received activity=%s", LS(resp.ActivityType.Name))
 		return resp, nil
 	}
 	log.Println("component=ActivityTaskPoller at=activity-task-empty-response")
@@ -142,7 +142,7 @@ func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 	for {
 		select {
 		case <-stop:
-			log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=recieved-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
+			log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=received-stop action=shutting-down poller=%s task-list=%q", pollerName, p.TaskList)
 			stopAck <- true
 			return
 		default:

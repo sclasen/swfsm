@@ -21,7 +21,7 @@ test-aws: install forego
 	forego run godep go test
 
 tidy:
-	go get code.google.com/p/go.tools/cmd/goimports
+	go get golang.org/x/tools/cmd/goimports
 	test -z "$$(goimports -l -d $(GO_PACKAGES) | tee /dev/stderr)"
 
 lint:
@@ -37,6 +37,3 @@ fmt:
 	go fmt ./...
 
 ready: fmt imports tidy
-
-
-
