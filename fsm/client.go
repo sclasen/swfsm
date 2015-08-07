@@ -171,17 +171,15 @@ func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 		}
 	}
 }
-
-func (c *client) GetState(id string) (string, interface{}, error) {
+func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
 	getState := func() (string, interface{}, error) {
-		execution, err := c.findExecution(id)
-		if err != nil {
-			return "", nil, err
-		}
 
 		history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
-			Domain:       S(c.f.Domain),
-			Execution:    execution,
+			Domain: S(c.f.Domain),
+			Execution: &swf.WorkflowExecution{
+				WorkflowID: S(id),
+				RunID:      S(run),
+			},
 			ReverseOrder: aws.Bool(true),
 		})
 
@@ -222,7 +220,14 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 	}
 
 	return "", nil, err
+}
 
+func (c *client) GetState(id string) (string, interface{}, error) {
+	execution, err := c.findExecution(id)
+	if err != nil {
+		return "", nil, err
+	}
+	return c.GetStateForRun(id, *execution.RunID)
 }
 
 func (c *client) Signal(id string, signal string, input interface{}) error {

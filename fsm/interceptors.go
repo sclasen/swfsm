@@ -124,7 +124,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 			for _, h := range decision.Events {
 				if *h.EventType == swf.EventTypeWorkflowExecutionSignaled {
 					if *h.WorkflowExecutionSignaledEventAttributes.SignalName == ContinueSignal {
-						continueTimerFired = true
+						continueSignalFired = true
 					}
 				}
 			}
@@ -133,7 +133,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 
 			//if we pass history size or if we see ContinuteTimer or ContinueSignal fired
 			if continueTimerFired || continueSignalFired || historySizeExceeded {
-				logf(ctx, "fn=managed-continuations at=attempt-continue continue-timer=%t history-size=%t", continueTimerFired, historySizeExceeded)
+				logf(ctx, "fn=managed-continuations at=attempt-continue continue-timer=%t continue-signal=%t history-size=%t", continueTimerFired, continueSignalFired, historySizeExceeded)
 				//if we can safely continue
 				decisions := len(outcome.Decisions)
 				activities := len(ctx.Correlator().Activities)
@@ -145,13 +145,15 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 				} else {
 					//re-start the timer for timerRetrySecs
 					logf(ctx, "fn=managed-continuations at=unable-to-continue decisions=%d activities=%d signals=%d children=%d action=start-continue-timer-retry", decisions, activities, signals, children)
-					outcome.Decisions = append(outcome.Decisions, &swf.Decision{
-						DecisionType: S(swf.DecisionTypeStartTimer),
-						StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
-							TimerID:            S(ContinueTimer),
-							StartToFireTimeout: S(strconv.Itoa(timerRetrySeconds)),
-						},
-					})
+					if continueTimerFired || !ctx.Correlator().TimerScheduled(ContinueTimer) {
+						outcome.Decisions = append(outcome.Decisions, &swf.Decision{
+							DecisionType: S(swf.DecisionTypeStartTimer),
+							StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+								TimerID:            S(ContinueTimer),
+								StartToFireTimeout: S(strconv.Itoa(timerRetrySeconds)),
+							},
+						})
+					}
 				}
 			}
 		},

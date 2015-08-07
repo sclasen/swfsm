@@ -106,6 +106,8 @@ func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkfl
 					}
 				case swf.DecisionTypeScheduleActivityTask:
 					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testID)}
+				case swf.DecisionTypeContinueAsNewWorkflowExecution:
+					d.ContinueAsNewWorkflowExecutionDecisionAttributes.TaskList = &swf.TaskList{Name: S(testID)}
 				}
 			}
 		},
