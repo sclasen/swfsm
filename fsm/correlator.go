@@ -138,7 +138,7 @@ func (a *EventCorrelator) RemoveCorrelation(h *swf.HistoryEvent) {
 		delete(a.Timers, a.key(h.TimerCanceledEventAttributes.StartedEventID))
 	case swf.EventTypeRequestCancelExternalWorkflowExecutionFailed:
 		a.incrementCancellationAttempts(h)
-		delete(a.Activities, a.key(h.RequestCancelExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))
+		delete(a.Cancellations, a.key(h.RequestCancelExternalWorkflowExecutionFailedEventAttributes.InitiatedEventID))
 	case swf.EventTypeExternalWorkflowExecutionCancelRequested:
 		key := a.key(h.ExternalWorkflowExecutionCancelRequestedEventAttributes.InitiatedEventID)
 		info := a.Cancellations[key]
