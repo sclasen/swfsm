@@ -371,6 +371,28 @@ func OnWorkflowCancelRequested(deciders ...Decider) Decider {
 	}
 }
 
+func OnExternalWorkflowExecutionCancelRequested(deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeExternalWorkflowExecutionCancelRequested:
+			logf(ctx, "at=on-external-workflow-execution-cancel-requested")
+			return NewComposedDecider(deciders...)(ctx, h, data)
+		}
+		return ctx.Pass()
+	}
+}
+
+func OnRequestCancelExternalWorkflowExecutionFailed(deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeRequestCancelExternalWorkflowExecutionFailed:
+			logf(ctx, "at=on-request-cancel-external-workflow-execution-failed")
+			return NewComposedDecider(deciders...)(ctx, h, data)
+		}
+		return ctx.Pass()
+	}
+}
+
 // AddDecision adds a single decision to a ContinueDecider outcome
 func AddDecision(decisionFn DecisionFunc) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
