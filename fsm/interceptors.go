@@ -139,12 +139,13 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 				activities := len(ctx.Correlator().Activities)
 				signals := len(ctx.Correlator().Signals)
 				children := len(ctx.Correlator().Children)
-				if decisions == 0 && activities == 0 && signals == 0 && children == 0 {
+				cancels := len(ctx.Correlator().Cancellations)
+				if decisions == 0 && activities == 0 && signals == 0 && children == 0 && cancels == 0 {
 					logf(ctx, "fn=managed-continuations at=able-to-continue action=add-continue-decision")
 					outcome.Decisions = append(outcome.Decisions, ctx.ContinueWorkflowDecision(ctx.State, ctx.stateData)) //stateData safe?
 				} else {
 					//re-start the timer for timerRetrySecs
-					logf(ctx, "fn=managed-continuations at=unable-to-continue decisions=%d activities=%d signals=%d children=%d action=start-continue-timer-retry", decisions, activities, signals, children)
+					logf(ctx, "fn=managed-continuations at=unable-to-continue decisions=%d activities=%d signals=%d children=%d cancels=%d action=start-continue-timer-retry", decisions, activities, signals, children, cancels)
 					if continueTimerFired || !ctx.Correlator().TimerScheduled(ContinueTimer) {
 						outcome.Decisions = append(outcome.Decisions, &swf.Decision{
 							DecisionType: S(swf.DecisionTypeStartTimer),
