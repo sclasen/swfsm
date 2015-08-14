@@ -79,7 +79,7 @@ func TestFSM(t *testing.T) {
 		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
 		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
 		EventFromPayload(1, &swf.WorkflowExecutionStartedEventAttributes{
-			Input: S(fsm.Serialize(new(TestData))),
+			Input: StartFSMWorkflowInput(fsm, new(TestData)),
 		}),
 	}
 
@@ -515,7 +515,7 @@ func TestCompleteState(t *testing.T) {
 		EventID:   I(1),
 		EventType: S("WorkflowExecutionStarted"),
 		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-			Input: S(fsm.Serialize(new(TestData))),
+			Input: StartFSMWorkflowInput(fsm, new(TestData)),
 		},
 	}
 

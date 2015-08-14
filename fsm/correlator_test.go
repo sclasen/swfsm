@@ -112,7 +112,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			EventID:   I(1),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: S(fsm.Serialize(new(TestData))),
+				Input: StartFSMWorkflowInput(fsm, new(TestData)),
 			},
 		},
 	}

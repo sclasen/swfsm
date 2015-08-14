@@ -404,3 +404,13 @@ type FSMSnapshotEvent struct {
 	Input   interface{}
 	Output  interface{}
 }
+
+// StartFSMWorkflowInput should be used to construct the input for any StartWorkflowExecutionRequests.
+// This panics on errors cause really this should never err.
+func StartFSMWorkflowInput(serializer Serialization, data interface{}) *string {
+	ss := new(SerializedState)
+	stateData := serializer.Serialize(data)
+	ss.StateData = stateData
+	serialized := serializer.Serialize(ss)
+	return aws.String(serialized)
+}
