@@ -532,6 +532,15 @@ func TestCompleteState(t *testing.T) {
 	}
 }
 
+func TestSerializationInterface(t *testing.T) {
+	f := func(s Serialization) {
+
+	}
+
+	f(&FSM{})
+	f(&FSMContext{})
+}
+
 func testFSM() *FSM {
 	fsm := &FSM{
 		Name:             "test-fsm",

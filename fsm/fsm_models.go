@@ -178,6 +178,14 @@ func NewFSMContext(
 	}
 }
 
+func (f *FSMContext) InitialState() string {
+	return f.serialization.InitialState()
+}
+
+func (f *FSMContext) StateSerializer() StateSerializer {
+	return f.serialization.StateSerializer()
+}
+
 // ContinueDecider is a helper func to easily create a ContinueOutcome.
 func (f *FSMContext) ContinueDecider(data interface{}, decisions []*swf.Decision) Outcome {
 	return Outcome{
