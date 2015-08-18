@@ -602,21 +602,14 @@ func (f *FSM) statefulHistoryEventToSerializedState(event *swf.HistoryEvent) (*S
 		return state, err
 	} else if *event.EventType == swf.EventTypeWorkflowExecutionStarted {
 		state := &SerializedState{}
-		//If the workflow is continued, we expect a full SerializedState as Input
-		if event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunID != nil {
-			err := f.Serializer.Deserialize(*event.WorkflowExecutionStartedEventAttributes.Input, state)
-			if err == nil {
-				if state.StateName == "" {
-					state.StateName = f.initialState.Name
-				}
+		err := f.Serializer.Deserialize(*event.WorkflowExecutionStartedEventAttributes.Input, state)
+		if err == nil {
+			if state.StateName == "" {
+				state.StateName = f.initialState.Name
 			}
-			return state, err
 		}
-		//Otherwise we expect just a stateData struct
-		state.StateVersion = 0
-		state.StateName = f.initialState.Name
-		state.StateData = *event.WorkflowExecutionStartedEventAttributes.Input
-		return state, nil
+		return state, err
+
 	}
 	return nil, nil
 }

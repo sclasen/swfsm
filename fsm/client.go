@@ -256,11 +256,7 @@ func (c *client) Signal(id string, signal string, input interface{}) error {
 func (c *client) Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error) {
 	var serializedInput *string
 	if input != nil {
-		ser, err := c.f.Serializer.Serialize(input)
-		if err != nil {
-			return nil, errors.Trace(err)
-		}
-		serializedInput = S(ser)
+		serializedInput = StartFSMWorkflowInput(c.f, input)
 	}
 	startTemplate.Domain = S(c.f.Domain)
 	startTemplate.WorkflowID = S(id)

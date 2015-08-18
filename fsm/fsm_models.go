@@ -178,6 +178,14 @@ func NewFSMContext(
 	}
 }
 
+func (f *FSMContext) InitialState() string {
+	return f.serialization.InitialState()
+}
+
+func (f *FSMContext) StateSerializer() StateSerializer {
+	return f.serialization.StateSerializer()
+}
+
 // ContinueDecider is a helper func to easily create a ContinueOutcome.
 func (f *FSMContext) ContinueDecider(data interface{}, decisions []*swf.Decision) Outcome {
 	return Outcome{
@@ -403,4 +411,14 @@ type FSMSnapshotEvent struct {
 	Target  string
 	Input   interface{}
 	Output  interface{}
+}
+
+// StartFSMWorkflowInput should be used to construct the input for any StartWorkflowExecutionRequests.
+// This panics on errors cause really this should never err.
+func StartFSMWorkflowInput(serializer Serialization, data interface{}) *string {
+	ss := new(SerializedState)
+	stateData := serializer.Serialize(data)
+	ss.StateData = stateData
+	serialized := serializer.Serialize(ss)
+	return aws.String(serialized)
 }
