@@ -171,8 +171,9 @@ func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 		}
 	}
 }
-func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
-	getState := func() (string, interface{}, error) {
+
+func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, error) {
+	getState := func() (*SerializedState, error) {
 
 		history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
 			Domain: S(c.f.Domain),
@@ -189,37 +190,40 @@ func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
 			} else {
 				log.Printf("component=client fn=GetState at=get-history error=%s", err)
 			}
-			return "", nil, err
+			return nil, err
 		}
 
-		serialized, err := c.f.findSerializedState(history.Events)
+		return c.f.findSerializedState(history.Events)
 
-		if err != nil {
-			log.Printf("component=client fn=GetState at=find-serialized-state error=%s", err)
-			return "", nil, err
-		}
-
-		data := c.f.zeroStateData()
-		err = c.f.Serializer.Deserialize(serialized.StateData, data)
-		if err != nil {
-			log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%s", err)
-			return "", nil, err
-		}
-
-		return serialized.StateName, data, nil
 	}
 
 	var err error
 	for i := 0; i < 5; i++ {
-		state, data, err := getState()
+		state, err := getState()
 		if err != nil && strings.HasSuffix(err.Error(), io.EOF.Error()) {
 			continue
 		} else {
-			return state, data, err
+			return state, err
 		}
 	}
 
-	return "", nil, err
+	return nil, err
+}
+
+func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
+	serialized, err := c.GetSerializedStateForRun(id, run)
+	if err != nil {
+		log.Printf("component=client fn=GetState at=get-serialized-state error=%s", err)
+		return "", nil, err
+	}
+	data := c.f.zeroStateData()
+	err = c.f.Serializer.Deserialize(serialized.StateData, data)
+	if err != nil {
+		log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%s", err)
+		return "", nil, err
+	}
+
+	return serialized.StateName, data, nil
 }
 
 func (c *client) GetState(id string) (string, interface{}, error) {
