@@ -20,7 +20,7 @@ type FSMClient interface {
 	WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error
 	GetState(id string) (string, interface{}, error)
 	GetStateForRun(workflow, run string) (string, interface{}, error)
-	GetSerializedStateForRun(workflow, run string) (*SerializedState, error)
+	GetSerializedStateForRun(workflow, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error)
 	GetSnapshots(id string) ([]FSMSnapshot, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
@@ -174,8 +174,8 @@ func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 	}
 }
 
-func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, error) {
-	getState := func() (*SerializedState, error) {
+func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error) {
+	getState := func() (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error) {
 
 		history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
 			Domain: S(c.f.Domain),
@@ -192,28 +192,29 @@ func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, err
 			} else {
 				log.Printf("component=client fn=GetState at=get-history error=%s", err)
 			}
-			return nil, err
+			return nil, nil, err
 		}
 
-		return c.f.findSerializedState(history.Events)
+		ss, err := c.f.findSerializedState(history.Events)
+		return ss, history, err
 
 	}
 
 	var err error
 	for i := 0; i < 5; i++ {
-		state, err := getState()
+		state, history, err := getState()
 		if err != nil && strings.HasSuffix(err.Error(), io.EOF.Error()) {
 			continue
 		} else {
-			return state, err
+			return state, history, err
 		}
 	}
 
-	return nil, err
+	return nil, nil, err
 }
 
 func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
-	serialized, err := c.GetSerializedStateForRun(id, run)
+	serialized, _, err := c.GetSerializedStateForRun(id, run)
 	if err != nil {
 		log.Printf("component=client fn=GetState at=get-serialized-state error=%s", err)
 		return "", nil, err
