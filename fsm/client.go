@@ -19,6 +19,8 @@ import (
 type FSMClient interface {
 	WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error
 	GetState(id string) (string, interface{}, error)
+	GetStateForRun(workflow, run string) (string, interface{}, error)
+	GetSerializedStateForRun(workflow, run string) (*SerializedState, error)
 	GetSnapshots(id string) ([]FSMSnapshot, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
