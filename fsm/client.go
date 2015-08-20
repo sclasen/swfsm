@@ -19,6 +19,8 @@ import (
 type FSMClient interface {
 	WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error
 	GetState(id string) (string, interface{}, error)
+	GetStateForRun(workflow, run string) (string, interface{}, error)
+	GetSerializedStateForRun(workflow, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error)
 	GetSnapshots(id string) ([]FSMSnapshot, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
@@ -171,8 +173,9 @@ func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 		}
 	}
 }
-func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
-	getState := func() (string, interface{}, error) {
+
+func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error) {
+	getState := func() (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error) {
 
 		history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
 			Domain: S(c.f.Domain),
@@ -189,37 +192,41 @@ func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
 			} else {
 				log.Printf("component=client fn=GetState at=get-history error=%s", err)
 			}
-			return "", nil, err
+			return nil, nil, err
 		}
 
-		serialized, err := c.f.findSerializedState(history.Events)
+		ss, err := c.f.findSerializedState(history.Events)
+		return ss, history, err
 
-		if err != nil {
-			log.Printf("component=client fn=GetState at=find-serialized-state error=%s", err)
-			return "", nil, err
-		}
-
-		data := c.f.zeroStateData()
-		err = c.f.Serializer.Deserialize(serialized.StateData, data)
-		if err != nil {
-			log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%s", err)
-			return "", nil, err
-		}
-
-		return serialized.StateName, data, nil
 	}
 
 	var err error
 	for i := 0; i < 5; i++ {
-		state, data, err := getState()
+		state, history, err := getState()
 		if err != nil && strings.HasSuffix(err.Error(), io.EOF.Error()) {
 			continue
 		} else {
-			return state, data, err
+			return state, history, err
 		}
 	}
 
-	return "", nil, err
+	return nil, nil, err
+}
+
+func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
+	serialized, _, err := c.GetSerializedStateForRun(id, run)
+	if err != nil {
+		log.Printf("component=client fn=GetState at=get-serialized-state error=%s", err)
+		return "", nil, err
+	}
+	data := c.f.zeroStateData()
+	err = c.f.Serializer.Deserialize(serialized.StateData, data)
+	if err != nil {
+		log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%s", err)
+		return "", nil, err
+	}
+
+	return serialized.StateName, data, nil
 }
 
 func (c *client) GetState(id string) (string, interface{}, error) {
