@@ -374,6 +374,7 @@ type SerializedState struct {
 	StateVersion uint64 `json:"stateVersion"`
 	StateName    string `json:"stateName"`
 	StateData    string `json:"stateData"`
+	WorkflowID   string `json:"workflowID"`
 }
 
 //ErrorState is used as the input to a marker that signifies that the workflow is in an error state.

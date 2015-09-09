@@ -372,7 +372,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 			logf(context, "at=error error=error-recovery-failed cause=%s", err)
 			//bump the unprocessed window, and re-record the error marker
 			errorState.LatestUnprocessedEventID = *decisionTask.StartedEventID
-			final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator, errorState)
+			final, serializedState, err := f.recordStateMarkers(context, outcome, eventCorrelator, errorState)
 			//update Error State Marker and exit with 3 marker decisions
 			return context, final, serializedState, err
 		}
@@ -406,7 +406,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 						EarliestUnprocessedEventID: *decisionTask.PreviousStartedEventID + 1,
 						LatestUnprocessedEventID:   *decisionTask.StartedEventID,
 					}
-					final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, eventCorrelator, errorState)
+					final, serializedState, err := f.recordStateMarkers(context, outcome, eventCorrelator, errorState)
 					if err != nil {
 						f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
 						if f.allowPanics {
@@ -444,7 +444,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 		outcome.Data = after.Data
 	}
 
-	final, serializedState, err := f.recordStateMarkers(context.stateVersion, outcome, context.eventCorrelator, nil)
+	final, serializedState, err := f.recordStateMarkers(context, outcome, context.eventCorrelator, nil)
 	if err != nil {
 		f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
 		if f.allowPanics {
@@ -664,13 +664,14 @@ func (f *FSM) findLastEvents(prevStarted int64, events []*swf.HistoryEvent) []*s
 	return lastEvents
 }
 
-func (f *FSM) recordStateMarkers(stateVersion uint64, outcome *Outcome, eventCorrelator *EventCorrelator, errorState *SerializedErrorState) ([]*swf.Decision, *SerializedState, error) {
+func (f *FSM) recordStateMarkers(context *FSMContext, outcome *Outcome, eventCorrelator *EventCorrelator, errorState *SerializedErrorState) ([]*swf.Decision, *SerializedState, error) {
 	serializedData, err := f.Serializer.Serialize(outcome.Data)
 
 	state := &SerializedState{
-		StateVersion: stateVersion + 1, //increment the version here only.
+		StateVersion: context.stateVersion + 1, //increment the version here only.
 		StateName:    outcome.State,
 		StateData:    serializedData,
+		WorkflowID:   *context.WorkflowID,
 	}
 	serializedMarker, err := f.systemSerializer.Serialize(state)
 
