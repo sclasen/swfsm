@@ -103,14 +103,14 @@ func TestClient(t *testing.T) {
 	}
 
 	found := false
-	err = fsmClient.WalkOpenWorkflowInfos(&swf.ListOpenWorkflowExecutionsInput{}, func(infos *swf.WorkflowExecutionInfos) error {
-		for _, info := range infos.ExecutionInfos {
+	err = fsmClient.WalkOpenWorkflowInfos(&swf.ListOpenWorkflowExecutionsInput{}, func(p *swf.WorkflowExecutionInfos, lastPage bool) (shouldContinue bool) {
+		for _, info := range p.ExecutionInfos {
 			if *info.Execution.WorkflowID == workflow {
 				found = true
-				return StopWalking()
+				return false
 			}
 		}
-		return nil
+		return true
 	})
 
 	if err != nil {
