@@ -83,7 +83,7 @@ func TestKinesisReplication(t *testing.T) {
 	if *replication.StreamName != rep.KinesisStream {
 		t.Fatalf("expected Kinesis stream: %q, got %q", rep.KinesisStream, replication.StreamName)
 	}
-	var replicatedState ReplicationData
+	var replicatedState SerializedState
 	if err := fsm.Serializer.Deserialize(string(replication.Data), &replicatedState); err != nil {
 		t.Fatal(err)
 	}

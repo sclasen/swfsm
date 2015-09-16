@@ -79,13 +79,6 @@ type FSMErrorReporter interface {
 	ErrorSerializingStateData(decisionTask *swf.PollForDecisionTaskOutput, outcome Outcome, eventCorrelator EventCorrelator, err error)
 }
 
-// ReplicationData is the part of SerializedState that will be replicated onto Kinesis streams.
-type ReplicationData struct {
-	StateVersion uint64 `json:"stateVersion"`
-	StateName    string `json:"stateName"`
-	StateData    string `json:"stateData"`
-}
-
 // StateSerializer defines the interface for serializing state to and deserializing state from the workflow history.
 type StateSerializer interface {
 	Serialize(state interface{}) (string, error)
