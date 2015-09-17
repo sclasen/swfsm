@@ -335,8 +335,8 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 	snapshots := []FSMSnapshot{}
 	var err error
 
+	snapshot := FSMSnapshot{}
 	for event := next(); event != nil; event = next() {
-		snapshot := FSMSnapshot{}
 
 		// TODO: how to deal with failure events?
 		switch EventType := *event.EventType; EventType {
@@ -418,6 +418,7 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 			}
 
 			snapshots = append(snapshots, snapshot)
+			snapshot = FSMSnapshot{}
 		}
 	}
 
