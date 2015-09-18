@@ -338,25 +338,39 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 	snapshot := FSMSnapshot{}
 	for event := next(); event != nil; event = next() {
 
-		// TODO: how to deal with failure events?
 		switch EventType := *event.EventType; EventType {
+
+		// starting
 		case swf.EventTypeWorkflowExecutionStarted:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:  EventType,
 				Name:  "start",
 				Input: c.tryDeserialize(event.WorkflowExecutionStartedEventAttributes.Input),
 			}
+
+		// signals
 		case swf.EventTypeWorkflowExecutionSignaled:
 			snapshot.Event = &FSMSnapshotEvent{
-				Type:  EventType,
-				Name:  *event.WorkflowExecutionSignaledEventAttributes.SignalName,
-				Input: c.tryDeserialize(event.WorkflowExecutionSignaledEventAttributes.Input),
+				Type:   EventType,
+				Name:   *event.WorkflowExecutionSignaledEventAttributes.SignalName,
+				Source: *event.WorkflowExecutionSignaledEventAttributes.ExternalWorkflowExecution.WorkflowID,
+				Input:  c.tryDeserialize(event.WorkflowExecutionSignaledEventAttributes.Input),
 			}
+
+		// activities
 		case swf.EventTypeActivityTaskScheduled:
 			if snapshot.Event != nil && snapshot.Event.Input == c.pointerScheduledEventID(event.EventID) {
 				snapshot.Event.Name = *event.ActivityTaskScheduledEventAttributes.ActivityType.Name
 				snapshot.Event.Version = *event.ActivityTaskScheduledEventAttributes.ActivityType.Version
 				snapshot.Event.Input = c.tryDeserialize(event.ActivityTaskScheduledEventAttributes.Input)
+			}
+		case swf.EventTypeScheduleActivityTaskFailed:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:    EventType,
+				Name:    *event.ScheduleActivityTaskFailedEventAttributes.ActivityType.Name,
+				Version: *event.ScheduleActivityTaskFailedEventAttributes.ActivityType.Version,
+				Target:  *event.ScheduleActivityTaskFailedEventAttributes.ActivityID,
+				Output:  *event.ScheduleActivityTaskFailedEventAttributes.Cause,
 			}
 		case swf.EventTypeActivityTaskCompleted:
 			snapshot.Event = &FSMSnapshotEvent{
@@ -364,13 +378,74 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 				Input:  c.pointerScheduledEventID(event.ActivityTaskCompletedEventAttributes.ScheduledEventID),
 				Output: c.tryDeserialize(event.ActivityTaskCompletedEventAttributes.Result),
 			}
-		case swf.EventTypeStartChildWorkflowExecutionInitiated:
+		case swf.EventTypeActivityTaskFailed:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
-				Name:   *event.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType.Name,
-				Input:  c.tryDeserialize(event.StartChildWorkflowExecutionInitiatedEventAttributes.Input),
-				Target: *event.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowID,
+				Input:  c.pointerScheduledEventID(event.ActivityTaskFailedEventAttributes.ScheduledEventID),
+				Output: c.tryDeserialize(event.ActivityTaskFailedEventAttributes.Details),
 			}
+		case swf.EventTypeActivityTaskCanceled:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Input:  c.pointerScheduledEventID(event.ActivityTaskCanceledEventAttributes.ScheduledEventID),
+				Output: c.tryDeserialize(event.ActivityTaskCanceledEventAttributes.Details),
+			}
+		case swf.EventTypeActivityTaskTimedOut:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Input:  c.pointerScheduledEventID(event.ActivityTaskTimedOutEventAttributes.ScheduledEventID),
+				Output: c.tryDeserialize(event.ActivityTaskTimedOutEventAttributes.Details),
+			}
+
+		// children
+		case swf.EventTypeStartChildWorkflowExecutionInitiated:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:    EventType,
+				Name:    *event.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType.Name,
+				Version: *event.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType.Version,
+				Input:   c.tryDeserialize(event.StartChildWorkflowExecutionInitiatedEventAttributes.Input),
+				Target:  *event.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowID,
+			}
+		case swf.EventTypeStartChildWorkflowExecutionFailed:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:    EventType,
+				Name:    *event.StartChildWorkflowExecutionFailedEventAttributes.WorkflowType.Name,
+				Version: *event.StartChildWorkflowExecutionFailedEventAttributes.WorkflowType.Version,
+				Target:  *event.StartChildWorkflowExecutionFailedEventAttributes.WorkflowID,
+				Output:  *event.StartChildWorkflowExecutionFailedEventAttributes.Cause,
+			}
+		case swf.EventTypeChildWorkflowExecutionFailed:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:    EventType,
+				Name:    *event.ChildWorkflowExecutionFailedEventAttributes.WorkflowType.Name,
+				Version: *event.ChildWorkflowExecutionFailedEventAttributes.WorkflowType.Version,
+				Target:  *event.ChildWorkflowExecutionFailedEventAttributes.WorkflowExecution.WorkflowID,
+			}
+		case swf.EventTypeChildWorkflowExecutionTimedOut:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:    EventType,
+				Name:    *event.ChildWorkflowExecutionTimedOutEventAttributes.WorkflowType.Name,
+				Version: *event.ChildWorkflowExecutionTimedOutEventAttributes.WorkflowType.Version,
+				Output:  *event.ChildWorkflowExecutionTimedOutEventAttributes.TimeoutType,
+				Target:  *event.ChildWorkflowExecutionTimedOutEventAttributes.WorkflowExecution.WorkflowID,
+			}
+		case swf.EventTypeChildWorkflowExecutionCanceled:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:    EventType,
+				Name:    *event.ChildWorkflowExecutionCanceledEventAttributes.WorkflowType.Name,
+				Version: *event.ChildWorkflowExecutionCanceledEventAttributes.WorkflowType.Version,
+				Output:  *event.ChildWorkflowExecutionCanceledEventAttributes.Details,
+				Target:  *event.ChildWorkflowExecutionCanceledEventAttributes.WorkflowExecution.WorkflowID,
+			}
+		case swf.EventTypeChildWorkflowExecutionTerminated:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:    EventType,
+				Name:    *event.ChildWorkflowExecutionTerminatedEventAttributes.WorkflowType.Name,
+				Version: *event.ChildWorkflowExecutionTerminatedEventAttributes.WorkflowType.Version,
+				Target:  *event.ChildWorkflowExecutionTerminatedEventAttributes.WorkflowExecution.WorkflowID,
+			}
+
+		// signal externals
 		case swf.EventTypeSignalExternalWorkflowExecutionInitiated:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
@@ -378,11 +453,21 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 				Input:  c.tryDeserialize(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input),
 				Target: *event.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 			}
+		case swf.EventTypeSignalExternalWorkflowExecutionFailed:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Target: *event.SignalExternalWorkflowExecutionFailedEventAttributes.WorkflowID,
+				Output: *event.SignalExternalWorkflowExecutionFailedEventAttributes.Cause,
+			}
+
+		// cancel externals
 		case swf.EventTypeRequestCancelExternalWorkflowExecutionInitiated:
 			snapshot.Event = &FSMSnapshotEvent{
 				Type:   EventType,
 				Target: *event.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
 			}
+
+		// timers
 		case swf.EventTypeTimerStarted:
 			if snapshot.Event != nil && snapshot.Event.Input == c.pointerStartedEventID(event.EventID) {
 				snapshot.Event.Input = *event.TimerStartedEventAttributes.StartToFireTimeout
@@ -393,10 +478,79 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 				Name:  *event.TimerFiredEventAttributes.TimerID,
 				Input: c.pointerStartedEventID(event.TimerFiredEventAttributes.StartedEventID),
 			}
+
+		// cancellations
 		case swf.EventTypeWorkflowExecutionCancelRequested:
 			snapshot.Event = &FSMSnapshotEvent{
-				Type: EventType,
+				Type:   EventType,
+				Source: *swf.WorkflowExecutionCancelRequestedEventAttributes.ExternalWorkflowExecution.WorkflowID,
+				Input:  *swf.WorkflowExecutionCancelRequestedEventAttributes.Cause,
 			}
+		case swf.EventTypeWorkflowExecutionCanceled:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Output: *swf.WorkflowExecutionCanceledEventAttributes.Details,
+			}
+		case swf.EventTypeCancelWorkflowExecutionFailed:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Output: *swf.CancelWorkflowExecutionFailedEventAttributes.Cause,
+			}
+
+		// completions
+		case swf.EventTypeWorkflowExecutionCompleted:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Output: c.tryDeserialize(swf.WorkflowExecutionCompletedEventAttributes.Result),
+			}
+		case swf.EventTypeCompleteWorkflowExecutionFailed:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Output: swf.CompleteWorkflowExecutionFailedEventAttributes.Cause,
+			}
+
+		// failed
+		case swf.EventTypeWorkflowExecutionFailed:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type: EventType,
+				Output: *swf.WorkflowExecutionFailedEventAttributes.Reason + ": " +
+					swf.WorkflowExecutionFailedEventAttributes.Details,
+			}
+		case swf.EventTypeFailWorkflowExecutionFailed:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Output: *swf.FailWorkflowExecutionFailedEventAttributes.Cause,
+			}
+
+		// time outs
+		case swf.EventTypeWorkflowExecutionTimedOut:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Output: *swf.WorkflowExecutionTimedOutEventAttributes.TimeoutType,
+			}
+
+		// continuations
+		case swf.EventTypeWorkflowExecutionContinuedAsNew:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Input:  c.tryDeserialize(swf.WorkflowExecutionContinuedAsNewEventAttributes.Input),
+				Output: *swf.WorkflowExecutionContinuedAsNewEventAttributes.NewExecutionRunID,
+			}
+		case swf.EventTypeContinueAsNewWorkflowExecutionFailed:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type:   EventType,
+				Output: *swf.ContinueAsNewWorkflowExecutionFailedEventAttributes.Cause,
+			}
+
+		// terminations
+		case swf.EventTypeWorkflowExecutionTerminated:
+			snapshot.Event = &FSMSnapshotEvent{
+				Type: EventType,
+				Output: *swf.WorkflowExecutionTerminatedEventAttributes.Cause + ": " +
+					*swf.WorkflowExecutionTerminatedEventAttributes.Reason + ": " +
+					*swf.WorkflowExecutionTerminatedEventAttributes.Details,
+			}
+
 		}
 
 		state, err := c.f.statefulHistoryEventToSerializedState(event)
