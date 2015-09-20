@@ -402,6 +402,7 @@ type FSMSnapshotEvent struct {
 	Timestamp  time.Time
 	Type       string
 	Attributes map[string]interface{}
+	References []int64
 }
 
 // StartFSMWorkflowInput should be used to construct the input for any StartWorkflowExecutionRequests.

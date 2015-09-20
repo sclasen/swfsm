@@ -12,6 +12,8 @@ import (
 	"encoding/json"
 	"reflect"
 
+	"strconv"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/swf"
@@ -338,6 +340,8 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 	snapshots := []FSMSnapshot{}
 	var err error
 
+	refs := make(map[int64][]int64)
+
 	snapshot := FSMSnapshot{
 		State: &FSMSnapshotState{
 			Name:    "<unrecorded>",
@@ -392,11 +396,23 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 		if err != nil {
 			break
 		}
+
+		for _, refKey := range []string{"ScheduledEventID", "StartedEventID"} {
+			if raw, ok := eventAttributes[refKey]; ok {
+				parsed, err := strconv.ParseInt(fmt.Sprint(raw), 10, 64)
+				if err != nil {
+					break
+				}
+				refs[parsed] = append(refs[parsed], *event.EventID)
+			}
+		}
+
 		snapshot.Events = append(snapshot.Events, &FSMSnapshotEvent{
 			Type:       *event.EventType,
 			ID:         *event.EventID,
 			Timestamp:  *event.EventTimestamp,
 			Attributes: eventAttributes,
+			References: refs[*event.EventID],
 		})
 	}
 
