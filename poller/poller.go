@@ -49,7 +49,7 @@ func (p *DecisionTaskPoller) Poll(taskReady func(*swf.PollForDecisionTaskOutput)
 		} else {
 			resp.Events = append(resp.Events, out.Events...)
 		}
-		shouldContinue := ! (lastPage || taskReady(resp)) //stop if last page or task ready
+		shouldContinue := !(lastPage || taskReady(resp)) //stop if last page or task ready
 		return shouldContinue
 	}
 
