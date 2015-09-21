@@ -341,18 +341,8 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 	var err error
 
 	refs := make(map[int64][]int64)
-
-	snapshot := FSMSnapshot{
-		State: &FSMSnapshotState{
-			Name:    "<unrecorded>",
-			ID:      999999,
-			Version: 999999,
-		},
-		Events: []*FSMSnapshotEvent{},
-	}
-
+	snapshot := FSMSnapshot{Events: []*FSMSnapshotEvent{}}
 	var nextCorrelator *EventCorrelator
-
 	for event := next(); event != nil; event = next() {
 		if c.f.isCorrelatorMarker(event) {
 			correlator, err := c.f.findSerializedEventCorrelator([]*swf.HistoryEvent{event})
@@ -390,6 +380,14 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 			nextCorrelator = nil
 
 			continue
+		}
+
+		if snapshot.State == nil {
+			snapshot.State = &FSMSnapshotState{
+				Name:    "<unrecorded>",
+				ID:      999999,
+				Version: 999999,
+			}
 		}
 
 		eventAttributes, err := c.snapshotEventAttributesMap(event)
