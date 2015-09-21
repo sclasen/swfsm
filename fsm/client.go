@@ -395,9 +395,9 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 			break
 		}
 
-		for _, refKey := range []string{"ScheduledEventID", "StartedEventID"} {
-			if raw, ok := eventAttributes[refKey]; ok {
-				parsed, err := strconv.ParseInt(fmt.Sprint(raw), 10, 64)
+		for key, value := range eventAttributes {
+			if strings.HasSuffix(key, "EventID") {
+				parsed, err := strconv.ParseInt(fmt.Sprint(value), 10, 64)
 				if err != nil {
 					break
 				}
