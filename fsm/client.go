@@ -18,7 +18,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
 	. "github.com/sclasen/swfsm/log"
+	"github.com/sclasen/swfsm/awsinternal/jsonutil"
 	. "github.com/sclasen/swfsm/sugar"
+	"sort"
 )
 
 type FSMClient interface {
@@ -27,9 +29,12 @@ type FSMClient interface {
 	GetStateForRun(workflow, run string) (string, interface{}, error)
 	GetSerializedStateForRun(workflow, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error)
 	GetSnapshots(id string) ([]FSMSnapshot, error)
+	GetSnapshotsFromHistoryEventIterator(itr HistoryEventIterator) ([]FSMSnapshot, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
 	RequestCancel(id string) error
+	GetHistoryEventIteratorFromWorkflowID(workflowID string) (HistoryEventIterator, error)
+	GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error)
 }
 
 type ClientSWFOps interface {
@@ -53,6 +58,8 @@ type client struct {
 	f *FSM
 	c ClientSWFOps
 }
+
+type HistoryEventIterator func() (*swf.HistoryEvent, error)
 
 type WorkflowInfosFunc func(infos *swf.WorkflowExecutionInfos) error
 
@@ -287,12 +294,10 @@ func (c *client) RequestCancel(id string) error {
 	return err
 }
 
-func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
-	snapshots := []FSMSnapshot{}
-
-	execution, err := c.findExecution(id)
+func (c *client) GetHistoryEventIteratorFromWorkflowID(workflowID string) (HistoryEventIterator, error) {
+	execution, err := c.findExecution(workflowID)
 	if err != nil {
-		return snapshots, err
+		return nil, err
 	}
 
 	req := &swf.GetWorkflowExecutionHistoryInput{
@@ -303,47 +308,79 @@ func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
 
 	history, err := c.c.GetWorkflowExecutionHistory(req)
 	if err != nil {
-		return snapshots, err
+		return nil, err
 	}
 
 	i := 0
-	var iErr error
-	snapshots, err = c.snapshotsFromHistoryEventIterator(func() *swf.HistoryEvent {
+	return func() (*swf.HistoryEvent, error) {
 		if i < len(history.Events) {
 			e := history.Events[i]
 			i++
-			return e
+			return e, nil
 		}
 
 		if history.NextPageToken != nil {
 			req.NextPageToken = history.NextPageToken
-			history, iErr = c.c.GetWorkflowExecutionHistory(req)
-			if iErr != nil {
-				return nil
+			history, err = c.c.GetWorkflowExecutionHistory(req)
+			if err != nil {
+				return nil, err
 			}
 
 			i = 1
-			return history.Events[0]
+			return history.Events[0], nil
 		}
 
-		return nil
-	})
-
-	if iErr != nil {
-		return snapshots, iErr
-	}
-
-	return snapshots, err
+		return nil, nil
+	}, nil
 }
 
-func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent) ([]FSMSnapshot, error) {
+type sortEventsDescending []*swf.HistoryEvent
+
+func (es sortEventsDescending) Len() int           { return len(es) }
+func (es sortEventsDescending) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
+func (es sortEventsDescending) Less(i, j int) bool { return *es[i].EventID > *es[j].EventID }
+
+func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error) {
+	history := swf.GetWorkflowExecutionHistoryOutput{}
+	err := jsonutil.UnmarshalJSON(&history, reader)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Sort(sortEventsDescending(history.Events))
+
+	i := 0
+	return func() (*swf.HistoryEvent, error) {
+		if i < len(history.Events) {
+			e := history.Events[i]
+			i++
+			return e, nil
+		}
+		return nil, nil
+	}, nil
+}
+
+func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
+	itr, err := c.GetHistoryEventIteratorFromWorkflowID(id)
+	if err != nil {
+		return nil, err
+	}
+	return c.GetSnapshotsFromHistoryEventIterator(itr)
+}
+
+func (c *client) GetSnapshotsFromHistoryEventIterator(itr HistoryEventIterator) ([]FSMSnapshot, error) {
 	snapshots := []FSMSnapshot{}
 	var err error
 
 	refs := make(map[int64][]int64)
 	snapshot := FSMSnapshot{Events: []*FSMSnapshotEvent{}}
 	var nextCorrelator *EventCorrelator
-	for event := next(); event != nil; event = next() {
+	event, err := itr()
+	for ; event != nil; event, err = itr() {
+		if err != nil {
+			return snapshots, err
+		}
+
 		if c.f.isCorrelatorMarker(event) {
 			correlator, err := c.f.findSerializedEventCorrelator([]*swf.HistoryEvent{event})
 			if err != nil {
