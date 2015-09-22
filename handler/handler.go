@@ -8,10 +8,9 @@ import (
 	"regexp"
 	"strconv"
 
-	"log"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	. "github.com/sclasen/swfsm/log"
 )
 
 //copy of aws.SendHandler modified to use different http clients for timeouts
@@ -28,17 +27,17 @@ func SWFSendHandler(polling, heartbeat *http.Client) func(*aws.Request) {
 			switch r.Operation.Name {
 			case "PollForDecisionTask", "PollForActivityTask":
 				if r.Service.Config.LogLevel.AtLeast(aws.LogDebug) {
-					log.Printf("using polling client %s %s", r.Service.ServiceName, r.Operation.Name)
+					Log.Printf("using polling client %s %s", r.Service.ServiceName, r.Operation.Name)
 				}
 				client = polling
 			case "RecordActivityTaskHeartbeat":
 				if r.Service.Config.LogLevel.AtLeast(aws.LogDebug) {
-					log.Printf("using heartbeat client %s %s", r.Service.ServiceName, r.Operation.Name)
+					Log.Printf("using heartbeat client %s %s", r.Service.ServiceName, r.Operation.Name)
 				}
 				client = heartbeat
 			default:
 				if r.Service.Config.LogLevel.AtLeast(aws.LogDebug) {
-					log.Printf("using std client %s %s", r.Service.ServiceName, r.Operation.Name)
+					Log.Printf("using std client %s %s", r.Service.ServiceName, r.Operation.Name)
 				}
 			}
 

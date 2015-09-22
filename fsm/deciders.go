@@ -2,10 +2,10 @@ package fsm
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 
 	"github.com/aws/aws-sdk-go/service/swf"
+	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -55,14 +55,14 @@ func (c *ComposedDecider) Decide(ctx *FSMContext, h *swf.HistoryEvent, data inte
 
 func logf(ctx *FSMContext, format string, data ...interface{}) {
 	format = fmt.Sprintf("workflow=%s workflow-id=%s state=%s ", LS(ctx.WorkflowType.Name), LS(ctx.WorkflowID), ctx.State) + format
-	log.Printf(format, data...)
+	Log.Printf(format, data...)
 }
 
 //DefaultDecider is a 'catch-all' decider that simply logs the unhandled decision.
 //You should place this or one like it as the last decider in your top level ComposableDecider.
 func DefaultDecider() Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-		log.Printf("at=unhandled-event event=%s state=%s default=stay decisions=0", LS(h.EventType), ctx.State)
+		Log.Printf("at=unhandled-event event=%s state=%s default=stay decisions=0", LS(h.EventType), ctx.State)
 		return ctx.Stay(data, ctx.EmptyDecisions())
 	}
 }
@@ -435,7 +435,7 @@ func Transition(toState string) Decider {
 // CompleteWorkflow completes the workflow
 func CompleteWorkflow() Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-		log.Printf("at=complete-workflow workflowID=%s", LS(ctx.WorkflowID))
+		Log.Printf("at=complete-workflow workflowID=%s", LS(ctx.WorkflowID))
 		return ctx.CompleteWorkflow(data)
 	}
 }
@@ -443,7 +443,7 @@ func CompleteWorkflow() Decider {
 // CompleteWorkflow completes the workflow
 func CancelWorkflow(details *string) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-		log.Printf("at=complete-workflow workflowID=%s", LS(ctx.WorkflowID))
+		Log.Printf("at=complete-workflow workflowID=%s", LS(ctx.WorkflowID))
 		return ctx.CancelWorkflow(data, details)
 	}
 }
