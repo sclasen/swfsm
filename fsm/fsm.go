@@ -14,8 +14,7 @@ import (
 
 //SWFOps is the subset of swf.SWF ops required by the fsm package
 type SWFOps interface {
-	PollForDecisionTask(*swf.PollForDecisionTaskInput) (*swf.PollForDecisionTaskOutput, error)
-	PollForActivityTask(*swf.PollForActivityTaskInput) (*swf.PollForActivityTaskOutput, error)
+	PollForDecisionTaskPages(*swf.PollForDecisionTaskInput, func(*swf.PollForDecisionTaskOutput, bool) bool) error
 	RespondDecisionTaskCompleted(*swf.RespondDecisionTaskCompletedInput) (*swf.RespondDecisionTaskCompletedOutput, error)
 }
 
@@ -247,7 +246,24 @@ func (f *FSM) Init() {
 func (f *FSM) Start() {
 	f.Init()
 	poller := poller.NewDecisionTaskPoller(f.SWF, f.Domain, f.Identity, f.TaskList)
-	go poller.PollUntilShutdownBy(f.ShutdownManager, fmt.Sprintf("%s-poller", f.Name), f.dispatchTask)
+	go poller.PollUntilShutdownBy(f.ShutdownManager, fmt.Sprintf("%s-poller", f.Name), f.dispatchTask, f.taskReady)
+}
+
+// signals the poller to stop reading decision task pages once we have marker events
+func (f *FSM) taskReady(task *swf.PollForDecisionTaskOutput) bool {
+	var start, state, correlator bool
+	for _, e := range task.Events {
+		if f.isStateMarker(e) {
+			state = true
+		}
+		if f.isCorrelatorMarker(e) {
+			correlator = true
+		}
+		if e.EventType != nil && *e.EventType == swf.EventTypeWorkflowExecutionStarted {
+			start = true
+		}
+	}
+	return (state && correlator) || start
 }
 
 func (f *FSM) dispatchTask(decisionTask *swf.PollForDecisionTaskOutput) {
