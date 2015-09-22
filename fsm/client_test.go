@@ -130,11 +130,7 @@ func TestClient(t *testing.T) {
 		t.Fatalf("snapshots length: %d", length)
 	}
 
-	if name := snapshots[0].Event.Name; name != "start" {
-		t.Fatalf("snapshots[0].Event.Name: %s ", name)
-	}
-
-	if Type := snapshots[0].Event.Type; Type != swf.EventTypeWorkflowExecutionStarted {
+	if Type := snapshots[0].Events[0].Type; Type != swf.EventTypeWorkflowExecutionStarted {
 		t.Fatalf("snapshots[0].Event.Type: %s ", Type)
 	}
 

@@ -384,9 +384,9 @@ type SerializedActivityState struct {
 }
 
 type FSMSnapshot struct {
-	State *FSMSnapshotState
-	Event *FSMSnapshotEvent
-	//	Actions // TODO: separate Actions from Events?
+	State      *FSMSnapshotState
+	Correlator *EventCorrelator
+	Events     []*FSMSnapshotEvent
 }
 
 type FSMSnapshotState struct {
@@ -398,13 +398,11 @@ type FSMSnapshotState struct {
 }
 
 type FSMSnapshotEvent struct {
-	Type    string
-	Name    string
-	Version string
-	Source  string
-	Target  string
-	Input   interface{}
-	Output  interface{}
+	ID         int64
+	Timestamp  time.Time
+	Type       string
+	Attributes map[string]interface{}
+	References []int64
 }
 
 // StartFSMWorkflowInput should be used to construct the input for any StartWorkflowExecutionRequests.

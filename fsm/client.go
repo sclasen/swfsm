@@ -9,6 +9,11 @@ import (
 	"io"
 	"strings"
 
+	"encoding/json"
+	"reflect"
+
+	"strconv"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/swf"
@@ -335,68 +340,17 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 	snapshots := []FSMSnapshot{}
 	var err error
 
+	refs := make(map[int64][]int64)
+	snapshot := FSMSnapshot{Events: []*FSMSnapshotEvent{}}
+	var nextCorrelator *EventCorrelator
 	for event := next(); event != nil; event = next() {
-		snapshot := FSMSnapshot{}
-
-		// TODO: how to deal with failure events?
-		switch EventType := *event.EventType; EventType {
-		case swf.EventTypeWorkflowExecutionStarted:
-			snapshot.Event = &FSMSnapshotEvent{
-				Type:  EventType,
-				Name:  "start",
-				Input: c.tryDeserialize(event.WorkflowExecutionStartedEventAttributes.Input),
+		if c.f.isCorrelatorMarker(event) {
+			correlator, err := c.f.findSerializedEventCorrelator([]*swf.HistoryEvent{event})
+			if err != nil {
+				break
 			}
-		case swf.EventTypeWorkflowExecutionSignaled:
-			snapshot.Event = &FSMSnapshotEvent{
-				Type:  EventType,
-				Name:  *event.WorkflowExecutionSignaledEventAttributes.SignalName,
-				Input: c.tryDeserialize(event.WorkflowExecutionSignaledEventAttributes.Input),
-			}
-		case swf.EventTypeActivityTaskScheduled:
-			if snapshot.Event != nil && snapshot.Event.Input == c.pointerScheduledEventID(event.EventID) {
-				snapshot.Event.Name = *event.ActivityTaskScheduledEventAttributes.ActivityType.Name
-				snapshot.Event.Version = *event.ActivityTaskScheduledEventAttributes.ActivityType.Version
-				snapshot.Event.Input = c.tryDeserialize(event.ActivityTaskScheduledEventAttributes.Input)
-			}
-		case swf.EventTypeActivityTaskCompleted:
-			snapshot.Event = &FSMSnapshotEvent{
-				Type:   EventType,
-				Input:  c.pointerScheduledEventID(event.ActivityTaskCompletedEventAttributes.ScheduledEventID),
-				Output: c.tryDeserialize(event.ActivityTaskCompletedEventAttributes.Result),
-			}
-		case swf.EventTypeStartChildWorkflowExecutionInitiated:
-			snapshot.Event = &FSMSnapshotEvent{
-				Type:   EventType,
-				Name:   *event.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType.Name,
-				Input:  c.tryDeserialize(event.StartChildWorkflowExecutionInitiatedEventAttributes.Input),
-				Target: *event.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowID,
-			}
-		case swf.EventTypeSignalExternalWorkflowExecutionInitiated:
-			snapshot.Event = &FSMSnapshotEvent{
-				Type:   EventType,
-				Name:   *event.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
-				Input:  c.tryDeserialize(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input),
-				Target: *event.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
-			}
-		case swf.EventTypeRequestCancelExternalWorkflowExecutionInitiated:
-			snapshot.Event = &FSMSnapshotEvent{
-				Type:   EventType,
-				Target: *event.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.WorkflowID,
-			}
-		case swf.EventTypeTimerStarted:
-			if snapshot.Event != nil && snapshot.Event.Input == c.pointerStartedEventID(event.EventID) {
-				snapshot.Event.Input = *event.TimerStartedEventAttributes.StartToFireTimeout
-			}
-		case swf.EventTypeTimerFired:
-			snapshot.Event = &FSMSnapshotEvent{
-				Type:  EventType,
-				Name:  *event.TimerFiredEventAttributes.TimerID,
-				Input: c.pointerStartedEventID(event.TimerFiredEventAttributes.StartedEventID),
-			}
-		case swf.EventTypeWorkflowExecutionCancelRequested:
-			snapshot.Event = &FSMSnapshotEvent{
-				Type: EventType,
-			}
+			nextCorrelator = correlator
+			continue
 		}
 
 		state, err := c.f.statefulHistoryEventToSerializedState(event)
@@ -405,6 +359,11 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 		}
 
 		if state != nil {
+			if snapshot.State != nil {
+				snapshots = append(snapshots, snapshot)
+				snapshot = FSMSnapshot{Events: []*FSMSnapshotEvent{}}
+			}
+
 			snapshot.State = &FSMSnapshotState{
 				ID:        *event.EventID,
 				Timestamp: *event.EventTimestamp,
@@ -417,32 +376,70 @@ func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent
 				break
 			}
 
-			snapshots = append(snapshots, snapshot)
+			snapshot.Correlator = nextCorrelator
+			nextCorrelator = nil
+
+			continue
 		}
+
+		if snapshot.State == nil {
+			snapshot.State = &FSMSnapshotState{
+				Name:    "<unrecorded>",
+				ID:      999999,
+				Version: 999999,
+			}
+		}
+
+		eventAttributes, err := c.snapshotEventAttributesMap(event)
+		if err != nil {
+			break
+		}
+
+		for key, value := range eventAttributes {
+			if strings.HasSuffix(key, "EventID") {
+				parsed, err := strconv.ParseInt(fmt.Sprint(value), 10, 64)
+				if err != nil {
+					break
+				}
+				refs[parsed] = append(refs[parsed], *event.EventID)
+			}
+		}
+
+		snapshot.Events = append(snapshot.Events, &FSMSnapshotEvent{
+			Type:       *event.EventType,
+			ID:         *event.EventID,
+			Timestamp:  *event.EventTimestamp,
+			Attributes: eventAttributes,
+			References: refs[*event.EventID],
+		})
+	}
+
+	if snapshot.State != nil {
+		snapshots = append(snapshots, snapshot)
 	}
 
 	return snapshots, err
 }
 
-func (c *client) tryDeserialize(serialized *string) interface{} {
-	if serialized == nil || *serialized == "" {
-		return ""
+func (c *client) snapshotEventAttributesMap(e *swf.HistoryEvent) (map[string]interface{}, error) {
+	attrStruct := reflect.ValueOf(*e).FieldByName(*e.EventType + "EventAttributes").Interface()
+	attrJsonBytes, err := json.Marshal(attrStruct)
+	if err != nil {
+		return nil, err
 	}
 
-	tryMap := make(map[string]interface{})
-	err := c.f.systemSerializer.Deserialize(*serialized, &tryMap)
-	if err == nil {
-		return tryMap
+	attrMap := make(map[string]interface{})
+	err = json.Unmarshal(attrJsonBytes, &attrMap)
+	if err != nil {
+		return nil, err
 	}
-	log.Printf("component=client fn=trySystemDeserialize at=deserialize-map error=%s", err)
 
-	return *serialized
-}
-
-func (c *client) pointerStartedEventID(id *int64) string {
-	return fmt.Sprintf("StartedEventID->%d", *id)
-}
-
-func (c *client) pointerScheduledEventID(id *int64) string {
-	return fmt.Sprintf("ScheduledEventID->%d", *id)
+	for k, v := range attrMap {
+		tryValueMap := make(map[string]interface{})
+		tryErr := json.Unmarshal([]byte(fmt.Sprint(v)), &tryValueMap)
+		if tryErr == nil {
+			attrMap[k] = tryValueMap
+		}
+	}
+	return attrMap, nil
 }
