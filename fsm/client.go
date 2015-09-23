@@ -35,6 +35,7 @@ type FSMClient interface {
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
 	RequestCancel(id string) error
 	GetHistoryEventIteratorFromWorkflowID(workflowID string) (HistoryEventIterator, error)
+	GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error)
 }
 
@@ -300,7 +301,10 @@ func (c *client) GetHistoryEventIteratorFromWorkflowID(workflowID string) (Histo
 	if err != nil {
 		return nil, err
 	}
+	return c.GetHistoryEventIteratorFromWorkflowExecution(execution)
+}
 
+func (c *client) GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error) {
 	req := &swf.GetWorkflowExecutionHistoryInput{
 		Domain:       S(c.f.Domain),
 		Execution:    execution,
