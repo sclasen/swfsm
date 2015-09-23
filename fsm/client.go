@@ -20,6 +20,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/sclasen/swfsm/awsinternal/jsonutil"
 	. "github.com/sclasen/swfsm/sugar"
+	"sort"
 )
 
 type FSMClient interface {
@@ -333,12 +334,20 @@ func (c *client) GetHistoryEventIteratorFromWorkflowID(workflowID string) (Histo
 	}, nil
 }
 
+type sortEventsDescending []*swf.HistoryEvent
+
+func (es sortEventsDescending) Len() int           { return len(es) }
+func (es sortEventsDescending) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
+func (es sortEventsDescending) Less(i, j int) bool { return *es[i].EventID > *es[j].EventID }
+
 func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error) {
 	history := swf.GetWorkflowExecutionHistoryOutput{}
 	err := jsonutil.UnmarshalJSON(&history, reader)
 	if err != nil {
 		return nil, err
 	}
+
+	sort.Sort(sortEventsDescending(history.Events))
 
 	i := 0
 	return func() (*swf.HistoryEvent, error) {
