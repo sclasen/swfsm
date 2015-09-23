@@ -8,15 +8,13 @@ import (
 	"io"
 	"strings"
 
-	"encoding/json"
-	"reflect"
-
-	"strconv"
+	"sort"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	"github.com/sclasen/swfsm/awsinternal/jsonutil"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -26,10 +24,17 @@ type FSMClient interface {
 	GetState(id string) (string, interface{}, error)
 	GetStateForRun(workflow, run string) (string, interface{}, error)
 	GetSerializedStateForRun(workflow, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error)
-	GetSnapshots(id string) ([]FSMSnapshot, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
 	RequestCancel(id string) error
+	GetHistoryEventIteratorFromWorkflowID(workflowID string) (HistoryEventIterator, error)
+	GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error)
+	GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error)
+	NewSnapshotter() Snapshotter
+
+	// DEPRECATED
+	// TODO: remove after clients have stopped using this
+	GetSnapshots(id string) ([]FSMSnapshot, error)
 }
 
 type ClientSWFOps interface {
@@ -53,6 +58,8 @@ type client struct {
 	f *FSM
 	c ClientSWFOps
 }
+
+type HistoryEventIterator func() (*swf.HistoryEvent, error)
 
 type WorkflowInfosFunc func(infos *swf.WorkflowExecutionInfos) error
 
@@ -287,14 +294,15 @@ func (c *client) RequestCancel(id string) error {
 	return err
 }
 
-func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
-	snapshots := []FSMSnapshot{}
-
-	execution, err := c.findExecution(id)
+func (c *client) GetHistoryEventIteratorFromWorkflowID(workflowID string) (HistoryEventIterator, error) {
+	execution, err := c.findExecution(workflowID)
 	if err != nil {
-		return snapshots, err
+		return nil, err
 	}
+	return c.GetHistoryEventIteratorFromWorkflowExecution(execution)
+}
 
+func (c *client) GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error) {
 	req := &swf.GetWorkflowExecutionHistoryInput{
 		Domain:       S(c.f.Domain),
 		Execution:    execution,
@@ -303,143 +311,64 @@ func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
 
 	history, err := c.c.GetWorkflowExecutionHistory(req)
 	if err != nil {
-		return snapshots, err
+		return nil, err
 	}
 
 	i := 0
-	var iErr error
-	snapshots, err = c.snapshotsFromHistoryEventIterator(func() *swf.HistoryEvent {
+	return func() (*swf.HistoryEvent, error) {
 		if i < len(history.Events) {
 			e := history.Events[i]
 			i++
-			return e
+			return e, nil
 		}
 
 		if history.NextPageToken != nil {
 			req.NextPageToken = history.NextPageToken
-			history, iErr = c.c.GetWorkflowExecutionHistory(req)
-			if iErr != nil {
-				return nil
+			history, err = c.c.GetWorkflowExecutionHistory(req)
+			if err != nil {
+				return nil, err
 			}
 
 			i = 1
-			return history.Events[0]
+			return history.Events[0], nil
 		}
 
-		return nil
-	})
-
-	if iErr != nil {
-		return snapshots, iErr
-	}
-
-	return snapshots, err
+		return nil, nil
+	}, nil
 }
 
-func (c *client) snapshotsFromHistoryEventIterator(next func() *swf.HistoryEvent) ([]FSMSnapshot, error) {
-	snapshots := []FSMSnapshot{}
-	var err error
+type sortEventsDescending []*swf.HistoryEvent
 
-	refs := make(map[int64][]int64)
-	snapshot := FSMSnapshot{Events: []*FSMSnapshotEvent{}}
-	var nextCorrelator *EventCorrelator
-	for event := next(); event != nil; event = next() {
-		if c.f.isCorrelatorMarker(event) {
-			correlator, err := c.f.findSerializedEventCorrelator([]*swf.HistoryEvent{event})
-			if err != nil {
-				break
-			}
-			nextCorrelator = correlator
-			continue
-		}
+func (es sortEventsDescending) Len() int           { return len(es) }
+func (es sortEventsDescending) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
+func (es sortEventsDescending) Less(i, j int) bool { return *es[i].EventID > *es[j].EventID }
 
-		state, err := c.f.statefulHistoryEventToSerializedState(event)
-		if err != nil {
-			break
-		}
-
-		if state != nil {
-			if snapshot.State != nil {
-				snapshots = append(snapshots, snapshot)
-				snapshot = FSMSnapshot{Events: []*FSMSnapshotEvent{}}
-			}
-
-			snapshot.State = &FSMSnapshotState{
-				ID:        *event.EventID,
-				Timestamp: *event.EventTimestamp,
-				Version:   state.StateVersion,
-				Name:      state.StateName,
-				Data:      c.f.zeroStateData(),
-			}
-			err = c.f.Serializer.Deserialize(state.StateData, snapshot.State.Data)
-			if err != nil {
-				break
-			}
-
-			snapshot.Correlator = nextCorrelator
-			nextCorrelator = nil
-
-			continue
-		}
-
-		if snapshot.State == nil {
-			snapshot.State = &FSMSnapshotState{
-				Name:    "<unrecorded>",
-				ID:      999999,
-				Version: 999999,
-			}
-		}
-
-		eventAttributes, err := c.snapshotEventAttributesMap(event)
-		if err != nil {
-			break
-		}
-
-		for key, value := range eventAttributes {
-			if strings.HasSuffix(key, "EventID") {
-				parsed, err := strconv.ParseInt(fmt.Sprint(value), 10, 64)
-				if err != nil {
-					break
-				}
-				refs[parsed] = append(refs[parsed], *event.EventID)
-			}
-		}
-
-		snapshot.Events = append(snapshot.Events, &FSMSnapshotEvent{
-			Type:       *event.EventType,
-			ID:         *event.EventID,
-			Timestamp:  *event.EventTimestamp,
-			Attributes: eventAttributes,
-			References: refs[*event.EventID],
-		})
-	}
-
-	if snapshot.State != nil {
-		snapshots = append(snapshots, snapshot)
-	}
-
-	return snapshots, err
-}
-
-func (c *client) snapshotEventAttributesMap(e *swf.HistoryEvent) (map[string]interface{}, error) {
-	attrStruct := reflect.ValueOf(*e).FieldByName(*e.EventType + "EventAttributes").Interface()
-	attrJsonBytes, err := json.Marshal(attrStruct)
+func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error) {
+	history := swf.GetWorkflowExecutionHistoryOutput{}
+	err := jsonutil.UnmarshalJSON(&history, reader)
 	if err != nil {
 		return nil, err
 	}
 
-	attrMap := make(map[string]interface{})
-	err = json.Unmarshal(attrJsonBytes, &attrMap)
-	if err != nil {
-		return nil, err
-	}
+	sort.Sort(sortEventsDescending(history.Events))
 
-	for k, v := range attrMap {
-		tryValueMap := make(map[string]interface{})
-		tryErr := json.Unmarshal([]byte(fmt.Sprint(v)), &tryValueMap)
-		if tryErr == nil {
-			attrMap[k] = tryValueMap
+	i := 0
+	return func() (*swf.HistoryEvent, error) {
+		if i < len(history.Events) {
+			e := history.Events[i]
+			i++
+			return e, nil
 		}
-	}
-	return attrMap, nil
+		return nil, nil
+	}, nil
+}
+
+func (c *client) NewSnapshotter() Snapshotter {
+	return newSnapshotter(c)
+}
+
+// DEPRECATED
+// TODO: remove after clients have stopped using this
+func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
+	return c.NewSnapshotter().FromWorkflowID(id)
 }
