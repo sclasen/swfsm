@@ -13,14 +13,15 @@ import (
 
 	"strconv"
 
+	"sort"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
-	. "github.com/sclasen/swfsm/log"
 	"github.com/sclasen/swfsm/awsinternal/jsonutil"
+	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
-	"sort"
 )
 
 type FSMClient interface {
@@ -372,7 +373,12 @@ func (c *client) GetSnapshotsFromHistoryEventIterator(itr HistoryEventIterator) 
 	snapshots := []FSMSnapshot{}
 	var err error
 
-	refs := make(map[int64][]int64)
+	zero := c.f.zeroStateData()
+	unrecordedName := "<unrecorded>"
+	unrecordedID := int64(999999)
+	unrecordedVersion := uint64(999999)
+
+	refs := make(map[int64][]*int64)
 	snapshot := FSMSnapshot{Events: []*FSMSnapshotEvent{}}
 	var nextCorrelator *EventCorrelator
 	event, err := itr()
@@ -402,11 +408,11 @@ func (c *client) GetSnapshotsFromHistoryEventIterator(itr HistoryEventIterator) 
 			}
 
 			snapshot.State = &FSMSnapshotState{
-				ID:        *event.EventID,
-				Timestamp: *event.EventTimestamp,
-				Version:   state.StateVersion,
-				Name:      state.StateName,
-				Data:      c.f.zeroStateData(),
+				ID:        event.EventID,
+				Timestamp: event.EventTimestamp,
+				Version:   &state.StateVersion,
+				Name:      S(state.StateName),
+				Data:      &zero,
 			}
 			err = c.f.Serializer.Deserialize(state.StateData, snapshot.State.Data)
 			if err != nil {
@@ -421,9 +427,9 @@ func (c *client) GetSnapshotsFromHistoryEventIterator(itr HistoryEventIterator) 
 
 		if snapshot.State == nil {
 			snapshot.State = &FSMSnapshotState{
-				Name:    "<unrecorded>",
-				ID:      999999,
-				Version: 999999,
+				Name:    &unrecordedName,
+				ID:      &(unrecordedID),
+				Version: &unrecordedVersion,
 			}
 		}
 
@@ -438,15 +444,15 @@ func (c *client) GetSnapshotsFromHistoryEventIterator(itr HistoryEventIterator) 
 				if err != nil {
 					break
 				}
-				refs[parsed] = append(refs[parsed], *event.EventID)
+				refs[parsed] = append(refs[parsed], event.EventID)
 			}
 		}
 
 		snapshot.Events = append(snapshot.Events, &FSMSnapshotEvent{
-			Type:       *event.EventType,
-			ID:         *event.EventID,
-			Timestamp:  *event.EventTimestamp,
-			Attributes: eventAttributes,
+			Type:       event.EventType,
+			ID:         event.EventID,
+			Timestamp:  event.EventTimestamp,
+			Attributes: &eventAttributes,
 			References: refs[*event.EventID],
 		})
 	}

@@ -390,19 +390,19 @@ type FSMSnapshot struct {
 }
 
 type FSMSnapshotState struct {
-	ID        int64
-	Timestamp time.Time
-	Version   uint64
-	Name      string
-	Data      interface{}
+	ID        *int64
+	Timestamp *time.Time
+	Version   *uint64
+	Name      *string
+	Data      *interface{}
 }
 
 type FSMSnapshotEvent struct {
-	ID         int64
-	Timestamp  time.Time
-	Type       string
-	Attributes map[string]interface{}
-	References []int64
+	ID         *int64
+	Timestamp  *time.Time
+	Type       *string
+	Attributes *map[string]interface{}
+	References []*int64
 }
 
 // StartFSMWorkflowInput should be used to construct the input for any StartWorkflowExecutionRequests.
