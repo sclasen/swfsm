@@ -8,11 +8,6 @@ import (
 	"io"
 	"strings"
 
-	"encoding/json"
-	"reflect"
-
-	"strconv"
-
 	"sort"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -29,14 +24,17 @@ type FSMClient interface {
 	GetState(id string) (string, interface{}, error)
 	GetStateForRun(workflow, run string) (string, interface{}, error)
 	GetSerializedStateForRun(workflow, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error)
-	GetSnapshots(id string) ([]FSMSnapshot, error)
-	GetSnapshotsFromHistoryEventIterator(itr HistoryEventIterator) ([]FSMSnapshot, error)
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
 	RequestCancel(id string) error
 	GetHistoryEventIteratorFromWorkflowID(workflowID string) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error)
+	NewSnapshotter() Snapshotter
+
+	// DEPRECATED
+	// TODO: remove after clients have stopped using this
+	GetSnapshots(id string) ([]FSMSnapshot, error)
 }
 
 type ClientSWFOps interface {
@@ -365,128 +363,12 @@ func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEve
 	}, nil
 }
 
+func (c *client) NewSnapshotter() Snapshotter {
+	return newSnapshotter(c)
+}
+
+// DEPRECATED
+// TODO: remove after clients have stopped using this
 func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
-	itr, err := c.GetHistoryEventIteratorFromWorkflowID(id)
-	if err != nil {
-		return nil, err
-	}
-	return c.GetSnapshotsFromHistoryEventIterator(itr)
-}
-
-func (c *client) GetSnapshotsFromHistoryEventIterator(itr HistoryEventIterator) ([]FSMSnapshot, error) {
-	snapshots := []FSMSnapshot{}
-	var err error
-
-	zero := c.f.zeroStateData()
-	unrecordedName := "<unrecorded>"
-	unrecordedID := int64(999999)
-	unrecordedVersion := uint64(999999)
-
-	refs := make(map[int64][]*int64)
-	snapshot := FSMSnapshot{Events: []*FSMSnapshotEvent{}}
-	var nextCorrelator *EventCorrelator
-	event, err := itr()
-	for ; event != nil; event, err = itr() {
-		if err != nil {
-			return snapshots, err
-		}
-
-		if c.f.isCorrelatorMarker(event) {
-			correlator, err := c.f.findSerializedEventCorrelator([]*swf.HistoryEvent{event})
-			if err != nil {
-				break
-			}
-			nextCorrelator = correlator
-			continue
-		}
-
-		state, err := c.f.statefulHistoryEventToSerializedState(event)
-		if err != nil {
-			break
-		}
-
-		if state != nil {
-			if snapshot.State != nil {
-				snapshots = append(snapshots, snapshot)
-				snapshot = FSMSnapshot{Events: []*FSMSnapshotEvent{}}
-			}
-
-			snapshot.State = &FSMSnapshotState{
-				ID:        event.EventID,
-				Timestamp: event.EventTimestamp,
-				Version:   &state.StateVersion,
-				Name:      S(state.StateName),
-				Data:      &zero,
-			}
-			err = c.f.Serializer.Deserialize(state.StateData, snapshot.State.Data)
-			if err != nil {
-				break
-			}
-
-			snapshot.Correlator = nextCorrelator
-			nextCorrelator = nil
-
-			continue
-		}
-
-		if snapshot.State == nil {
-			snapshot.State = &FSMSnapshotState{
-				Name:    &unrecordedName,
-				ID:      &(unrecordedID),
-				Version: &unrecordedVersion,
-			}
-		}
-
-		eventAttributes, err := c.snapshotEventAttributesMap(event)
-		if err != nil {
-			break
-		}
-
-		for key, value := range eventAttributes {
-			if strings.HasSuffix(key, "EventID") {
-				parsed, err := strconv.ParseInt(fmt.Sprint(value), 10, 64)
-				if err != nil {
-					break
-				}
-				refs[parsed] = append(refs[parsed], event.EventID)
-			}
-		}
-
-		snapshot.Events = append(snapshot.Events, &FSMSnapshotEvent{
-			Type:       event.EventType,
-			ID:         event.EventID,
-			Timestamp:  event.EventTimestamp,
-			Attributes: &eventAttributes,
-			References: refs[*event.EventID],
-		})
-	}
-
-	if snapshot.State != nil {
-		snapshots = append(snapshots, snapshot)
-	}
-
-	return snapshots, err
-}
-
-func (c *client) snapshotEventAttributesMap(e *swf.HistoryEvent) (map[string]interface{}, error) {
-	attrStruct := reflect.ValueOf(*e).FieldByName(*e.EventType + "EventAttributes").Interface()
-	attrJsonBytes, err := json.Marshal(attrStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	attrMap := make(map[string]interface{})
-	err = json.Unmarshal(attrJsonBytes, &attrMap)
-	if err != nil {
-		return nil, err
-	}
-
-	for k, v := range attrMap {
-		tryValueMap := make(map[string]interface{})
-		tryErr := json.Unmarshal([]byte(fmt.Sprint(v)), &tryValueMap)
-		if tryErr == nil {
-			attrMap[k] = tryValueMap
-		}
-	}
-	return attrMap, nil
+	return c.NewSnapshotter().FromWorkflowID(id)
 }

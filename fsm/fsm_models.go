@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"time"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/golang/protobuf/proto"
@@ -381,28 +379,6 @@ type SerializedErrorState struct {
 type SerializedActivityState struct {
 	ActivityID string
 	Input      *string
-}
-
-type FSMSnapshot struct {
-	State      *FSMSnapshotState
-	Correlator *EventCorrelator
-	Events     []*FSMSnapshotEvent
-}
-
-type FSMSnapshotState struct {
-	ID        *int64
-	Timestamp *time.Time
-	Version   *uint64
-	Name      *string
-	Data      *interface{}
-}
-
-type FSMSnapshotEvent struct {
-	ID         *int64
-	Timestamp  *time.Time
-	Type       *string
-	Attributes *map[string]interface{}
-	References []*int64
 }
 
 // StartFSMWorkflowInput should be used to construct the input for any StartWorkflowExecutionRequests.
