@@ -21,6 +21,7 @@ type FSMSnapshot struct {
 	State                   *FSMSnapshotState
 	Correlator              *EventCorrelator
 	Events                  []*FSMSnapshotEvent
+	WorkflowID              *string
 	ContinuedExecutionRunID *string
 }
 
@@ -130,6 +131,8 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 			if err != nil {
 				break
 			}
+
+			snapshot.WorkflowID = &state.WorkflowID
 
 			if event.WorkflowExecutionStartedEventAttributes != nil {
 				snapshot.ContinuedExecutionRunID = event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunID
