@@ -57,7 +57,7 @@ func TestInterceptors(t *testing.T) {
 			EventID:   I(10),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-				Input: StartFSMWorkflowInput(fsm, new(TestData)),
+				Input: StartFSMWorkflowInput(fsm, "wf", new(TestData)),
 			},
 		},
 	}

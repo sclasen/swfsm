@@ -383,9 +383,10 @@ type SerializedActivityState struct {
 
 // StartFSMWorkflowInput should be used to construct the input for any StartWorkflowExecutionRequests.
 // This panics on errors cause really this should never err.
-func StartFSMWorkflowInput(serializer Serialization, data interface{}) *string {
+func StartFSMWorkflowInput(serializer Serialization, workflowID string, data interface{}) *string {
 	ss := new(SerializedState)
 	stateData := serializer.Serialize(data)
+	ss.WorkflowID = workflowID
 	ss.StateData = stateData
 	serialized := serializer.Serialize(ss)
 	return aws.String(serialized)
