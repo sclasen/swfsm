@@ -18,9 +18,11 @@ import (
 )
 
 type FSMSnapshot struct {
-	State      *FSMSnapshotState
-	Correlator *EventCorrelator
-	Events     []*FSMSnapshotEvent
+	State                   *FSMSnapshotState
+	Correlator              *EventCorrelator
+	Events                  []*FSMSnapshotEvent
+	WorkflowID              *string
+	ContinuedExecutionRunID *string
 }
 
 type FSMSnapshotState struct {
@@ -128,6 +130,12 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 			err = s.c.f.Serializer.Deserialize(state.StateData, snapshot.State.Data)
 			if err != nil {
 				break
+			}
+
+			snapshot.WorkflowID = &state.WorkflowID
+
+			if event.WorkflowExecutionStartedEventAttributes != nil {
+				snapshot.ContinuedExecutionRunID = event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunID
 			}
 
 			snapshot.Correlator = nextCorrelator
