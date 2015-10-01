@@ -38,7 +38,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
-		ActivityID: S("id"),
+		ActivityId: S("id"),
 		Input:      S(input),
 	})
 
@@ -60,7 +60,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
-		ActivityID: S("id"),
+		ActivityId: S("id"),
 		Input:      S(input),
 	})
 
@@ -94,7 +94,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
-		ActivityID: S("id"),
+		ActivityId: S("id"),
 		Input:      S(input),
 	})
 
@@ -116,7 +116,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
-		ActivityID: S("id"),
+		ActivityId: S("id"),
 		Input:      S(input),
 	})
 
@@ -157,7 +157,7 @@ func TestTickRateLimit(t *testing.T) {
 		ActivityType: &swf.ActivityType{
 			Name: S("activity"),
 		},
-		ActivityID: S("id"),
+		ActivityId: S("id"),
 		Input:      S(input),
 	})
 

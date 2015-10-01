@@ -21,8 +21,8 @@ type FSMSnapshot struct {
 	State                   *FSMSnapshotState
 	Correlator              *EventCorrelator
 	Events                  []*FSMSnapshotEvent
-	WorkflowID              *string
-	ContinuedExecutionRunID *string
+	WorkflowId              *string
+	ContinuedExecutionRunId *string
 }
 
 type FSMSnapshotState struct {
@@ -42,7 +42,7 @@ type FSMSnapshotEvent struct {
 }
 
 type Snapshotter interface {
-	FromWorkflowID(id string) ([]FSMSnapshot, error)
+	FromWorkflowId(id string) ([]FSMSnapshot, error)
 	FromWorkflowExecution(exec *swf.WorkflowExecution) ([]FSMSnapshot, error)
 	FromReader(reader io.Reader) ([]FSMSnapshot, error)
 	FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMSnapshot, error)
@@ -58,8 +58,8 @@ func newSnapshotter(c *client) Snapshotter {
 	}
 }
 
-func (s *snapshotter) FromWorkflowID(id string) ([]FSMSnapshot, error) {
-	itr, err := s.c.GetHistoryEventIteratorFromWorkflowID(id)
+func (s *snapshotter) FromWorkflowId(id string) ([]FSMSnapshot, error) {
+	itr, err := s.c.GetHistoryEventIteratorFromWorkflowId(id)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 
 	zero := s.c.f.zeroStateData()
 	unrecordedName := "<unrecorded>"
-	unrecordedID := int64(999999)
+	unrecordedId := int64(999999)
 	unrecordedVersion := uint64(999999)
 
 	refs := make(map[int64][]*int64)
@@ -121,7 +121,7 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 			}
 
 			snapshot.State = &FSMSnapshotState{
-				ID:        event.EventID,
+				ID:        event.EventId,
 				Timestamp: event.EventTimestamp,
 				Version:   &state.StateVersion,
 				Name:      S(state.StateName),
@@ -132,10 +132,10 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 				break
 			}
 
-			snapshot.WorkflowID = &state.WorkflowID
+			snapshot.WorkflowId = &state.WorkflowId
 
 			if event.WorkflowExecutionStartedEventAttributes != nil {
-				snapshot.ContinuedExecutionRunID = event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunID
+				snapshot.ContinuedExecutionRunId = event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunId
 			}
 
 			snapshot.Correlator = nextCorrelator
@@ -147,7 +147,7 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 		if snapshot.State == nil {
 			snapshot.State = &FSMSnapshotState{
 				Name:    &unrecordedName,
-				ID:      &(unrecordedID),
+				ID:      &(unrecordedId),
 				Version: &unrecordedVersion,
 			}
 		}
@@ -158,21 +158,21 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 		}
 
 		for key, value := range eventAttributes {
-			if strings.HasSuffix(key, "EventID") {
+			if strings.HasSuffix(key, "EventId") {
 				parsed, err := strconv.ParseInt(fmt.Sprint(value), 10, 64)
 				if err != nil {
 					break
 				}
-				refs[parsed] = append(refs[parsed], event.EventID)
+				refs[parsed] = append(refs[parsed], event.EventId)
 			}
 		}
 
 		snapshot.Events = append(snapshot.Events, &FSMSnapshotEvent{
 			Type:       event.EventType,
-			ID:         event.EventID,
+			ID:         event.EventId,
 			Timestamp:  event.EventTimestamp,
 			Attributes: &eventAttributes,
-			References: refs[*event.EventID],
+			References: refs[*event.EventId],
 		})
 	}
 

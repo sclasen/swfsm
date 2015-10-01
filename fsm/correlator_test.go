@@ -23,7 +23,7 @@ func TestTrackPendingActivities(t *testing.T) {
 			decision := &swf.Decision{
 				DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 				ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
-					ActivityID:   S(testActivityInfo.ActivityID),
+					ActivityId:   S(testActivityInfo.ActivityId),
 					ActivityType: testActivityInfo.ActivityType,
 					TaskList:     &swf.TaskList{Name: S("taskList")},
 					Input:        S(serialized),
@@ -53,7 +53,7 @@ func TestTrackPendingActivities(t *testing.T) {
 					DecisionType: S(swf.DecisionTypeStartTimer),
 					StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
 						StartToFireTimeout: S(timeoutSeconds),
-						TimerID:            S("timeToComplete"),
+						TimerId:            S("timeToComplete"),
 					},
 				}
 				return f.Goto("done", testData, []*swf.Decision{decision})
@@ -68,7 +68,7 @@ func TestTrackPendingActivities(t *testing.T) {
 				decision := &swf.Decision{
 					DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 					ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
-						ActivityID:   S(testActivityInfo.ActivityID),
+						ActivityId:   S(testActivityInfo.ActivityId),
 						ActivityType: testActivityInfo.ActivityType,
 						TaskList:     &swf.TaskList{Name: S("taskList")},
 						Input:        S(serialized),
@@ -106,10 +106,10 @@ func TestTrackPendingActivities(t *testing.T) {
 
 	// Schedule a task
 	events := []*swf.HistoryEvent{
-		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
-		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventId: I(3)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventId: I(2)},
 		&swf.HistoryEvent{
-			EventID:   I(1),
+			EventId:   I(1),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
 				Input: StartFSMWorkflowInput(fsm, new(TestData)),
@@ -131,22 +131,22 @@ func TestTrackPendingActivities(t *testing.T) {
 	secondEvents := []*swf.HistoryEvent{
 		{
 			EventType: S("ActivityTaskFailed"),
-			EventID:   I(7),
+			EventId:   I(7),
 			ActivityTaskFailedEventAttributes: &swf.ActivityTaskFailedEventAttributes{
-				ScheduledEventID: I(6),
+				ScheduledEventId: I(6),
 			},
 		},
 		{
 			EventType: S("ActivityTaskScheduled"),
-			EventID:   I(6),
+			EventId:   I(6),
 			ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
-				ActivityID:   S(testActivityInfo.ActivityID),
+				ActivityId:   S(testActivityInfo.ActivityId),
 				ActivityType: testActivityInfo.ActivityType,
 			},
 		},
 		{
 			EventType: S("MarkerRecorded"),
-			EventID:   I(5),
+			EventId:   I(5),
 			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
 				MarkerName: S(StateMarker),
 				Details:    recordMarker.RecordMarkerDecisionAttributes.Details,
@@ -172,22 +172,22 @@ func TestTrackPendingActivities(t *testing.T) {
 	thirdEvents := []*swf.HistoryEvent{
 		{
 			EventType: S("ActivityTaskCompleted"),
-			EventID:   I(11),
+			EventId:   I(11),
 			ActivityTaskCompletedEventAttributes: &swf.ActivityTaskCompletedEventAttributes{
-				ScheduledEventID: I(10),
+				ScheduledEventId: I(10),
 			},
 		},
 		{
 			EventType: S("ActivityTaskScheduled"),
-			EventID:   I(10),
+			EventId:   I(10),
 			ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
-				ActivityID:   S(testActivityInfo.ActivityID),
+				ActivityId:   S(testActivityInfo.ActivityId),
 				ActivityType: testActivityInfo.ActivityType,
 			},
 		},
 		{
 			EventType: S("MarkerRecorded"),
-			EventID:   I(9),
+			EventId:   I(9),
 			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
 				MarkerName: S(StateMarker),
 				Details:    recordMarker.RecordMarkerDecisionAttributes.Details,
@@ -212,15 +212,15 @@ func TestTrackPendingActivities(t *testing.T) {
 	fourthEvents := []*swf.HistoryEvent{
 		{
 			EventType: S("TimerFired"),
-			EventID:   I(14),
+			EventId:   I(14),
 			TimerFiredEventAttributes: &swf.TimerFiredEventAttributes{
-				StartedEventID: I(12),
-				TimerID:        S("FOO"),
+				StartedEventId: I(12),
+				TimerId:        S("FOO"),
 			},
 		},
 		{
 			EventType: S("MarkerRecorded"),
-			EventID:   I(13),
+			EventId:   I(13),
 			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
 				MarkerName: S(StateMarker),
 				Details:    recordMarker.RecordMarkerDecisionAttributes.Details,
@@ -228,9 +228,9 @@ func TestTrackPendingActivities(t *testing.T) {
 		},
 		{
 			EventType: S(swf.EventTypeTimerStarted),
-			EventID:   I(12),
+			EventId:   I(12),
 			TimerStartedEventAttributes: &swf.TimerStartedEventAttributes{
-				TimerID: S("foo"),
+				TimerId: S("foo"),
 			},
 		},
 	}
@@ -251,13 +251,13 @@ func TestTrackPendingActivities(t *testing.T) {
 
 func TestFSMContextActivityTracking(t *testing.T) {
 	ctx := testContext(testFSM())
-	scheduledEventID := rand.Int()
-	activityID := fmt.Sprintf("test-activity-%d", scheduledEventID)
+	scheduledEventId := rand.Int()
+	activityId := fmt.Sprintf("test-activity-%d", scheduledEventId)
 	taskScheduled := &swf.HistoryEvent{
 		EventType: S("ActivityTaskScheduled"),
-		EventID:   I(scheduledEventID),
+		EventId:   I(scheduledEventId),
 		ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
-			ActivityID: S(activityID),
+			ActivityId: S(activityId),
 			ActivityType: &swf.ActivityType{
 				Name:    S("test-activity"),
 				Version: S("1"),
@@ -280,26 +280,26 @@ func TestFSMContextActivityTracking(t *testing.T) {
 	// the pending activity can now be retrieved
 	taskCompleted := &swf.HistoryEvent{
 		EventType: S("ActivityTaskCompleted"),
-		EventID:   I(rand.Int()),
+		EventId:   I(rand.Int()),
 		ActivityTaskCompletedEventAttributes: &swf.ActivityTaskCompletedEventAttributes{
-			ScheduledEventID: I(scheduledEventID),
+			ScheduledEventId: I(scheduledEventId),
 		},
 	}
 	taskFailed := &swf.HistoryEvent{
 		EventType: S("ActivityTaskFailed"),
-		EventID:   I(rand.Int()),
+		EventId:   I(rand.Int()),
 		ActivityTaskFailedEventAttributes: &swf.ActivityTaskFailedEventAttributes{
-			ScheduledEventID: I(scheduledEventID),
+			ScheduledEventId: I(scheduledEventId),
 		},
 	}
 	infoOnCompleted := ctx.ActivityInfo(taskCompleted)
 	infoOnFailed := ctx.ActivityInfo(taskFailed)
-	if infoOnCompleted.ActivityID != activityID ||
+	if infoOnCompleted.ActivityId != activityId ||
 		*infoOnCompleted.Name != "test-activity" ||
 		*infoOnCompleted.Version != "1" {
 		t.Fatal("Pending activity can not be retrieved when completed")
 	}
-	if infoOnFailed.ActivityID != activityID ||
+	if infoOnFailed.ActivityId != activityId ||
 		*infoOnFailed.Name != "test-activity" ||
 		*infoOnFailed.Version != "1" {
 		t.Fatal("Pending activity can not be retrieved when failed")
@@ -314,7 +314,7 @@ func TestFSMContextActivityTracking(t *testing.T) {
 			t.Fatal("Got an unexpected event")
 		}
 		infoOnCompleted := ctx.ActivityInfo(taskCompleted)
-		if infoOnCompleted.ActivityID != activityID ||
+		if infoOnCompleted.ActivityId != activityId ||
 			*infoOnCompleted.Name != "test-activity" ||
 			*infoOnCompleted.Version != "1" {
 			t.Fatal("Pending activity can not be retrieved when completed")
@@ -332,16 +332,16 @@ func TestCountActivityAttemtps(t *testing.T) {
 
 	start := func(eventId int) *swf.HistoryEvent {
 		return EventFromPayload(eventId, &swf.ActivityTaskScheduledEventAttributes{
-			ActivityID: S("the-id"),
+			ActivityId: S("the-id"),
 		})
 	}
 
 	fail := EventFromPayload(2, &swf.ActivityTaskFailedEventAttributes{
-		ScheduledEventID: I(1),
+		ScheduledEventId: I(1),
 	})
 
 	timeout := EventFromPayload(4, &swf.ActivityTaskTimedOutEventAttributes{
-		ScheduledEventID: I(3),
+		ScheduledEventId: I(3),
 	})
 
 	c.Track(start(1))
@@ -355,7 +355,7 @@ func TestCountActivityAttemtps(t *testing.T) {
 		t.Fatal(PrettyHistoryEvent(start(1)), PrettyHistoryEvent(fail), PrettyHistoryEvent(timeout), c)
 	}
 	cancel := EventFromPayload(6, &swf.ActivityTaskCanceledEventAttributes{
-		ScheduledEventID: I(5),
+		ScheduledEventId: I(5),
 	})
 
 	c.Track(start(5))
@@ -374,23 +374,23 @@ func TestCountActivityAttemtps(t *testing.T) {
 }
 
 func TestSignalTracking(t *testing.T) {
-	//track signal'->'workflowID => attempts
+	//track signal'->'workflowId => attempts
 	event := func(eventId int, payload interface{}) *swf.HistoryEvent {
 		return EventFromPayload(eventId, payload)
 	}
 
 	start := event(1, &swf.SignalExternalWorkflowExecutionInitiatedEventAttributes{
 		SignalName: S("the-signal"),
-		WorkflowID: S("the-workflow"),
-		RunID:      S("the-runid"),
+		WorkflowId: S("the-workflow"),
+		RunId:      S("the-runid"),
 	})
 
 	fail := EventFromPayload(2, &swf.SignalExternalWorkflowExecutionFailedEventAttributes{
-		InitiatedEventID: I(1),
+		InitiatedEventId: I(1),
 	})
 
 	ok := EventFromPayload(4, &swf.ExternalWorkflowExecutionSignaledEventAttributes{
-		InitiatedEventID: I(3),
+		InitiatedEventId: I(3),
 	})
 
 	c := new(EventCorrelator)
@@ -400,7 +400,7 @@ func TestSignalTracking(t *testing.T) {
 	//track happens in FSM after Decider
 	info := c.SignalInfo(fail)
 	c.Track(fail)
-	start.EventID = I(3)
+	start.EventId = I(3)
 	c.Track(start)
 	if c.AttemptsForSignal(info) != 1 {
 		t.Fatal(c.SignalAttempts)
@@ -414,33 +414,33 @@ func TestSignalTracking(t *testing.T) {
 }
 
 func TestTimerTracking(t *testing.T) {
-	//track signal'->'workflowID => attempts
+	//track signal'->'workflowId => attempts
 	event := func(eventId int, payload interface{}) *swf.HistoryEvent {
 		return EventFromPayload(eventId, payload)
 	}
 
 	start := event(1, &swf.SignalExternalWorkflowExecutionInitiatedEventAttributes{
 		SignalName: S("the-signal"),
-		WorkflowID: S("the-workflow"),
-		RunID:      S("the-runid"),
+		WorkflowId: S("the-workflow"),
+		RunId:      S("the-runid"),
 	})
 
 	timerStart := EventFromPayload(2, &swf.TimerStartedEventAttributes{
-		TimerID: S("the-timer"),
+		TimerId: S("the-timer"),
 		Control: S("the-control"),
 	})
 
 	timerFired := EventFromPayload(3, &swf.TimerFiredEventAttributes{
-		StartedEventID: I(2),
+		StartedEventId: I(2),
 	})
 
 	timerStart2 := EventFromPayload(4, &swf.TimerStartedEventAttributes{
-		TimerID: S("the-timer"),
+		TimerId: S("the-timer"),
 		Control: S("the-control"),
 	})
 
 	timerCanceled := EventFromPayload(5, &swf.TimerCanceledEventAttributes{
-		StartedEventID: I(4),
+		StartedEventId: I(4),
 	})
 
 	c := new(EventCorrelator)
@@ -450,7 +450,7 @@ func TestTimerTracking(t *testing.T) {
 	c.Track(timerStart)
 	//track happens in FSM after Decider
 	info := c.TimerInfo(timerFired)
-	if info == nil || info.Control != "the-control" || info.TimerID != "the-timer" {
+	if info == nil || info.Control != "the-control" || info.TimerId != "the-timer" {
 		t.Fatal(info)
 	}
 
@@ -464,7 +464,7 @@ func TestTimerTracking(t *testing.T) {
 	c.Track(timerStart2)
 	info = c.TimerInfo(timerCanceled)
 
-	if info == nil || info.Control != "the-control" || info.TimerID != "the-timer" {
+	if info == nil || info.Control != "the-control" || info.TimerId != "the-timer" {
 		t.Fatal(info)
 	}
 
@@ -477,21 +477,21 @@ func TestTimerTracking(t *testing.T) {
 }
 
 func TestCancelTracking(t *testing.T) {
-	//track signal'->'workflowID => attempts
+	//track signal'->'workflowId => attempts
 	event := func(eventId int, payload interface{}) *swf.HistoryEvent {
 		return EventFromPayload(eventId, payload)
 	}
 
 	start := event(1, &swf.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes{
-		WorkflowID: S("the-workflow"),
+		WorkflowId: S("the-workflow"),
 	})
 
 	fail := EventFromPayload(2, &swf.RequestCancelExternalWorkflowExecutionFailedEventAttributes{
-		InitiatedEventID: I(1),
+		InitiatedEventId: I(1),
 	})
 
 	ok := EventFromPayload(4, &swf.WorkflowExecutionCancelRequestedEventAttributes{
-		ExternalInitiatedEventID: I(3),
+		ExternalInitiatedEventId: I(3),
 	})
 
 	c := new(EventCorrelator)
@@ -504,7 +504,7 @@ func TestCancelTracking(t *testing.T) {
 	t.Log(info, c.Cancellations, c.CancelationAttempts)
 
 	c.Track(fail)
-	start.EventID = I(3)
+	start.EventId = I(3)
 	c.Track(start)
 	if c.AttemptsForCancellation(info) != 1 {
 		t.Fatal("attempts not", info, c.AttemptsForCancellation(info), c.Cancellations, c.CancelationAttempts)
@@ -518,13 +518,13 @@ func TestCancelTracking(t *testing.T) {
 }
 
 func TestChildTracking(t *testing.T) {
-	//track signal'->'workflowID => attempts
+	//track signal'->'workflowId => attempts
 	event := func(eventId int, payload interface{}) *swf.HistoryEvent {
 		return EventFromPayload(eventId, payload)
 	}
 
 	start := event(1, &swf.StartChildWorkflowExecutionInitiatedEventAttributes{
-		WorkflowID: S("the-workflow"),
+		WorkflowId: S("the-workflow"),
 		WorkflowType: &swf.WorkflowType{
 			Name:    S("the-name"),
 			Version: S("the-version"),
@@ -532,11 +532,11 @@ func TestChildTracking(t *testing.T) {
 	})
 
 	fail := EventFromPayload(2, &swf.StartChildWorkflowExecutionFailedEventAttributes{
-		InitiatedEventID: I(1),
+		InitiatedEventId: I(1),
 	})
 
 	ok := EventFromPayload(4, &swf.ChildWorkflowExecutionStartedEventAttributes{
-		InitiatedEventID: I(3),
+		InitiatedEventId: I(3),
 	})
 
 	c := new(EventCorrelator)
@@ -549,7 +549,7 @@ func TestChildTracking(t *testing.T) {
 	t.Log(info, c.Children, c.ChildrenAttempts)
 
 	c.Track(fail)
-	start.EventID = I(3)
+	start.EventId = I(3)
 	c.Track(start)
 	if c.AttemptsForChild(info) != 1 {
 		t.Fatal("attempts not", info, c.AttemptsForChild(info), c.Children, c.ChildrenAttempts)

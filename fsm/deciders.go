@@ -54,7 +54,7 @@ func (c *ComposedDecider) Decide(ctx *FSMContext, h *swf.HistoryEvent, data inte
 }
 
 func logf(ctx *FSMContext, format string, data ...interface{}) {
-	format = fmt.Sprintf("workflow=%s workflow-id=%s state=%s ", LS(ctx.WorkflowType.Name), LS(ctx.WorkflowID), ctx.State) + format
+	format = fmt.Sprintf("workflow=%s workflow-id=%s state=%s ", LS(ctx.WorkflowType.Name), LS(ctx.WorkflowId), ctx.State) + format
 	Log.Printf(format, data...)
 }
 
@@ -274,11 +274,11 @@ func OnSignalSent(signalName string, deciders ...Decider) Decider {
 }
 
 // OnTimerFired builds a composed decider that fires on when a matching timer is fired.
-func OnTimerFired(timerID string, deciders ...Decider) Decider {
+func OnTimerFired(timerId string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
 		case swf.EventTypeTimerFired:
-			if *h.TimerFiredEventAttributes.TimerID == timerID {
+			if *h.TimerFiredEventAttributes.TimerId == timerId {
 				logf(ctx, "at=on-timer-fired")
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
@@ -435,7 +435,7 @@ func Transition(toState string) Decider {
 // CompleteWorkflow completes the workflow
 func CompleteWorkflow() Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-		Log.Printf("at=complete-workflow workflowID=%s", LS(ctx.WorkflowID))
+		Log.Printf("at=complete-workflow workflowId=%s", LS(ctx.WorkflowId))
 		return ctx.CompleteWorkflow(data)
 	}
 }
@@ -443,7 +443,7 @@ func CompleteWorkflow() Decider {
 // CompleteWorkflow completes the workflow
 func CancelWorkflow(details *string) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-		Log.Printf("at=complete-workflow workflowID=%s", LS(ctx.WorkflowID))
+		Log.Printf("at=complete-workflow workflowId=%s", LS(ctx.WorkflowId))
 		return ctx.CancelWorkflow(data, details)
 	}
 }

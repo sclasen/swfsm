@@ -102,7 +102,7 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 
 func (p *DecisionTaskPoller) logTaskLatency(resp *swf.PollForDecisionTaskOutput) {
 	for _, e := range resp.Events {
-		if e.EventID == resp.StartedEventID {
+		if e.EventId == resp.StartedEventId {
 			elapsed := time.Since(*e.EventTimestamp)
 			Log.Printf("component=DecisionTaskPoller at=decision-task-latency latency=%s workflow=%s", elapsed, LS(resp.WorkflowType.Name))
 		}

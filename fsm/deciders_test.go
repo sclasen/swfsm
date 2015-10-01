@@ -232,6 +232,6 @@ func testContextWithActivity(scheduledEventId int, event *swf.ActivityTaskSchedu
 func deciderTestContext() *FSMContext {
 	return NewFSMContext(nil,
 		swf.WorkflowType{Name: s.S("foo"), Version: s.S("1")},
-		swf.WorkflowExecution{WorkflowID: s.S("id"), RunID: s.S("runid")},
+		swf.WorkflowExecution{WorkflowId: s.S("id"), RunId: s.S("runid")},
 		nil, "state", nil, 1)
 }

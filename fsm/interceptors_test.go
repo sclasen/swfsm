@@ -48,13 +48,13 @@ func TestInterceptors(t *testing.T) {
 	decisionTask := new(swf.PollForDecisionTaskOutput)
 	decisionTask.WorkflowExecution = new(swf.WorkflowExecution)
 	decisionTask.WorkflowType = &swf.WorkflowType{Name: S("test"), Version: S("1")}
-	decisionTask.WorkflowExecution.RunID = S("run")
-	decisionTask.WorkflowExecution.WorkflowID = S("wf")
-	decisionTask.PreviousStartedEventID = I(5)
-	decisionTask.StartedEventID = I(15)
+	decisionTask.WorkflowExecution.RunId = S("run")
+	decisionTask.WorkflowExecution.WorkflowId = S("wf")
+	decisionTask.PreviousStartedEventId = I(5)
+	decisionTask.StartedEventId = I(15)
 	decisionTask.Events = []*swf.HistoryEvent{
 		{
-			EventID:   I(10),
+			EventId:   I(10),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
 				Input: StartFSMWorkflowInput(fsm, new(TestData)),
@@ -147,11 +147,11 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	start := &swf.PollForDecisionTaskOutput{
 		Events: []*swf.HistoryEvent{
 			{
-				EventID:   L(1),
+				EventId:   L(1),
 				EventType: S(swf.EventTypeWorkflowExecutionStarted),
 			},
 		},
-		PreviousStartedEventID: L(0),
+		PreviousStartedEventId: L(0),
 	}
 
 	startOutcome := &Outcome{
@@ -170,14 +170,14 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	cont := &swf.PollForDecisionTaskOutput{
 		Events: []*swf.HistoryEvent{
 			{
-				EventID:   L(2),
+				EventId:   L(2),
 				EventType: S(swf.EventTypeTimerFired),
 				TimerFiredEventAttributes: &swf.TimerFiredEventAttributes{
-					TimerID: S(ContinueTimer),
+					TimerId: S(ContinueTimer),
 				},
 			},
 		},
-		PreviousStartedEventID: L(1),
+		PreviousStartedEventId: L(1),
 	}
 
 	contOutcome := &Outcome{
@@ -212,11 +212,11 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	histCont := &swf.PollForDecisionTaskOutput{
 		Events: []*swf.HistoryEvent{
 			{
-				EventID:   L(10),
+				EventId:   L(10),
 				EventType: S(swf.EventTypeExternalWorkflowExecutionSignaled), //n
 			},
 		},
-		PreviousStartedEventID: L(7),
+		PreviousStartedEventId: L(7),
 	}
 
 	histContOutcome := &Outcome{
@@ -252,14 +252,14 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 	sigCont := &swf.PollForDecisionTaskOutput{
 		Events: []*swf.HistoryEvent{
 			{
-				EventID:   L(10),
+				EventId:   L(10),
 				EventType: S(swf.EventTypeWorkflowExecutionSignaled),
 				WorkflowExecutionSignaledEventAttributes: &swf.WorkflowExecutionSignaledEventAttributes{
 					SignalName: S(ContinueSignal),
 				},
 			},
 		},
-		PreviousStartedEventID: L(7),
+		PreviousStartedEventId: L(7),
 	}
 
 	sigContOutcome := &Outcome{
@@ -296,6 +296,6 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 func interceptorTestContext() *FSMContext {
 	return NewFSMContext(&FSM{Serializer: &JSONStateSerializer{}},
 		swf.WorkflowType{Name: S("foo"), Version: S("1")},
-		swf.WorkflowExecution{WorkflowID: S("id"), RunID: S("runid")},
+		swf.WorkflowExecution{WorkflowId: S("id"), RunId: S("runid")},
 		&EventCorrelator{}, "state", "data", 1)
 }

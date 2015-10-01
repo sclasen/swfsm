@@ -17,8 +17,8 @@ func TestInterceptors(t *testing.T) {
 
 	task := &swf.PollForActivityTaskOutput{
 		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
-		ActivityID:        S("ID"),
-		WorkflowExecution: &swf.WorkflowExecution{WorkflowID: S("ID"), RunID: S("run")},
+		ActivityId:        S("ID"),
+		WorkflowExecution: &swf.WorkflowExecution{WorkflowId: S("ID"), RunId: S("run")},
 	}
 
 	interceptor := &FuncInterceptor{
@@ -88,8 +88,8 @@ func TestFailedInterceptor(t *testing.T) {
 	)
 	task := &swf.PollForActivityTaskOutput{
 		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
-		ActivityID:        S("ID"),
-		WorkflowExecution: &swf.WorkflowExecution{WorkflowID: S("ID"), RunID: S("run")},
+		ActivityId:        S("ID"),
+		WorkflowExecution: &swf.WorkflowExecution{WorkflowId: S("ID"), RunId: S("run")},
 	}
 	interceptor := &FuncInterceptor{
 		BeforeTaskFn: func(decision *swf.PollForActivityTaskOutput) {
@@ -141,8 +141,8 @@ func TestCanceledInterceptor(t *testing.T) {
 	)
 	task := &swf.PollForActivityTaskOutput{
 		ActivityType:      &swf.ActivityType{Name: S("test"), Version: S("test")},
-		ActivityID:        S("ID"),
-		WorkflowExecution: &swf.WorkflowExecution{WorkflowID: S("ID"), RunID: S("run")},
+		ActivityId:        S("ID"),
+		WorkflowExecution: &swf.WorkflowExecution{WorkflowId: S("ID"), RunId: S("run")},
 	}
 	interceptor := &FuncInterceptor{
 		BeforeTaskFn: func(decision *swf.PollForActivityTaskOutput) {

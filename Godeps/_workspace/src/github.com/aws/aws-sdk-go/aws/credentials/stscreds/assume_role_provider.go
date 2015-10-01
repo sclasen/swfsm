@@ -54,6 +54,9 @@ type AssumeRoleProvider struct {
 	// Expiry duration of the STS credentials. Defaults to 15 minutes if not set.
 	Duration time.Duration
 
+	// Optional ExternalID to pass along, defaults to nil if not set.
+	ExternalID *string
+
 	// ExpiryWindow will allow the credentials to trigger refreshing prior to
 	// the credentials actually expiring. This is beneficial so race conditions
 	// with expiring credentials do not cause request to fail unexpectedly
@@ -102,8 +105,9 @@ func (p *AssumeRoleProvider) Retrieve() (credentials.Value, error) {
 
 	roleOutput, err := p.Client.AssumeRole(&sts.AssumeRoleInput{
 		DurationSeconds: aws.Int64(int64(p.Duration / time.Second)),
-		RoleARN:         aws.String(p.RoleARN),
+		RoleArn:         aws.String(p.RoleARN),
 		RoleSessionName: aws.String(p.RoleSessionName),
+		ExternalId:      p.ExternalID,
 	})
 
 	if err != nil {
@@ -114,7 +118,7 @@ func (p *AssumeRoleProvider) Retrieve() (credentials.Value, error) {
 	p.SetExpiration(*roleOutput.Credentials.Expiration, p.ExpiryWindow)
 
 	return credentials.Value{
-		AccessKeyID:     *roleOutput.Credentials.AccessKeyID,
+		AccessKeyID:     *roleOutput.Credentials.AccessKeyId,
 		SecretAccessKey: *roleOutput.Credentials.SecretAccessKey,
 		SessionToken:    *roleOutput.Credentials.SessionToken,
 	}, nil

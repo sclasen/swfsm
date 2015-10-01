@@ -235,7 +235,7 @@ func (w *WorkerFSM) activity(ctx *fsm.FSMContext, name string, input interface{}
 	return &swf.Decision{
 		DecisionType: S(swf.DecisionTypeScheduleActivityTask),
 		ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
-			ActivityID:             S(name),
+			ActivityId:             S(name),
 			ActivityType:           &swf.ActivityType{Name: S(name), Version: S(name)},
 			Input:                  serialized,
 			HeartbeatTimeout:       S("30"),
@@ -342,7 +342,7 @@ func TestTypedActivityWorker(t *testing.T) {
 
 	_, err := client.StartWorkflowExecution(&swf.StartWorkflowExecutionInput{
 		Domain:       S(domain),
-		WorkflowID:   S("worker-test"),
+		WorkflowId:   S("worker-test"),
 		WorkflowType: &swf.WorkflowType{Name: S(workflow), Version: S(version)},
 		Input:        S("{}"),
 		ExecutionStartToCloseTimeout: S("90"),
@@ -444,7 +444,7 @@ func TestBackoff(t *testing.T) {
 		worker.fail(&swf.PollForActivityTaskOutput{
 			WorkflowExecution: &swf.WorkflowExecution{},
 			ActivityType:      &swf.ActivityType{Name: S("activity")},
-			ActivityID:        S("the-id"),
+			ActivityId:        S("the-id"),
 			Input:             S("theInput"),
 		}, errors.New("the error"))
 		failed <- struct{}{}
