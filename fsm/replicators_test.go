@@ -26,7 +26,7 @@ func (c *MockClient) PutRecord(req *kinesis.PutRecordInput) (*kinesis.PutRecordO
 	c.seqNumber++
 	return &kinesis.PutRecordOutput{
 		SequenceNumber: S(strconv.Itoa(c.seqNumber)),
-		ShardID:        req.PartitionKey,
+		ShardId:        req.PartitionKey,
 	}, nil
 }
 
@@ -62,10 +62,10 @@ func TestKinesisReplication(t *testing.T) {
 		},
 	})
 	events := []*swf.HistoryEvent{
-		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventID: I(3)},
-		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventID: I(2)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventId: I(3)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventId: I(2)},
 		&swf.HistoryEvent{
-			EventID:   I(1),
+			EventId:   I(1),
 			EventType: S("WorkflowExecutionStarted"),
 			WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
 				Input: StartFSMWorkflowInput(fsm, new(TestData)),

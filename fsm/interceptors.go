@@ -98,12 +98,12 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 			}
 
 			//if prevStarted = 0 this is the first decision of the workflow, so start the continue timer.
-			if *decision.PreviousStartedEventID == int64(0) {
-				logf(ctx, "fn=managed-continuations at=workflow-start %d", *decision.PreviousStartedEventID)
+			if *decision.PreviousStartedEventId == int64(0) {
+				logf(ctx, "fn=managed-continuations at=workflow-start %d", *decision.PreviousStartedEventId)
 				outcome.Decisions = append(outcome.Decisions, &swf.Decision{
 					DecisionType: S(swf.DecisionTypeStartTimer),
 					StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
-						TimerID:            S(ContinueTimer),
+						TimerId:            S(ContinueTimer),
 						StartToFireTimeout: S(strconv.Itoa(workflowAgeInSec)),
 					},
 				})
@@ -113,7 +113,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 			continueTimerFired := false
 			for _, h := range decision.Events {
 				if *h.EventType == swf.EventTypeTimerFired {
-					if *h.TimerFiredEventAttributes.TimerID == ContinueTimer {
+					if *h.TimerFiredEventAttributes.TimerId == ContinueTimer {
 						continueTimerFired = true
 					}
 				}
@@ -129,7 +129,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 				}
 			}
 
-			historySizeExceeded := int64(historySize) < *decision.Events[0].EventID
+			historySizeExceeded := int64(historySize) < *decision.Events[0].EventId
 
 			//if we pass history size or if we see ContinuteTimer or ContinueSignal fired
 			if continueTimerFired || continueSignalFired || historySizeExceeded {
@@ -150,7 +150,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 						outcome.Decisions = append(outcome.Decisions, &swf.Decision{
 							DecisionType: S(swf.DecisionTypeStartTimer),
 							StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
-								TimerID:            S(ContinueTimer),
+								TimerId:            S(ContinueTimer),
 								StartToFireTimeout: S(strconv.Itoa(timerRetrySeconds)),
 							},
 						})

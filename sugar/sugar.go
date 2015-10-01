@@ -80,9 +80,9 @@ var eventTypes = map[string]func(*swf.HistoryEvent) interface{}{
 
 //EventFromPayload will construct swf.HistoryEvent with the correct id, event type and Attributes struct set, based on the type of the data passed to it,
 //which should be one of the swf.*EventAttributes structs.
-func EventFromPayload(eventID int, data interface{}) *swf.HistoryEvent {
+func EventFromPayload(eventId int, data interface{}) *swf.HistoryEvent {
 	event := &swf.HistoryEvent{}
-	event.EventID = I(eventID)
+	event.EventId = I(eventId)
 	switch t := data.(type) {
 	case *swf.ActivityTaskCancelRequestedEventAttributes:
 		event.ActivityTaskCancelRequestedEventAttributes = t
@@ -233,8 +233,8 @@ func EventFromPayload(eventID int, data interface{}) *swf.HistoryEvent {
 func PrettyHistoryEvent(h *swf.HistoryEvent) string {
 	var buffer bytes.Buffer
 	buffer.WriteString("HistoryEvent{ ")
-	if h.EventID != nil {
-		buffer.WriteString(fmt.Sprintf("EventId: %d,", *h.EventID))
+	if h.EventId != nil {
+		buffer.WriteString(fmt.Sprintf("EventId: %d,", *h.EventId))
 	}
 	if h.EventTimestamp != nil {
 		buffer.WriteString(fmt.Sprintf("EventTimestamp: %s, ", *h.EventTimestamp))

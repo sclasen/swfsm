@@ -77,7 +77,7 @@ func ShortStubState() fsm.Decider {
 }
 
 //intercept any attempts to start a workflow and launch the stub workflow instead.
-func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkflows []string) fsm.DecisionInterceptor {
+func TestDecisionInterceptor(testId string, stubbedWorkflows, stubbedShortWorkflows []string) fsm.DecisionInterceptor {
 	stubbed := make(map[string]struct{})
 	stubbedShort := make(map[string]struct{})
 	v := struct{}{}
@@ -105,9 +105,9 @@ func TestDecisionInterceptor(testID string, stubbedWorkflows, stubbedShortWorkfl
 						d.StartChildWorkflowExecutionDecisionAttributes.TaskList = ShortStubTaskList
 					}
 				case swf.DecisionTypeScheduleActivityTask:
-					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testID)}
+					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testId)}
 				case swf.DecisionTypeContinueAsNewWorkflowExecution:
-					d.ContinueAsNewWorkflowExecutionDecisionAttributes.TaskList = &swf.TaskList{Name: S(testID)}
+					d.ContinueAsNewWorkflowExecutionDecisionAttributes.TaskList = &swf.TaskList{Name: S(testId)}
 				}
 			}
 		},
@@ -128,13 +128,13 @@ func TestFailOnceActivityInterceptor() activity.ActivityInterceptor {
 			mutex.Lock()
 			defer mutex.Unlock()
 
-			if err != nil || tried[*t.ActivityID] {
-				Log.Printf("interceptor.test.fail-once at=passthrough activity-id=%q", *t.ActivityID)
+			if err != nil || tried[*t.ActivityId] {
+				Log.Printf("interceptor.test.fail-once at=passthrough activity-id=%q", *t.ActivityId)
 				return result, err
 			}
 
-			tried[*t.ActivityID] = true
-			msg := fmt.Sprintf("interceptor.test.fail-once at=fail activity-id=%q", *t.ActivityID)
+			tried[*t.ActivityId] = true
+			msg := fmt.Sprintf("interceptor.test.fail-once at=fail activity-id=%q", *t.ActivityId)
 			Log.Println(msg)
 			return nil, fmt.Errorf(msg)
 		},

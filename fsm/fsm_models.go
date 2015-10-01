@@ -270,7 +270,7 @@ func (f *FSMContext) ActivityInfo(h *swf.HistoryEvent) *ActivityInfo {
 	return f.eventCorrelator.ActivityInfo(h)
 }
 
-// ActivitiesInfo will return a map of scheduledID -> ActivityInfo for all in-flight activities in the workflow.
+// ActivitiesInfo will return a map of scheduledId -> ActivityInfo for all in-flight activities in the workflow.
 func (f *FSMContext) ActivitiesInfo() map[string]*ActivityInfo {
 	return f.eventCorrelator.Activities
 }
@@ -365,19 +365,19 @@ type SerializedState struct {
 	StateVersion uint64 `json:"stateVersion"`
 	StateName    string `json:"stateName"`
 	StateData    string `json:"stateData"`
-	WorkflowID   string `json:"workflowID"`
+	WorkflowId   string `json:"workflowId"`
 }
 
 //ErrorState is used as the input to a marker that signifies that the workflow is in an error state.
 type SerializedErrorState struct {
-	EarliestUnprocessedEventID int64
-	LatestUnprocessedEventID   int64
+	EarliestUnprocessedEventId int64
+	LatestUnprocessedEventId   int64
 	ErrorEvent                 *swf.HistoryEvent
 }
 
 //Payload of Signals ActivityStartedSignal and ActivityUpdatedSignal
 type SerializedActivityState struct {
-	ActivityID string
+	ActivityId string
 	Input      *string
 }
 

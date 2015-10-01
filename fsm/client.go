@@ -27,7 +27,7 @@ type FSMClient interface {
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
 	RequestCancel(id string) error
-	GetHistoryEventIteratorFromWorkflowID(workflowID string) (HistoryEventIterator, error)
+	GetHistoryEventIteratorFromWorkflowId(workflowId string) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error)
 	NewSnapshotter() Snapshotter
@@ -127,7 +127,7 @@ func (c *client) listIds(executionInfosFunc func() (*swf.WorkflowExecutionInfos,
 
 	ids := []string{}
 	for _, info := range executionInfos.ExecutionInfos {
-		ids = append(ids, *info.Execution.WorkflowID)
+		ids = append(ids, *info.Execution.WorkflowId)
 	}
 
 	nextPageToken := ""
@@ -144,7 +144,7 @@ func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 		MaximumPageSize: aws.Int64(1),
 		StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
 		ExecutionFilter: &swf.WorkflowExecutionFilter{
-			WorkflowID: S(id),
+			WorkflowId: S(id),
 		},
 	})
 
@@ -165,7 +165,7 @@ func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 			MaximumPageSize: aws.Int64(1),
 			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
 			ExecutionFilter: &swf.WorkflowExecutionFilter{
-				WorkflowID: S(id),
+				WorkflowId: S(id),
 			},
 		})
 
@@ -192,8 +192,8 @@ func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, *sw
 		history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
 			Domain: S(c.f.Domain),
 			Execution: &swf.WorkflowExecution{
-				WorkflowID: S(id),
-				RunID:      S(run),
+				WorkflowId: S(id),
+				RunId:      S(run),
 			},
 			ReverseOrder: aws.Bool(true),
 		})
@@ -246,7 +246,7 @@ func (c *client) GetState(id string) (string, interface{}, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	return c.GetStateForRun(id, *execution.RunID)
+	return c.GetStateForRun(id, *execution.RunId)
 }
 
 func (c *client) Signal(id string, signal string, input interface{}) error {
@@ -267,7 +267,7 @@ func (c *client) Signal(id string, signal string, input interface{}) error {
 		Domain:     S(c.f.Domain),
 		SignalName: S(signal),
 		Input:      serializedInput,
-		WorkflowID: S(id),
+		WorkflowId: S(id),
 	})
 	return err
 }
@@ -278,7 +278,7 @@ func (c *client) Start(startTemplate swf.StartWorkflowExecutionInput, id string,
 		serializedInput = StartFSMWorkflowInput(c.f, input)
 	}
 	startTemplate.Domain = S(c.f.Domain)
-	startTemplate.WorkflowID = S(id)
+	startTemplate.WorkflowId = S(id)
 	startTemplate.Input = serializedInput
 	if len(startTemplate.TagList) == 0 {
 		startTemplate.TagList = GetTagsIfTaggable(input)
@@ -289,13 +289,13 @@ func (c *client) Start(startTemplate swf.StartWorkflowExecutionInput, id string,
 func (c *client) RequestCancel(id string) error {
 	_, err := c.c.RequestCancelWorkflowExecution(&swf.RequestCancelWorkflowExecutionInput{
 		Domain:     S(c.f.Domain),
-		WorkflowID: S(id),
+		WorkflowId: S(id),
 	})
 	return err
 }
 
-func (c *client) GetHistoryEventIteratorFromWorkflowID(workflowID string) (HistoryEventIterator, error) {
-	execution, err := c.findExecution(workflowID)
+func (c *client) GetHistoryEventIteratorFromWorkflowId(workflowId string) (HistoryEventIterator, error) {
+	execution, err := c.findExecution(workflowId)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +341,7 @@ type sortEventsDescending []*swf.HistoryEvent
 
 func (es sortEventsDescending) Len() int           { return len(es) }
 func (es sortEventsDescending) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
-func (es sortEventsDescending) Less(i, j int) bool { return *es[i].EventID > *es[j].EventID }
+func (es sortEventsDescending) Less(i, j int) bool { return *es[i].EventId > *es[j].EventId }
 
 func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error) {
 	history := swf.GetWorkflowExecutionHistoryOutput{}
@@ -370,5 +370,5 @@ func (c *client) NewSnapshotter() Snapshotter {
 // DEPRECATED
 // TODO: remove after clients have stopped using this
 func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
-	return c.NewSnapshotter().FromWorkflowID(id)
+	return c.NewSnapshotter().FromWorkflowId(id)
 }

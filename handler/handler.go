@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	. "github.com/sclasen/swfsm/log"
 )
 
@@ -18,10 +19,10 @@ import (
 //to use, when constructing an swf.SWM
 // swfClient.Service.Handlers.Send.Clear()
 // swfClient.Service.Handlers.Send.PushBack(handler.SWFSendHandler(polling, heartbeat))
-func SWFSendHandler(polling, heartbeat *http.Client) func(*aws.Request) {
+func SWFSendHandler(polling, heartbeat *http.Client) func(*request.Request) {
 	var reStatusCode = regexp.MustCompile(`^(\d+)`)
 
-	return func(r *aws.Request) {
+	return func(r *request.Request) {
 		client := r.Service.Config.HTTPClient
 		if r.Service.ServiceName == "swf" {
 			switch r.Operation.Name {
