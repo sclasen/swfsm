@@ -31,10 +31,6 @@ type FSMClient interface {
 	GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error)
 	NewSnapshotter() Snapshotter
-
-	// DEPRECATED
-	// TODO: remove after clients have stopped using this
-	GetSnapshots(id string) ([]FSMSnapshot, error)
 }
 
 type ClientSWFOps interface {
@@ -365,10 +361,4 @@ func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEve
 
 func (c *client) NewSnapshotter() Snapshotter {
 	return newSnapshotter(c)
-}
-
-// DEPRECATED
-// TODO: remove after clients have stopped using this
-func (c *client) GetSnapshots(id string) ([]FSMSnapshot, error) {
-	return c.NewSnapshotter().FromWorkflowId(id)
 }
