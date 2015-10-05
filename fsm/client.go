@@ -108,32 +108,6 @@ func (c *client) WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsI
 	return nil
 }
 
-// TODO: make usable again
-func (c *client) listIds(executionInfosFunc func() (*swf.WorkflowExecutionInfos, error)) ([]string, string, error) {
-	executionInfos, err := executionInfosFunc()
-
-	if err != nil {
-		if ae, ok := err.(awserr.Error); ok {
-			Log.Printf("component=client fn=listIds at=list-infos-func error-type=%s message=%s", ae.Code(), ae.Message())
-		} else {
-			Log.Printf("component=client fn=listIds at=list-infos-func error=%s", err)
-		}
-		return []string{}, "", err
-	}
-
-	ids := []string{}
-	for _, info := range executionInfos.ExecutionInfos {
-		ids = append(ids, *info.Execution.WorkflowId)
-	}
-
-	nextPageToken := ""
-	if executionInfos.NextPageToken != nil {
-		nextPageToken = *executionInfos.NextPageToken
-	}
-
-	return ids, nextPageToken, nil
-}
-
 func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
 	open, err := c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
 		Domain:          S(c.f.Domain),
