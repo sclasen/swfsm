@@ -10,7 +10,6 @@ import (
 
 	"strconv"
 
-	"io"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/swf"
@@ -41,45 +40,14 @@ type HistorySegmentEvent struct {
 	References []*int64
 }
 
-type HistorySegmentor interface {
-	FromWorkflowId(id string) ([]HistorySegment, error)
-	FromWorkflowExecution(exec *swf.WorkflowExecution) ([]HistorySegment, error)
-	FromReader(reader io.Reader) ([]HistorySegment, error)
-	FromHistoryEventIterator(itr HistoryEventIterator) ([]HistorySegment, error)
-}
-
 type historySegmentor struct {
 	c *client
 }
 
-func newHistorySegmentor(c *client) HistorySegmentor {
+func newHistorySegmentor(c *client) *historySegmentor {
 	return &historySegmentor{
 		c: c,
 	}
-}
-
-func (s *historySegmentor) FromWorkflowId(id string) ([]HistorySegment, error) {
-	itr, err := s.c.GetHistoryEventIteratorFromWorkflowId(id)
-	if err != nil {
-		return nil, err
-	}
-	return s.FromHistoryEventIterator(itr)
-}
-
-func (s *historySegmentor) FromWorkflowExecution(exec *swf.WorkflowExecution) ([]HistorySegment, error) {
-	itr, err := s.c.GetHistoryEventIteratorFromWorkflowExecution(exec)
-	if err != nil {
-		return nil, err
-	}
-	return s.FromHistoryEventIterator(itr)
-}
-
-func (s *historySegmentor) FromReader(reader io.Reader) ([]HistorySegment, error) {
-	itr, err := s.c.GetHistoryEventIteratorFromReader(reader)
-	if err != nil {
-		return nil, err
-	}
-	return s.FromHistoryEventIterator(itr)
 }
 
 func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([]HistorySegment, error) {

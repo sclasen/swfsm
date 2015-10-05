@@ -27,10 +27,11 @@ type FSMClient interface {
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
 	RequestCancel(id string) error
-	GetHistoryEventIteratorFromWorkflowId(workflowId string) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error)
-	NewHistorySegmentor() HistorySegmentor
+	FindAll(input *FindInput) (output *FindOutput, err error)
+	FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error)
+	SegmentHistory(itr HistoryEventIterator) ([]HistorySegment, error)
 }
 
 type ClientSWFOps interface {
@@ -108,54 +109,6 @@ func (c *client) WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsI
 	return nil
 }
 
-func (c *client) findExecution(id string) (*swf.WorkflowExecution, error) {
-	open, err := c.c.ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
-		Domain:          S(c.f.Domain),
-		MaximumPageSize: aws.Int64(1),
-		StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
-		ExecutionFilter: &swf.WorkflowExecutionFilter{
-			WorkflowId: S(id),
-		},
-	})
-
-	if err != nil {
-		if ae, ok := err.(awserr.Error); ok {
-			Log.Printf("component=client fn=findExecution at=list-open error-type=%s message=%s", ae.Code(), ae.Message())
-		} else {
-			Log.Printf("component=client fn=findExecution at=list-open error=%s", err)
-		}
-		return nil, err
-	}
-
-	if len(open.ExecutionInfos) == 1 {
-		return open.ExecutionInfos[0].Execution, nil
-	} else {
-		closed, err := c.c.ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
-			Domain:          S(c.f.Domain),
-			MaximumPageSize: aws.Int64(1),
-			StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
-			ExecutionFilter: &swf.WorkflowExecutionFilter{
-				WorkflowId: S(id),
-			},
-		})
-
-		if err != nil {
-			if ae, ok := err.(awserr.Error); ok {
-				Log.Printf("component=client fn=findExecution at=list-closed error-type=%s message=%s", ae.Code(), ae.Message())
-			} else {
-				Log.Printf("component=client fn=findExecution at=list-closed error=%s", err)
-			}
-			return nil, err
-		}
-
-		if len(closed.ExecutionInfos) > 0 {
-			return closed.ExecutionInfos[0].Execution, nil
-		} else {
-			return nil, errors.Trace(fmt.Errorf("workflow not found for id %s", id))
-		}
-	}
-}
-
 func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error) {
 	getState := func() (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error) {
 
@@ -212,7 +165,7 @@ func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
 }
 
 func (c *client) GetState(id string) (string, interface{}, error) {
-	execution, err := c.findExecution(id)
+	execution, err := c.FindLatestByWorkflowID(id)
 	if err != nil {
 		return "", nil, err
 	}
@@ -264,14 +217,6 @@ func (c *client) RequestCancel(id string) error {
 	return err
 }
 
-func (c *client) GetHistoryEventIteratorFromWorkflowId(workflowId string) (HistoryEventIterator, error) {
-	execution, err := c.findExecution(workflowId)
-	if err != nil {
-		return nil, err
-	}
-	return c.GetHistoryEventIteratorFromWorkflowExecution(execution)
-}
-
 func (c *client) GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error) {
 	req := &swf.GetWorkflowExecutionHistoryInput{
 		Domain:       S(c.f.Domain),
@@ -307,11 +252,11 @@ func (c *client) GetHistoryEventIteratorFromWorkflowExecution(execution *swf.Wor
 	}, nil
 }
 
-type sortEventsDescending []*swf.HistoryEvent
+type sortHistoryEvents []*swf.HistoryEvent
 
-func (es sortEventsDescending) Len() int           { return len(es) }
-func (es sortEventsDescending) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
-func (es sortEventsDescending) Less(i, j int) bool { return *es[i].EventId > *es[j].EventId }
+func (es sortHistoryEvents) Len() int           { return len(es) }
+func (es sortHistoryEvents) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
+func (es sortHistoryEvents) Less(i, j int) bool { return *es[i].EventId < *es[j].EventId }
 
 func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error) {
 	history := swf.GetWorkflowExecutionHistoryOutput{}
@@ -320,7 +265,7 @@ func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEve
 		return nil, err
 	}
 
-	sort.Sort(sortEventsDescending(history.Events))
+	sort.Sort(sort.Reverse(sortHistoryEvents(history.Events)))
 
 	i := 0
 	return func() (*swf.HistoryEvent, error) {
@@ -333,6 +278,14 @@ func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEve
 	}, nil
 }
 
-func (c *client) NewHistorySegmentor() HistorySegmentor {
-	return newHistorySegmentor(c)
+func (c *client) SegmentHistory(itr HistoryEventIterator) ([]HistorySegment, error) {
+	return newHistorySegmentor(c).FromHistoryEventIterator(itr)
+}
+
+func (c *client) FindAll(input *FindInput) (output *FindOutput, err error) {
+	return newFinder(c).FindAll(input)
+}
+
+func (c *client) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error) {
+	return newFinder(c).FindLatestByWorkflowID(workflowID)
 }

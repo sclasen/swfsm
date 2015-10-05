@@ -121,31 +121,36 @@ func TestClient(t *testing.T) {
 		t.Fatalf("%s not found", workflow)
 	}
 
-	snapshots, err := fsmClient.GetSnapshots(workflow)
+	exec, err := fsmClient.FindLatestByWorkflowID(workflow)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if length := len(snapshots); length != 1 {
-		t.Fatalf("snapshots length: %d", length)
+	itr, err := fsmClient.GetHistoryEventIteratorFromWorkflowExecution(exec)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if Type := *snapshots[0].Events[0].Type; Type != swf.EventTypeWorkflowExecutionStarted {
-		t.Fatalf("snapshots[0].Event.Type: %s ", Type)
+	segments, err := fsmClient.SegmentHistory(itr)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if name := *snapshots[0].State.Name; name != "initial" {
-		t.Fatalf("snapshots[0].State.Name: %s ", name)
+	if length := len(segments); length != 2 {
+		t.Fatalf("segments length: %d \n%#v", length, segments)
 	}
 
-	if version := *snapshots[0].State.Version; version != 0 {
-		t.Fatalf("snapshots[0].State.Version: %d ", version)
+	if name := *segments[1].State.Name; name != "initial" {
+		t.Fatalf("segments[1].State.Name: %s ", name)
 	}
 
-	if id := *snapshots[0].State.ID; id != 1 {
-		t.Fatalf("snapshots[0].State.ID: %d ", id)
+	if version := *segments[1].State.Version; version != 0 {
+		t.Fatalf("segments[1].State.Version: %d ", version)
 	}
 
+	if id := *segments[1].State.ID; id != 1 {
+		t.Fatalf("segments[1].State.ID: %d ", id)
+	}
 }
 
 func TestStringDoesntSerialize(t *testing.T) {
