@@ -30,7 +30,7 @@ type FSMClient interface {
 	GetHistoryEventIteratorFromWorkflowId(workflowId string) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error)
 	GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error)
-	NewSnapshotter() Snapshotter
+	NewHistorySegmentor() HistorySegmentor
 }
 
 type ClientSWFOps interface {
@@ -359,6 +359,6 @@ func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEve
 	}, nil
 }
 
-func (c *client) NewSnapshotter() Snapshotter {
-	return newSnapshotter(c)
+func (c *client) NewHistorySegmentor() HistorySegmentor {
+	return newHistorySegmentor(c)
 }
