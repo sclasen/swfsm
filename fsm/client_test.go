@@ -12,6 +12,7 @@ import (
 	"github.com/pborman/uuid"
 	. "github.com/sclasen/swfsm/log"
 	"github.com/sclasen/swfsm/migrator"
+	"github.com/sclasen/swfsm/testing/mocks"
 )
 
 func TestClient(t *testing.T) {
@@ -164,29 +165,19 @@ func TestStringDoesntSerialize(t *testing.T) {
 		allowPanics:      false,
 	}
 
-	swf := &swf.SWF{}
-	mock := &MockSWF{
-		t:   t,
-		SWF: swf,
-	}
+	mockSwf := &mocks.SWFAPI{}
+	mockSwf.MockOnAny_SignalWorkflowExecution().Return(func(req *swf.SignalWorkflowExecutionInput) *swf.SignalWorkflowExecutionOutput {
+		if strings.Contains(*req.Input, "\"") {
+			t.Fatal("simple string input has quotes")
+		}
+		if *req.Input != "simple" {
+			t.Fatal("not simele")
+		}
+		return nil
+	}, nil)
 
-	fsmClient := NewFSMClient(fsm, mock)
+	fsmClient := NewFSMClient(fsm, mockSwf)
 
 	fsmClient.Signal("wf", "signal", "simple")
-
-}
-
-type MockSWF struct {
-	t *testing.T
-	*swf.SWF
-}
-
-func (m *MockSWF) SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (*swf.SignalWorkflowExecutionOutput, error) {
-	if strings.Contains(*req.Input, "\"") {
-		m.t.Fatal("simple string input has quotes")
-	}
-	if *req.Input != "simple" {
-		m.t.Fatal("not simele")
-	}
-	return nil, nil
+	mockSwf.AssertExpectations(t)
 }
