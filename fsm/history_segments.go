@@ -10,22 +10,21 @@ import (
 
 	"strconv"
 
-	"io"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
-type FSMSnapshot struct {
-	State                   *FSMSnapshotState
+type HistorySegment struct {
+	State                   *HistorySegmentState
 	Correlator              *EventCorrelator
-	Events                  []*FSMSnapshotEvent
+	Events                  []*HistorySegmentEvent
 	WorkflowId              *string
 	ContinuedExecutionRunId *string
 }
 
-type FSMSnapshotState struct {
+type HistorySegmentState struct {
 	ID        *int64
 	Timestamp *time.Time
 	Version   *uint64
@@ -33,7 +32,7 @@ type FSMSnapshotState struct {
 	Data      *interface{}
 }
 
-type FSMSnapshotEvent struct {
+type HistorySegmentEvent struct {
 	ID         *int64
 	Timestamp  *time.Time
 	Type       *string
@@ -41,49 +40,18 @@ type FSMSnapshotEvent struct {
 	References []*int64
 }
 
-type Snapshotter interface {
-	FromWorkflowId(id string) ([]FSMSnapshot, error)
-	FromWorkflowExecution(exec *swf.WorkflowExecution) ([]FSMSnapshot, error)
-	FromReader(reader io.Reader) ([]FSMSnapshot, error)
-	FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMSnapshot, error)
-}
-
-type snapshotter struct {
+type historySegmentor struct {
 	c *client
 }
 
-func newSnapshotter(c *client) Snapshotter {
-	return &snapshotter{
+func newHistorySegmentor(c *client) *historySegmentor {
+	return &historySegmentor{
 		c: c,
 	}
 }
 
-func (s *snapshotter) FromWorkflowId(id string) ([]FSMSnapshot, error) {
-	itr, err := s.c.GetHistoryEventIteratorFromWorkflowId(id)
-	if err != nil {
-		return nil, err
-	}
-	return s.FromHistoryEventIterator(itr)
-}
-
-func (s *snapshotter) FromWorkflowExecution(exec *swf.WorkflowExecution) ([]FSMSnapshot, error) {
-	itr, err := s.c.GetHistoryEventIteratorFromWorkflowExecution(exec)
-	if err != nil {
-		return nil, err
-	}
-	return s.FromHistoryEventIterator(itr)
-}
-
-func (s *snapshotter) FromReader(reader io.Reader) ([]FSMSnapshot, error) {
-	itr, err := s.c.GetHistoryEventIteratorFromReader(reader)
-	if err != nil {
-		return nil, err
-	}
-	return s.FromHistoryEventIterator(itr)
-}
-
-func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMSnapshot, error) {
-	snapshots := []FSMSnapshot{}
+func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([]HistorySegment, error) {
+	snapshots := []HistorySegment{}
 	var err error
 
 	zero := s.c.f.zeroStateData()
@@ -92,7 +60,7 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 	unrecordedVersion := uint64(999999)
 
 	refs := make(map[int64][]*int64)
-	snapshot := FSMSnapshot{Events: []*FSMSnapshotEvent{}}
+	snapshot := HistorySegment{Events: []*HistorySegmentEvent{}}
 	var nextCorrelator *EventCorrelator
 	event, err := itr()
 	for ; event != nil; event, err = itr() {
@@ -117,10 +85,10 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 		if state != nil {
 			if snapshot.State != nil {
 				snapshots = append(snapshots, snapshot)
-				snapshot = FSMSnapshot{Events: []*FSMSnapshotEvent{}}
+				snapshot = HistorySegment{Events: []*HistorySegmentEvent{}}
 			}
 
-			snapshot.State = &FSMSnapshotState{
+			snapshot.State = &HistorySegmentState{
 				ID:        event.EventId,
 				Timestamp: event.EventTimestamp,
 				Version:   &state.StateVersion,
@@ -145,7 +113,7 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 		}
 
 		if snapshot.State == nil {
-			snapshot.State = &FSMSnapshotState{
+			snapshot.State = &HistorySegmentState{
 				Name:    &unrecordedName,
 				ID:      &(unrecordedId),
 				Version: &unrecordedVersion,
@@ -167,7 +135,7 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 			}
 		}
 
-		snapshot.Events = append(snapshot.Events, &FSMSnapshotEvent{
+		snapshot.Events = append(snapshot.Events, &HistorySegmentEvent{
 			Type:       event.EventType,
 			ID:         event.EventId,
 			Timestamp:  event.EventTimestamp,
@@ -183,7 +151,7 @@ func (s *snapshotter) FromHistoryEventIterator(itr HistoryEventIterator) ([]FSMS
 	return snapshots, err
 }
 
-func (s *snapshotter) snapshotEventAttributesMap(e *swf.HistoryEvent) (map[string]interface{}, error) {
+func (s *historySegmentor) snapshotEventAttributesMap(e *swf.HistoryEvent) (map[string]interface{}, error) {
 	attrStruct := reflect.ValueOf(*e).FieldByName(*e.EventType + "EventAttributes").Interface()
 	attrJsonBytes, err := json.Marshal(attrStruct)
 	if err != nil {
