@@ -54,7 +54,6 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 	segments := []HistorySegment{}
 	var err error
 
-	zero := s.c.f.zeroStateData()
 	unrecordedName := "<unrecorded>"
 	unrecordedId := int64(999999)
 	unrecordedVersion := uint64(999999)
@@ -88,12 +87,13 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 				segment = HistorySegment{Events: []*HistorySegmentEvent{}}
 			}
 
+			data := s.c.f.zeroStateData()
 			segment.State = &HistorySegmentState{
 				ID:        event.EventId,
 				Timestamp: event.EventTimestamp,
 				Version:   &state.StateVersion,
 				Name:      S(state.StateName),
-				Data:      &zero,
+				Data:      &data,
 			}
 			err = s.c.f.Serializer.Deserialize(state.StateData, segment.State.Data)
 			if err != nil {
