@@ -237,10 +237,11 @@ func (f *finder) applyInputLocally(input *FindInput, infos []*swf.WorkflowExecut
 		applied = append(applied, info)
 	}
 
+	// swf default order is descending, so reverseOrder is ascending
 	if input.ReverseOrder != nil && *input.ReverseOrder {
-		sort.Sort(sort.Reverse(sortExecutionInfos(applied)))
-	} else {
 		sort.Sort(sortExecutionInfos(applied))
+	} else {
+		sort.Sort(sort.Reverse(sortExecutionInfos(applied)))
 	}
 
 	if input.MaximumPageSize != nil && *input.MaximumPageSize > 0 && int64(len(applied)) > *input.MaximumPageSize {
@@ -262,7 +263,7 @@ func (f *finder) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowEx
 	output, err := f.FindAll(&FindInput{
 		StatusFilter:    FilterStatusOpenPriority,
 		MaximumPageSize: I(1),
-		ReverseOrder:    aws.Bool(true),
+		ReverseOrder:    aws.Bool(false), // keep descending default
 		StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
 		ExecutionFilter: &swf.WorkflowExecutionFilter{
 			WorkflowId: S(workflowID),
