@@ -439,7 +439,7 @@ func TestFindAll_Max(t *testing.T) {
 		t.Fatal(output.ExecutionInfos)
 	}
 
-	if *output.ExecutionInfos[0].Execution.WorkflowId != "open-1" {
+	if *output.ExecutionInfos[0].Execution.WorkflowId != "closed-1" {
 		t.Fatal(output.ExecutionInfos)
 	}
 
@@ -505,13 +505,13 @@ func TestFindAll_ReverseOrder_Interleaving(t *testing.T) {
 		t.Fatal(output.ExecutionInfos)
 	}
 
-	if *output.ExecutionInfos[0].Execution.WorkflowId != "C-open" {
+	if *output.ExecutionInfos[0].Execution.WorkflowId != "A-open" {
 		t.Fatal(output.ExecutionInfos)
 	}
 	if *output.ExecutionInfos[1].Execution.WorkflowId != "B-closed" {
 		t.Fatal(output.ExecutionInfos)
 	}
-	if *output.ExecutionInfos[2].Execution.WorkflowId != "A-open" {
+	if *output.ExecutionInfos[2].Execution.WorkflowId != "C-open" {
 		t.Fatal(output.ExecutionInfos)
 	}
 
@@ -527,7 +527,7 @@ func TestFindAll_FindLatestByWorkflowID(t *testing.T) {
 			WorkflowId: aws.String("workflow-A"),
 		},
 		MaximumPageSize: aws.Int64(int64(1)),
-		ReverseOrder:    aws.Bool(true),
+		ReverseOrder:    aws.Bool(false),
 		StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
 	}
 	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(expectedOpenInput).Return(
