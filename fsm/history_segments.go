@@ -70,7 +70,7 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 		if s.c.f.isCorrelatorMarker(event) {
 			correlator, err := s.c.f.findSerializedEventCorrelator([]*swf.HistoryEvent{event})
 			if err != nil {
-				break
+				return segments, err
 			}
 			nextCorrelator = correlator
 			continue
@@ -78,7 +78,7 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 
 		state, err := s.c.f.statefulHistoryEventToSerializedState(event)
 		if err != nil {
-			break
+			return segments, err
 		}
 
 		if state != nil {
@@ -97,7 +97,7 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 			}
 			err = s.c.f.Serializer.Deserialize(state.StateData, segment.State.Data)
 			if err != nil {
-				break
+				return segments, err
 			}
 
 			segment.WorkflowId = &state.WorkflowId
@@ -122,14 +122,14 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 
 		eventAttributes, err := s.transformHistoryEventAttributes(event)
 		if err != nil {
-			break
+			return segments, err
 		}
 
 		for key, value := range eventAttributes {
 			if strings.HasSuffix(key, "EventId") {
 				parsed, err := strconv.ParseInt(fmt.Sprint(value), 10, 64)
 				if err != nil {
-					break
+					return segments, err
 				}
 				refs[parsed] = append(refs[parsed], event.EventId)
 			}
