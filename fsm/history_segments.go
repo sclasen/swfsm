@@ -20,7 +20,6 @@ type HistorySegment struct {
 	State                   *HistorySegmentState
 	Correlator              *EventCorrelator
 	Events                  []*HistorySegmentEvent
-	WorkflowId              *string
 	ContinuedExecutionRunId *string
 }
 
@@ -99,8 +98,6 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 			if err != nil {
 				return segments, err
 			}
-
-			segment.WorkflowId = &state.WorkflowId
 
 			if event.WorkflowExecutionStartedEventAttributes != nil {
 				segment.ContinuedExecutionRunId = event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunId

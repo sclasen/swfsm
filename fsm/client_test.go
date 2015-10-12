@@ -565,7 +565,6 @@ func TestSegmentHistory(t *testing.T) {
 	var startData interface{}
 	startData = TestData{States: []string{"start data"}}
 
-	workflowId := "workflow-id"
 	activityId := "activity-id"
 	activityData := "activity data"
 
@@ -596,7 +595,6 @@ func TestSegmentHistory(t *testing.T) {
 					StateVersion: 1,
 					StateName:    "ready",
 					StateData:    fsm.Serialize(readyData),
-					WorkflowId:   workflowId,
 				})),
 			},
 		},
@@ -628,7 +626,6 @@ func TestSegmentHistory(t *testing.T) {
 
 	expected := []HistorySegment{
 		HistorySegment{
-			//			WorkflowId: aws.String(workflowId),
 			State: &HistorySegmentState{
 				ID:      aws.Int64(999999),
 				Version: uInt64(999999),
@@ -657,7 +654,6 @@ func TestSegmentHistory(t *testing.T) {
 			},
 		},
 		HistorySegment{
-			WorkflowId: aws.String(workflowId),
 			State: &HistorySegmentState{
 				ID:      aws.Int64(5),
 				Version: uInt64(1),
@@ -690,7 +686,6 @@ func TestSegmentHistory(t *testing.T) {
 			},
 			Correlator: nil,
 			Events:     []*HistorySegmentEvent{},
-			WorkflowId: aws.String(""), // TODO: this is caused by a bug in initial serialization
 		},
 	}
 
