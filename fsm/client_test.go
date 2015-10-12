@@ -568,14 +568,30 @@ func TestSegmentHistory(t *testing.T) {
 	activityId := "activity-id"
 	activityData := "activity data"
 
+	errorState := &SerializedErrorState{
+		EarliestUnprocessedEventId: -1,
+		LatestUnprocessedEventId:   -2,
+		ErrorEvent: &swf.HistoryEvent{
+			EventId: aws.Int64(-3),
+		},
+	}
+
 	itr := sliceHistoryIterator(t, []*swf.HistoryEvent{
 		&swf.HistoryEvent{
-			EventId:   aws.Int64(7),
+			EventId:   aws.Int64(8),
 			EventType: aws.String(swf.EventTypeActivityTaskScheduled),
 			ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
 				ActivityId: aws.String(activityId),
 				Input:      aws.String(fsm.Serialize(activityData)),
 				DecisionTaskCompletedEventId: aws.Int64(4),
+			},
+		},
+		&swf.HistoryEvent{
+			EventId:   aws.Int64(7),
+			EventType: aws.String(swf.EventTypeMarkerRecorded),
+			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
+				MarkerName: aws.String(ErrorMarker),
+				Details:    aws.String(fsm.Serialize(errorState)),
 			},
 		},
 		&swf.HistoryEvent{
@@ -633,9 +649,10 @@ func TestSegmentHistory(t *testing.T) {
 				Data:    nil,
 			},
 			Correlator: nil,
+			Error:      nil,
 			Events: []*HistorySegmentEvent{
 				&HistorySegmentEvent{
-					ID:   aws.Int64(7),
+					ID:   aws.Int64(8),
 					Type: aws.String(swf.EventTypeActivityTaskScheduled),
 					Attributes: &map[string]interface{}{
 						"ActivityId":                   activityId,
@@ -661,11 +678,12 @@ func TestSegmentHistory(t *testing.T) {
 				Data:    &readyData,
 			},
 			Correlator: &EventCorrelator{},
+			Error:      errorState,
 			Events: []*HistorySegmentEvent{
 				&HistorySegmentEvent{
 					ID:         aws.Int64(4),
 					Type:       aws.String(swf.EventTypeDecisionTaskCompleted),
-					References: []*int64{aws.Int64(7)},
+					References: []*int64{aws.Int64(8)},
 				},
 				&HistorySegmentEvent{
 					ID:   aws.Int64(3),

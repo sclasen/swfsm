@@ -19,6 +19,7 @@ import (
 type HistorySegment struct {
 	State                   *HistorySegmentState
 	Correlator              *EventCorrelator
+	Error                   *SerializedErrorState
 	Events                  []*HistorySegmentEvent
 	ContinuedExecutionRunId *string
 }
@@ -60,6 +61,7 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 	refs := make(map[int64][]*int64)
 	segment := HistorySegment{Events: []*HistorySegmentEvent{}}
 	var nextCorrelator *EventCorrelator
+	var nextErrorState *SerializedErrorState
 	event, err := itr()
 	for ; event != nil; event, err = itr() {
 		if err != nil {
@@ -72,6 +74,15 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 				return segments, err
 			}
 			nextCorrelator = correlator
+			continue
+		}
+
+		if s.c.f.isErrorMarker(event) {
+			errorState, err := s.c.f.findSerializedErrorState([]*swf.HistoryEvent{event})
+			if err != nil {
+				return segments, err
+			}
+			nextErrorState = errorState
 			continue
 		}
 
@@ -105,6 +116,9 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 
 			segment.Correlator = nextCorrelator
 			nextCorrelator = nil
+
+			segment.Error = nextErrorState
+			nextErrorState = nil
 
 			continue
 		}
