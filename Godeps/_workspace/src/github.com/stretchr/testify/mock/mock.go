@@ -2,13 +2,14 @@ package mock
 
 import (
 	"fmt"
-	"github.com/stretchr/objx"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/stretchr/objx"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestingT is an interface wrapper around *testing.T

@@ -19,8 +19,8 @@ import (
 type HistorySegment struct {
 	State                   *HistorySegmentState
 	Correlator              *EventCorrelator
+	Error                   *SerializedErrorState
 	Events                  []*HistorySegmentEvent
-	WorkflowId              *string
 	ContinuedExecutionRunId *string
 }
 
@@ -51,91 +51,102 @@ func newHistorySegmentor(c *client) *historySegmentor {
 }
 
 func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([]HistorySegment, error) {
-	snapshots := []HistorySegment{}
+	segments := []HistorySegment{}
 	var err error
 
-	zero := s.c.f.zeroStateData()
 	unrecordedName := "<unrecorded>"
 	unrecordedId := int64(999999)
 	unrecordedVersion := uint64(999999)
 
 	refs := make(map[int64][]*int64)
-	snapshot := HistorySegment{Events: []*HistorySegmentEvent{}}
+	segment := HistorySegment{Events: []*HistorySegmentEvent{}}
 	var nextCorrelator *EventCorrelator
+	var nextErrorState *SerializedErrorState
 	event, err := itr()
 	for ; event != nil; event, err = itr() {
 		if err != nil {
-			return snapshots, err
+			return segments, err
 		}
 
 		if s.c.f.isCorrelatorMarker(event) {
 			correlator, err := s.c.f.findSerializedEventCorrelator([]*swf.HistoryEvent{event})
 			if err != nil {
-				break
+				return segments, err
 			}
 			nextCorrelator = correlator
 			continue
 		}
 
+		if s.c.f.isErrorMarker(event) {
+			errorState, err := s.c.f.findSerializedErrorState([]*swf.HistoryEvent{event})
+			if err != nil {
+				return segments, err
+			}
+			nextErrorState = errorState
+			continue
+		}
+
 		state, err := s.c.f.statefulHistoryEventToSerializedState(event)
 		if err != nil {
-			break
+			return segments, err
 		}
 
 		if state != nil {
-			if snapshot.State != nil {
-				snapshots = append(snapshots, snapshot)
-				snapshot = HistorySegment{Events: []*HistorySegmentEvent{}}
+			if segment.State != nil {
+				segments = append(segments, segment)
+				segment = HistorySegment{Events: []*HistorySegmentEvent{}}
 			}
 
-			snapshot.State = &HistorySegmentState{
+			data := s.c.f.zeroStateData()
+			segment.State = &HistorySegmentState{
 				ID:        event.EventId,
 				Timestamp: event.EventTimestamp,
 				Version:   &state.StateVersion,
 				Name:      S(state.StateName),
-				Data:      &zero,
+				Data:      &data,
 			}
-			err = s.c.f.Serializer.Deserialize(state.StateData, snapshot.State.Data)
+			err = s.c.f.Serializer.Deserialize(state.StateData, segment.State.Data)
 			if err != nil {
-				break
+				return segments, err
 			}
-
-			snapshot.WorkflowId = &state.WorkflowId
 
 			if event.WorkflowExecutionStartedEventAttributes != nil {
-				snapshot.ContinuedExecutionRunId = event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunId
+				segment.ContinuedExecutionRunId = event.WorkflowExecutionStartedEventAttributes.ContinuedExecutionRunId
 			}
 
-			snapshot.Correlator = nextCorrelator
+			segment.Correlator = nextCorrelator
 			nextCorrelator = nil
+
+			segment.Error = nextErrorState
+			nextErrorState = nil
 
 			continue
 		}
 
-		if snapshot.State == nil {
-			snapshot.State = &HistorySegmentState{
+		if segment.State == nil {
+			segment.State = &HistorySegmentState{
 				Name:    &unrecordedName,
 				ID:      &(unrecordedId),
 				Version: &unrecordedVersion,
 			}
 		}
 
-		eventAttributes, err := s.snapshotEventAttributesMap(event)
+		eventAttributes, err := s.transformHistoryEventAttributes(event)
 		if err != nil {
-			break
+			return segments, err
 		}
 
 		for key, value := range eventAttributes {
 			if strings.HasSuffix(key, "EventId") {
 				parsed, err := strconv.ParseInt(fmt.Sprint(value), 10, 64)
 				if err != nil {
-					break
+					return segments, err
 				}
 				refs[parsed] = append(refs[parsed], event.EventId)
 			}
 		}
 
-		snapshot.Events = append(snapshot.Events, &HistorySegmentEvent{
+		segment.Events = append(segment.Events, &HistorySegmentEvent{
 			Type:       event.EventType,
 			ID:         event.EventId,
 			Timestamp:  event.EventTimestamp,
@@ -144,14 +155,14 @@ func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([
 		})
 	}
 
-	if snapshot.State != nil {
-		snapshots = append(snapshots, snapshot)
+	if segment.State != nil {
+		segments = append(segments, segment)
 	}
 
-	return snapshots, err
+	return segments, err
 }
 
-func (s *historySegmentor) snapshotEventAttributesMap(e *swf.HistoryEvent) (map[string]interface{}, error) {
+func (s *historySegmentor) transformHistoryEventAttributes(e *swf.HistoryEvent) (map[string]interface{}, error) {
 	attrStruct := reflect.ValueOf(*e).FieldByName(*e.EventType + "EventAttributes").Interface()
 	attrJsonBytes, err := json.Marshal(attrStruct)
 	if err != nil {
