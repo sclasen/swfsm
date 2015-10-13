@@ -370,6 +370,7 @@ type SerializedState struct {
 
 //ErrorState is used as the input to a marker that signifies that the workflow is in an error state.
 type SerializedErrorState struct {
+	Details                    string
 	EarliestUnprocessedEventId int64
 	LatestUnprocessedEventId   int64
 	ErrorEvent                 *swf.HistoryEvent
