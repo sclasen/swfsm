@@ -85,7 +85,11 @@ func TestFSM(t *testing.T) {
 
 	first := testDecisionTask(0, events)
 
-	_, decisions, _, _ := fsm.Tick(first)
+	_, decisions, _, err := fsm.Tick(first)
+
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !Find(decisions, stateMarkerPredicate) {
 		t.Fatal("No Record State Marker")
@@ -99,6 +103,10 @@ func TestFSM(t *testing.T) {
 		t.Fatal("No ScheduleActivityTask")
 	}
 
+	if Find(decisions, errorMarkerPredicate) {
+		t.Fatal("Found Error Marker")
+	}
+
 	secondEvents := DecisionsToEvents(decisions)
 	secondEvents = append(secondEvents, events...)
 
@@ -108,7 +116,11 @@ func TestFSM(t *testing.T) {
 
 	second := testDecisionTask(3, secondEvents)
 
-	_, secondDecisions, _, _ := fsm.Tick(second)
+	_, secondDecisions, _, err := fsm.Tick(second)
+
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !Find(secondDecisions, stateMarkerPredicate) {
 		t.Fatal("No Record State Marker")
@@ -118,6 +130,50 @@ func TestFSM(t *testing.T) {
 		t.Fatal("No CompleteWorkflow")
 	}
 
+	if Find(decisions, errorMarkerPredicate) {
+		t.Fatal("Found Error Marker")
+	}
+}
+
+func TestFSMError(t *testing.T) {
+	fsm := testFSM()
+
+	fsm.AddInitialState(&FSMState{
+		Name: "start",
+		Decider: func(f *FSMContext, lastEvent *swf.HistoryEvent, data interface{}) Outcome {
+			panic("BOOM")
+		},
+	})
+	fsm.Init()
+
+	events := []*swf.HistoryEvent{
+		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventId: I(3)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventId: I(2)},
+		EventFromPayload(1, &swf.WorkflowExecutionStartedEventAttributes{
+			Input: StartFSMWorkflowInput(fsm, new(TestData)),
+		}),
+	}
+
+	tasks := testDecisionTask(0, events)
+
+	fsm.allowPanics = false
+	_, decisions, _, err := fsm.Tick(tasks)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !Find(decisions, stateMarkerPredicate) {
+		t.Fatal("No Record State Marker")
+	}
+
+	if !Find(decisions, correlationMarkerPredicate) {
+		t.Fatal("No Record Correlator Marker")
+	}
+
+	if !Find(decisions, errorMarkerPredicate) {
+		t.Fatal("No Error Marker")
+	}
 }
 
 func Find(decisions []*swf.Decision, predicate func(*swf.Decision) bool) bool {
@@ -139,6 +195,10 @@ func stateMarkerPredicate(d *swf.Decision) bool {
 
 func correlationMarkerPredicate(d *swf.Decision) bool {
 	return *d.DecisionType == "RecordMarker" && *d.RecordMarkerDecisionAttributes.MarkerName == CorrelatorMarker
+}
+
+func errorMarkerPredicate(d *swf.Decision) bool {
+	return *d.DecisionType == "RecordMarker" && *d.RecordMarkerDecisionAttributes.MarkerName == ErrorMarker
 }
 
 func scheduleActivityPredicate(d *swf.Decision) bool {

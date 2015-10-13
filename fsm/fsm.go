@@ -417,7 +417,12 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 				if rescued != nil {
 					anOutcome = *rescued
 				} else {
+					notRescuedSerialized := ""
+					if notRescued != nil {
+						notRescuedSerialized = notRescued.Error()
+					}
 					errorState := &SerializedErrorState{
+						Details:                    notRescuedSerialized,
 						ErrorEvent:                 e,
 						EarliestUnprocessedEventId: *decisionTask.PreviousStartedEventId + 1,
 						LatestUnprocessedEventId:   *decisionTask.StartedEventId,
@@ -430,7 +435,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 						}
 						return nil, nil, nil, errors.Trace(err)
 					}
-					return context, final, serializedState, notRescued
+					return context, final, serializedState, nil
 				}
 			}
 			//NOTE this call is handled in fsmContext.Decide. The double call causes nil panics
@@ -540,7 +545,7 @@ func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event *swf.H
 				if err, ok := r.(error); ok && err != nil {
 					anErr = errors.Trace(err)
 				} else {
-					anErr = errors.New("panic in decider, null error, capture error state")
+					anErr = errors.New(fmt.Sprintf("panic in decider: %#v", r))
 				}
 			}
 		} else {
