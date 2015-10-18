@@ -129,14 +129,17 @@ func TestClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	itr, err := fsmClient.GetHistoryEventIteratorFromWorkflowExecution(exec)
+	segments := []HistorySegment{}
+	seg := fsmClient.NewHistorySegmentor(func(segment HistorySegment) {
+		segments = append(segments, segment)
+	})
+
+	err = fsmClient.GetWorkflowExecutionHistoryPages(exec, seg.FromPage)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	segments, err := fsmClient.SegmentHistory(itr)
-	if err != nil {
-		t.Fatal(err)
+	if seg.GetError() != nil {
+		t.Fatal(seg.GetError())
 	}
 
 	if length := len(segments); length != 2 {
@@ -576,7 +579,7 @@ func TestSegmentHistory(t *testing.T) {
 		},
 	}
 
-	itr := sliceHistoryIterator(t, []*swf.HistoryEvent{
+	history := &swf.GetWorkflowExecutionHistoryOutput{Events: []*swf.HistoryEvent{
 		&swf.HistoryEvent{
 			EventId:   aws.Int64(8),
 			EventType: aws.String(swf.EventTypeActivityTaskScheduled),
@@ -633,11 +636,19 @@ func TestSegmentHistory(t *testing.T) {
 				Input: StartFSMWorkflowInput(fsm, &startData),
 			},
 		},
+	}}
+
+	actual := []HistorySegment{}
+	seg := NewFSMClient(fsm, &mocks.SWFAPI{}).NewHistorySegmentor(func(segment HistorySegment) {
+		actual = append(actual, segment)
 	})
 
-	actual, err := NewFSMClient(fsm, &mocks.SWFAPI{}).SegmentHistory(itr)
-	if err != nil {
-		t.Fatal(err)
+	shouldContinue := seg.FromPage(history, true)
+	if !shouldContinue {
+		t.Error(shouldContinue)
+	}
+	if seg.GetError() != nil {
+		t.Error(seg.GetError())
 	}
 
 	expected := []HistorySegment{
@@ -718,19 +729,6 @@ func TestSegmentHistory(t *testing.T) {
 
 func uInt64(v uint64) *uint64 {
 	return &v
-}
-
-func sliceHistoryIterator(t *testing.T, events []*swf.HistoryEvent) HistoryEventIterator {
-	cursor := 0
-	return func() (*swf.HistoryEvent, error) {
-		if cursor >= len(events) {
-			return nil, nil
-		}
-		event := events[cursor]
-		cursor++
-		t.Log(event)
-		return event, nil
-	}
 }
 
 func dummyFsm() *FSM {

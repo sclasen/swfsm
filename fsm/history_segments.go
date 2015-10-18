@@ -40,38 +40,47 @@ type HistorySegmentEvent struct {
 	References []*int64
 }
 
+type HistorySegmentor interface {
+	FromPage(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool)
+	GetError() error
+}
+
 type historySegmentor struct {
 	c              *client
-	segments       []HistorySegment
+	sink           func(HistorySegment)
 	segment        HistorySegment
+	err            error
 	refs           map[int64][]*int64
 	nextCorrelator *EventCorrelator
 	nextErrorState *SerializedErrorState
 }
 
-func newHistorySegmentor(c *client) *historySegmentor {
+func newHistorySegmentor(c *client, sink func(HistorySegment)) *historySegmentor {
 	return &historySegmentor{
-		c:        c,
-		segments: []HistorySegment{},
-		segment:  HistorySegment{Events: []*HistorySegmentEvent{}},
-		refs:     make(map[int64][]*int64),
+		c:       c,
+		sink:    sink,
+		segment: HistorySegment{Events: []*HistorySegmentEvent{}},
+		refs:    make(map[int64][]*int64),
 	}
 }
 
-func (s *historySegmentor) FromHistoryEventIterator(itr HistoryEventIterator) ([]HistorySegment, error) {
-	event, err := itr()
-	for ; event != nil; event, err = itr() {
-		if err != nil {
-			return s.segments, err
-		}
-
-		if err := s.process(event); err != nil {
-			return s.segments, err
+// must call s.GetError after completion to check no errors exist
+func (s *historySegmentor) FromPage(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool) {
+	for _, event := range p.Events {
+		if s.err = s.process(event); s.err != nil {
+			return false
 		}
 	}
-	s.flush()
 
-	return s.segments, err
+	if lastPage {
+		s.flush()
+	}
+
+	return true
+}
+
+func (s *historySegmentor) GetError() error {
+	return s.err
 }
 
 func (s *historySegmentor) process(event *swf.HistoryEvent) error {
@@ -104,7 +113,7 @@ func (s *historySegmentor) process(event *swf.HistoryEvent) error {
 
 	if state != nil {
 		if s.segment.State != nil {
-			s.segments = append(s.segments, s.segment)
+			s.sink(s.segment)
 			s.segment = HistorySegment{Events: []*HistorySegmentEvent{}}
 		}
 
@@ -193,6 +202,6 @@ func (s *historySegmentor) transformHistoryEventAttributes(e *swf.HistoryEvent) 
 
 func (s *historySegmentor) flush() {
 	if s.segment.State != nil {
-		s.segments = append(s.segments, s.segment)
+		s.sink(s.segment)
 	}
 }
