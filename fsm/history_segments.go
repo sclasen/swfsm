@@ -42,48 +42,84 @@ type HistorySegmentEvent struct {
 
 type HistorySegmentor interface {
 	FromPage(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool)
-	GetError() error
+	OnStart(fn func()) HistorySegmentor
+	OnSegment(func(HistorySegment)) HistorySegmentor
+	OnError(func(error)) HistorySegmentor
+	OnFinish(fn func()) HistorySegmentor
 }
 
 type historySegmentor struct {
-	c              *client
-	sink           func(HistorySegment)
+	c         *client
+	onStart   func()
+	onSegment func(HistorySegment)
+	onError   func(error)
+	onFinish  func()
+
+	started        bool
+	finished       bool
 	segment        HistorySegment
-	err            error
 	refs           map[int64][]*int64
 	nextCorrelator *EventCorrelator
 	nextErrorState *SerializedErrorState
 }
 
-func newHistorySegmentor(c *client, sink func(HistorySegment)) *historySegmentor {
+func NewHistorySegmentor(c *client) *historySegmentor {
 	return &historySegmentor{
-		c:       c,
-		sink:    sink,
-		segment: HistorySegment{Events: []*HistorySegmentEvent{}},
-		refs:    make(map[int64][]*int64),
+		c:         c,
+		onStart:   func() {},
+		onSegment: func(_ HistorySegment) {},
+		onError:   func(_ error) {},
+		onFinish:  func() {},
+		segment:   HistorySegment{Events: []*HistorySegmentEvent{}},
+		refs:      make(map[int64][]*int64),
 	}
 }
 
-// must call s.GetError after completion to check no errors exist
+func (s *historySegmentor) OnStart(fn func()) HistorySegmentor {
+	s.onStart = fn
+	return s
+}
+
+func (s *historySegmentor) OnSegment(fn func(HistorySegment)) HistorySegmentor {
+	s.onSegment = fn
+	return s
+}
+
+func (s *historySegmentor) OnError(fn func(error)) HistorySegmentor {
+	s.onError = fn
+	return s
+}
+
+func (s *historySegmentor) OnFinish(fn func()) HistorySegmentor {
+	s.onFinish = fn
+	return s
+}
+
 func (s *historySegmentor) FromPage(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool) {
 	for _, event := range p.Events {
-		if s.err = s.process(event); s.err != nil {
+		if err := s.process(event); err != nil {
+			s.onError(err)
 			return false
 		}
 	}
 
 	if lastPage {
-		s.flush()
+		s.finish()
 	}
 
 	return true
 }
 
-func (s *historySegmentor) GetError() error {
-	return s.err
-}
-
 func (s *historySegmentor) process(event *swf.HistoryEvent) error {
+	if s.finished {
+		return fmt.Errorf("Cannot process more events after finising segmentor. Create a new segmentor.")
+	}
+
+	if !s.started {
+		s.started = true
+		s.onStart()
+	}
+
 	unrecordedName := "<unrecorded>"
 	unrecordedId := int64(999999)
 	unrecordedVersion := uint64(999999)
@@ -113,7 +149,7 @@ func (s *historySegmentor) process(event *swf.HistoryEvent) error {
 
 	if state != nil {
 		if s.segment.State != nil {
-			s.sink(s.segment)
+			s.onSegment(s.segment)
 			s.segment = HistorySegment{Events: []*HistorySegmentEvent{}}
 		}
 
@@ -200,8 +236,10 @@ func (s *historySegmentor) transformHistoryEventAttributes(e *swf.HistoryEvent) 
 	return attrMap, nil
 }
 
-func (s *historySegmentor) flush() {
+func (s *historySegmentor) finish() {
 	if s.segment.State != nil {
-		s.sink(s.segment)
+		s.onSegment(s.segment)
 	}
+	s.finished = true
+	s.onFinish()
 }

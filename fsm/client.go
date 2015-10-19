@@ -31,7 +31,7 @@ type FSMClient interface {
 	GetWorkflowExecutionHistoryFromReader(reader io.Reader) (*swf.GetWorkflowExecutionHistoryOutput, error)
 	FindAll(input *FindInput) (output *FindOutput, err error)
 	FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error)
-	NewHistorySegmentor(sink func(HistorySegment)) HistorySegmentor
+	NewHistorySegmentor() HistorySegmentor
 }
 
 type ClientSWFOps interface {
@@ -243,8 +243,8 @@ func (c *client) GetWorkflowExecutionHistoryFromReader(reader io.Reader) (*swf.G
 	return history, nil
 }
 
-func (c *client) NewHistorySegmentor(sink func(HistorySegment)) HistorySegmentor {
-	return newHistorySegmentor(c, sink)
+func (c *client) NewHistorySegmentor() HistorySegmentor {
+	return NewHistorySegmentor(c)
 }
 
 func (c *client) FindAll(input *FindInput) (output *FindOutput, err error) {
