@@ -44,6 +44,7 @@ type HistorySegmentor interface {
 	FromPage(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool)
 	OnStart(fn func()) HistorySegmentor
 	OnSegment(func(HistorySegment)) HistorySegmentor
+	OnPage(fn func()) HistorySegmentor
 	OnError(func(error)) HistorySegmentor
 	OnFinish(fn func()) HistorySegmentor
 }
@@ -52,6 +53,7 @@ type historySegmentor struct {
 	c         *client
 	onStart   func()
 	onSegment func(HistorySegment)
+	onPage    func()
 	onError   func(error)
 	onFinish  func()
 
@@ -68,6 +70,7 @@ func NewHistorySegmentor(c *client) *historySegmentor {
 		c:         c,
 		onStart:   func() {},
 		onSegment: func(_ HistorySegment) {},
+		onPage:    func() {},
 		onError:   func(_ error) {},
 		onFinish:  func() {},
 		segment:   HistorySegment{Events: []*HistorySegmentEvent{}},
@@ -82,6 +85,11 @@ func (s *historySegmentor) OnStart(fn func()) HistorySegmentor {
 
 func (s *historySegmentor) OnSegment(fn func(HistorySegment)) HistorySegmentor {
 	s.onSegment = fn
+	return s
+}
+
+func (s *historySegmentor) OnPage(fn func()) HistorySegmentor {
+	s.onPage = fn
 	return s
 }
 
@@ -107,6 +115,7 @@ func (s *historySegmentor) FromPage(p *swf.GetWorkflowExecutionHistoryOutput, la
 		s.finish()
 	}
 
+	s.onPage()
 	return true
 }
 
