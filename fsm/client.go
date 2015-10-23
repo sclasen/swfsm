@@ -27,17 +27,18 @@ type FSMClient interface {
 	Signal(id string, signal string, input interface{}) error
 	Start(startTemplate swf.StartWorkflowExecutionInput, id string, input interface{}) (*swf.StartWorkflowExecutionOutput, error)
 	RequestCancel(id string) error
-	GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error)
-	GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error)
+	GetWorkflowExecutionHistoryPages(execution *swf.WorkflowExecution, fn func(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool)) error
+	GetWorkflowExecutionHistoryFromReader(reader io.Reader) (*swf.GetWorkflowExecutionHistoryOutput, error)
 	FindAll(input *FindInput) (output *FindOutput, err error)
 	FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error)
-	SegmentHistory(itr HistoryEventIterator) ([]HistorySegment, error)
+	NewHistorySegmentor() HistorySegmentor
 }
 
 type ClientSWFOps interface {
 	ListOpenWorkflowExecutions(req *swf.ListOpenWorkflowExecutionsInput) (resp *swf.WorkflowExecutionInfos, err error)
 	ListClosedWorkflowExecutions(req *swf.ListClosedWorkflowExecutionsInput) (resp *swf.WorkflowExecutionInfos, err error)
 	GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHistoryInput) (resp *swf.GetWorkflowExecutionHistoryOutput, err error)
+	GetWorkflowExecutionHistoryPages(input *swf.GetWorkflowExecutionHistoryInput, fn func(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool)) error
 	SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (resp *swf.SignalWorkflowExecutionOutput, err error)
 	StartWorkflowExecution(req *swf.StartWorkflowExecutionInput) (resp *swf.StartWorkflowExecutionOutput, err error)
 	TerminateWorkflowExecution(req *swf.TerminateWorkflowExecutionInput) (resp *swf.TerminateWorkflowExecutionOutput, err error)
@@ -55,8 +56,6 @@ type client struct {
 	f *FSM
 	c ClientSWFOps
 }
-
-type HistoryEventIterator func() (*swf.HistoryEvent, error)
 
 type WorkflowInfosFunc func(infos *swf.WorkflowExecutionInfos) error
 
@@ -217,39 +216,14 @@ func (c *client) RequestCancel(id string) error {
 	return err
 }
 
-func (c *client) GetHistoryEventIteratorFromWorkflowExecution(execution *swf.WorkflowExecution) (HistoryEventIterator, error) {
+func (c *client) GetWorkflowExecutionHistoryPages(execution *swf.WorkflowExecution, fn func(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool)) error {
 	req := &swf.GetWorkflowExecutionHistoryInput{
 		Domain:       S(c.f.Domain),
 		Execution:    execution,
 		ReverseOrder: aws.Bool(true),
 	}
 
-	history, err := c.c.GetWorkflowExecutionHistory(req)
-	if err != nil {
-		return nil, err
-	}
-
-	i := 0
-	return func() (*swf.HistoryEvent, error) {
-		if i < len(history.Events) {
-			e := history.Events[i]
-			i++
-			return e, nil
-		}
-
-		if history.NextPageToken != nil {
-			req.NextPageToken = history.NextPageToken
-			history, err = c.c.GetWorkflowExecutionHistory(req)
-			if err != nil {
-				return nil, err
-			}
-
-			i = 1
-			return history.Events[0], nil
-		}
-
-		return nil, nil
-	}, nil
+	return c.c.GetWorkflowExecutionHistoryPages(req, fn)
 }
 
 type sortHistoryEvents []*swf.HistoryEvent
@@ -258,28 +232,19 @@ func (es sortHistoryEvents) Len() int           { return len(es) }
 func (es sortHistoryEvents) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
 func (es sortHistoryEvents) Less(i, j int) bool { return *es[i].EventId < *es[j].EventId }
 
-func (c *client) GetHistoryEventIteratorFromReader(reader io.Reader) (HistoryEventIterator, error) {
-	history := swf.GetWorkflowExecutionHistoryOutput{}
-	err := jsonutil.UnmarshalJSON(&history, reader)
+func (c *client) GetWorkflowExecutionHistoryFromReader(reader io.Reader) (*swf.GetWorkflowExecutionHistoryOutput, error) {
+	history := &swf.GetWorkflowExecutionHistoryOutput{}
+	err := jsonutil.UnmarshalJSON(history, reader)
 	if err != nil {
 		return nil, err
 	}
 
 	sort.Sort(sort.Reverse(sortHistoryEvents(history.Events)))
-
-	i := 0
-	return func() (*swf.HistoryEvent, error) {
-		if i < len(history.Events) {
-			e := history.Events[i]
-			i++
-			return e, nil
-		}
-		return nil, nil
-	}, nil
+	return history, nil
 }
 
-func (c *client) SegmentHistory(itr HistoryEventIterator) ([]HistorySegment, error) {
-	return newHistorySegmentor(c).FromHistoryEventIterator(itr)
+func (c *client) NewHistorySegmentor() HistorySegmentor {
+	return NewHistorySegmentor(c)
 }
 
 func (c *client) FindAll(input *FindInput) (output *FindOutput, err error) {
