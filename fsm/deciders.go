@@ -440,10 +440,10 @@ func CompleteWorkflow() Decider {
 	}
 }
 
-// CompleteWorkflow completes the workflow
+// CancelWorkflow cancels the workflow
 func CancelWorkflow(details *string) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-		Log.Printf("at=complete-workflow workflowId=%s", LS(ctx.WorkflowId))
+		Log.Printf("at=cancel-workflow workflowId=%s", LS(ctx.WorkflowId))
 		return ctx.CancelWorkflow(data, details)
 	}
 }
