@@ -160,33 +160,33 @@ func (f *FSM) DefaultCanceledState() *FSMState {
 
 // DefaultDecisionErrorHandler is the DefaultDecisionErrorHandler
 func (f *FSM) DefaultDecisionErrorHandler(ctx *FSMContext, event *swf.HistoryEvent, stateBeforeEvent interface{}, stateAfterError interface{}, err error) (*Outcome, error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=decider-error err=%q", ctx.WorkflowType.Name, ctx.WorkflowId, err)
+	f.log("action=tick workflow=%s workflow-id=%s at=decider-error err=%q", s.LS(ctx.WorkflowType.Name), s.LS(ctx.WorkflowId), err)
 	return nil, err
 }
 
 // ErrorFindingStateData is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorFindingStateData(decisionTask *swf.PollForDecisionTaskOutput, err error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-state-failed err=%q", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowId, err)
+	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-state-failed err=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
 }
 
 // ErrorFindingCorrelator is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorFindingCorrelator(decisionTask *swf.PollForDecisionTaskOutput, err error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-event-correlator-failed err=%q", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowId, err)
+	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-event-correlator-failed err=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
 }
 
 // ErrorMissingFSMState is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorMissingFSMState(decisionTask *swf.PollForDecisionTaskOutput, outcome Outcome) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error error=marked-state-not-in-fsm state=%s", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowId, outcome.State)
+	f.log("action=tick workflow=%s workflow-id=%s at=error error=marked-state-not-in-fsm state=%s", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), outcome.State)
 }
 
 // ErrorDeserializingStateData is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorDeserializingStateData(decisionTask *swf.PollForDecisionTaskOutput, serializedStateData string, err error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error=deserialize-state-failed err=&s", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowId, err)
+	f.log("action=tick workflow=%s workflow-id=%s at=error=deserialize-state-failed err=&s", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
 }
 
 // ErrorSerializingStateData is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorSerializingStateData(decisionTask *swf.PollForDecisionTaskOutput, outcome Outcome, eventCorrelator EventCorrelator, err error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error error=state-serialization-error err=%q error-type=system", decisionTask.WorkflowType.Name, decisionTask.WorkflowExecution.WorkflowId, err)
+	f.log("action=tick workflow=%s workflow-id=%s at=error error=state-serialization-error err=%q error-type=system", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
 
 }
 
@@ -273,7 +273,7 @@ func (f *FSM) dispatchTask(decisionTask *swf.PollForDecisionTaskOutput) {
 func (f *FSM) handleDecisionTask(decisionTask *swf.PollForDecisionTaskOutput) {
 	context, decisions, state, err := f.Tick(decisionTask)
 	if err != nil {
-		f.log("workflow=%s workflow-id=%s run-id=%s action=tick at=tick-error status=abandoning-task error=%q", *decisionTask.WorkflowType.Name, *decisionTask.WorkflowExecution.WorkflowId, *decisionTask.WorkflowExecution.RunId, err.Error())
+		f.log("workflow=%s workflow-id=%s run-id=%s action=tick at=tick-error status=abandoning-task error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), s.LS(decisionTask.WorkflowExecution.RunId), err.Error())
 		return
 	}
 	complete := &swf.RespondDecisionTaskCompletedInput{
@@ -284,14 +284,14 @@ func (f *FSM) handleDecisionTask(decisionTask *swf.PollForDecisionTaskOutput) {
 	complete.ExecutionContext = aws.String(state.StateName)
 
 	if _, err := f.SWF.RespondDecisionTaskCompleted(complete); err != nil {
-		f.log("workflow=%s workflow-id=%s action=tick at=decide-request-failed error=%q", *decisionTask.WorkflowType.Name, *decisionTask.WorkflowExecution.WorkflowId, *decisionTask.WorkflowExecution.RunId, err.Error())
+		f.log("workflow=%s workflow-id=%s action=tick at=decide-request-failed error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), s.LS(decisionTask.WorkflowExecution.RunId), err.Error())
 		return
 	}
 
 	if f.ReplicationHandler != nil {
 		repErr := f.ReplicationHandler(context, decisionTask, complete, state)
 		if repErr != nil {
-			f.log("workflow=%s workflow-id=%s action=tick at=replication-handler-failed error=%q", *decisionTask.WorkflowType.Name, *decisionTask.WorkflowExecution.WorkflowId, *decisionTask.WorkflowExecution.RunId, repErr.Error())
+			f.log("workflow=%s workflow-id=%s action=tick at=replication-handler-failed error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), s.LS(decisionTask.WorkflowExecution.RunId), repErr.Error())
 		}
 	}
 
@@ -603,7 +603,7 @@ func (f *FSM) log(format string, data ...interface{}) {
 }
 
 func (f *FSM) clog(ctx *FSMContext, format string, data ...interface{}) {
-	actualFormat := fmt.Sprintf("component=FSM name=%s type=%s id=%s %s", f.Name, *ctx.WorkflowType.Name, *ctx.WorkflowId, format)
+	actualFormat := fmt.Sprintf("component=FSM name=%s type=%s id=%s %s", f.Name, s.LS(ctx.WorkflowType.Name), s.LS(ctx.WorkflowId), format)
 	Log.Printf(actualFormat, data...)
 }
 
