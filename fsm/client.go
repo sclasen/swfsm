@@ -248,9 +248,9 @@ func (c *client) NewHistorySegmentor() HistorySegmentor {
 }
 
 func (c *client) FindAll(input *FindInput) (output *FindOutput, err error) {
-	return newFinder(c).FindAll(input)
+	return NewFinder(c.f.Domain, c.c).FindAll(input)
 }
 
 func (c *client) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error) {
-	return newFinder(c).FindLatestByWorkflowID(workflowID)
+	return NewFinder(c.f.Domain, c.c).FindLatestByWorkflowID(workflowID)
 }
