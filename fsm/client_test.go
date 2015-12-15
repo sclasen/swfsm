@@ -560,6 +560,52 @@ func TestFindAll_FindLatestByWorkflowID(t *testing.T) {
 	mockSwf.AssertExpectations(t)
 }
 
+func TestEmptyFindLatestByWorkflowID(t *testing.T) {
+	mockSwf := &mocks.SWFAPI{}
+
+	expectedOpenInput := &swf.ListOpenWorkflowExecutionsInput{
+		Domain: aws.String(dummyFsm().Domain),
+		ExecutionFilter: &swf.WorkflowExecutionFilter{
+			WorkflowId: aws.String("workflow-A"),
+		},
+		MaximumPageSize: aws.Int64(int64(1)),
+		ReverseOrder:    aws.Bool(false),
+		StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
+	}
+	expectedClosedInput := &swf.ListClosedWorkflowExecutionsInput{
+		Domain: aws.String(dummyFsm().Domain),
+		ExecutionFilter: &swf.WorkflowExecutionFilter{
+			WorkflowId: aws.String("workflow-A"),
+		},
+		MaximumPageSize: aws.Int64(int64(1)),
+		ReverseOrder:    aws.Bool(false),
+		StartTimeFilter: &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))},
+	}
+	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(expectedOpenInput).Return(
+		func(req *swf.ListOpenWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+				//empty
+				},
+			}
+		}, nil,
+	)
+	mockSwf.MockOnTyped_ListClosedWorkflowExecutions(expectedClosedInput).Return(
+		func(req *swf.ListClosedWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+				//empty
+				},
+			}
+		}, nil,
+	)
+
+	if _, err := NewFSMClient(dummyFsm(), mockSwf).FindLatestByWorkflowID("workflow-A"); err == nil {
+		t.Fatal("expected an error when no results")
+	}
+	mockSwf.AssertExpectations(t)
+}
+
 func dummyFsm() *FSM {
 	fsm := &FSM{
 		Domain:           "client-test",
