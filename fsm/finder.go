@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/juju/errors"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -290,7 +289,6 @@ func (f *finder) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowEx
 
 	if len(output.ExecutionInfos) == 1 {
 		return output.ExecutionInfos[0].Execution, nil
-	} else {
-		return nil, errors.Trace(fmt.Errorf("workflow not found for id %s", workflowID))
 	}
+	return nil, nil
 }

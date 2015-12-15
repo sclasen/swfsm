@@ -252,5 +252,9 @@ func (c *client) FindAll(input *FindInput) (output *FindOutput, err error) {
 }
 
 func (c *client) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error) {
-	return NewFinder(c.f.Domain, c.c).FindLatestByWorkflowID(workflowID)
+	ex, err := NewFinder(c.f.Domain, c.c).FindLatestByWorkflowID(workflowID)
+	if err == nil && ex == nil {
+		return nil, errors.Trace(fmt.Errorf("workflow not found for id %s", workflowID))
+	}
+	return ex, err
 }
