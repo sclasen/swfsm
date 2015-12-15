@@ -8,25 +8,28 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/juju/errors"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
-type finder struct {
-	c *client
+const (
+	FilterStatusAll          = "ALL"
+	FilterStatusOpen         = "OPEN"
+	FilterStatusOpenPriority = "OPEN_PRIORITY"
+	FilterStatusClosed       = "CLOSED"
+)
+
+type Finder interface {
+	FindAll(*FindInput) (*FindOutput, error)
+	FindLatestByWorkflowID(workflowID string) (*swf.WorkflowExecution, error)
 }
 
-func newFinder(c *client) *finder {
+func NewFinder(domain string, c ClientSWFOps) Finder {
 	return &finder{
-		c: c,
+		domain: domain,
+		c:      c,
 	}
 }
-
-const FilterStatusAll = "ALL"
-const FilterStatusOpen = "OPEN"
-const FilterStatusOpenPriority = "OPEN_PRIORITY"
-const FilterStatusClosed = "CLOSED"
 
 type FindInput struct {
 	MaximumPageSize *int64
@@ -53,6 +56,11 @@ type FindOutput struct {
 	ClosedNextPageToken *string
 }
 
+type finder struct {
+	domain string
+	c      ClientSWFOps
+}
+
 func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
 	if input.StatusFilter == "" {
 		if (input.CloseStatusFilter != nil && input.CloseStatusFilter.Status != nil) ||
@@ -76,7 +84,7 @@ func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
 
 	if input.StatusFilter == FilterStatusAll || input.StatusFilter == FilterStatusOpen || input.StatusFilter == FilterStatusOpenPriority {
 		openInput := &swf.ListOpenWorkflowExecutionsInput{
-			Domain:          &f.c.f.Domain,
+			Domain:          &f.domain,
 			ReverseOrder:    input.ReverseOrder,
 			MaximumPageSize: input.MaximumPageSize,
 			NextPageToken:   input.OpenNextPageToken,
@@ -86,7 +94,7 @@ func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
 			TypeFilter:      selectiveFilter.TypeFilter,
 		}
 
-		resp, err := f.c.c.ListOpenWorkflowExecutions(openInput)
+		resp, err := f.c.ListOpenWorkflowExecutions(openInput)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +112,7 @@ func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
 
 	if input.StatusFilter == FilterStatusAll || input.StatusFilter == FilterStatusClosed || input.StatusFilter == FilterStatusOpenPriority {
 		closedInput := &swf.ListClosedWorkflowExecutionsInput{
-			Domain:            &f.c.f.Domain,
+			Domain:            &f.domain,
 			ReverseOrder:      input.ReverseOrder,
 			MaximumPageSize:   input.MaximumPageSize,
 			NextPageToken:     input.ClosedNextPageToken,
@@ -116,7 +124,7 @@ func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
 			CloseStatusFilter: selectiveFilter.CloseStatusFilter,
 		}
 
-		resp, err := f.c.c.ListClosedWorkflowExecutions(closedInput)
+		resp, err := f.c.ListClosedWorkflowExecutions(closedInput)
 
 		if err != nil {
 			return nil, err
@@ -281,7 +289,6 @@ func (f *finder) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowEx
 
 	if len(output.ExecutionInfos) == 1 {
 		return output.ExecutionInfos[0].Execution, nil
-	} else {
-		return nil, errors.Trace(fmt.Errorf("workflow not found for id %s", workflowID))
 	}
+	return nil, nil
 }
