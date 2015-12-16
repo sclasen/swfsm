@@ -465,6 +465,8 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 		outcome.Data = after.Data
 	}
 
+	context.eventCorrelator.processForgets()
+
 	final, serializedState, err := f.recordStateMarkers(context, outcome, context.eventCorrelator, nil)
 	if err != nil {
 		f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
