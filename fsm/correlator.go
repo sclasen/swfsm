@@ -21,7 +21,8 @@ type EventCorrelator struct {
 	CancelationAttempts map[string]int               //? workflowId + signalName -> attempts
 	Children            map[string]*ChildInfo
 	ChildrenAttempts    map[string]int
-	Serializer          StateSerializer
+	Serializer          StateSerializer `json:"-"`
+	Forget              []*swf.HistoryEvent
 }
 
 // ActivityInfo holds the ActivityId and ActivityType for an activity
@@ -152,8 +153,44 @@ func (a *EventCorrelator) RemoveCorrelation(h *swf.HistoryEvent) {
 		info := a.Children[key]
 		delete(a.ChildrenAttempts, info.WorkflowId)
 		delete(a.Children, key)
-
 	}
+}
+
+func (a *EventCorrelator) ForgetCorrelation(h *swf.HistoryEvent) {
+	a.checkInit()
+	a.Forget = append(a.Forget, h)
+}
+
+func (a *EventCorrelator) processForgets() {
+	for _, h := range a.Forget {
+		if h.EventType == nil {
+			continue
+		}
+		switch *h.EventType {
+		case swf.EventTypeActivityTaskFailed:
+			delete(a.ActivityAttempts, a.safeActivityId(h))
+			delete(a.Activities, a.key(h.ActivityTaskFailedEventAttributes.ScheduledEventId))
+		case swf.EventTypeActivityTaskTimedOut:
+			delete(a.ActivityAttempts, a.safeActivityId(h))
+			delete(a.Activities, a.key(h.ActivityTaskTimedOutEventAttributes.ScheduledEventId))
+		case swf.EventTypeSignalExternalWorkflowExecutionFailed:
+			key := a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventId)
+			info := a.Signals[key]
+			delete(a.SignalAttempts, a.signalIdFromInfo(info))
+			delete(a.Signals, a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventId))
+		case swf.EventTypeRequestCancelExternalWorkflowExecutionFailed:
+			key := a.key(h.ExternalWorkflowExecutionCancelRequestedEventAttributes.InitiatedEventId)
+			info := a.Cancellations[key]
+			delete(a.CancelationAttempts, info.WorkflowId)
+			delete(a.Cancellations, a.key(h.RequestCancelExternalWorkflowExecutionFailedEventAttributes.InitiatedEventId))
+		case swf.EventTypeStartChildWorkflowExecutionFailed:
+			key := a.key(h.ChildWorkflowExecutionStartedEventAttributes.InitiatedEventId)
+			info := a.Children[key]
+			delete(a.ChildrenAttempts, info.WorkflowId)
+			delete(a.Children, a.key(h.StartChildWorkflowExecutionFailedEventAttributes.InitiatedEventId))
+		}
+	}
+	a.Forget = []*swf.HistoryEvent{}
 }
 
 // ActivityInfo returns the ActivityInfo that is correlates with a given event. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
@@ -254,6 +291,9 @@ func (a *EventCorrelator) checkInit() {
 	}
 	if a.ChildrenAttempts == nil {
 		a.ChildrenAttempts = make(map[string]int)
+	}
+	if a.Forget == nil {
+		a.Forget = []*swf.HistoryEvent{}
 	}
 }
 
