@@ -515,6 +515,18 @@ func TestCancelTracking(t *testing.T) {
 	if c.AttemptsForCancellation(info) != 0 {
 		t.Fatal("expected zero attempts", c)
 	}
+
+	start.EventId = I(5)
+	c.Track(start)
+	info = c.CancellationInfo(ok)
+
+	fail.RequestCancelExternalWorkflowExecutionFailedEventAttributes.InitiatedEventId = I(5)
+	c.ForgetCorrelation(fail)
+	c.Track(fail)
+	if c.AttemptsForCancellation(info) != 0 {
+		t.Fatal("expected zero attempts", c)
+	}
+
 }
 
 func TestChildTracking(t *testing.T) {
