@@ -385,7 +385,6 @@ func TestCountActivityAttemtps(t *testing.T) {
 		t.Fatal("expected 0 attempts", c)
 	}
 
-
 }
 
 func TestSignalTracking(t *testing.T) {
@@ -426,7 +425,6 @@ func TestSignalTracking(t *testing.T) {
 	if c.AttemptsForSignal(info) != 0 {
 		t.Fatal("expected zero attempts", c)
 	}
-
 
 	c = new(EventCorrelator)
 	start.EventId = I(5)
@@ -545,7 +543,6 @@ func TestCancelTracking(t *testing.T) {
 	if c.AttemptsForCancellation(info) != 0 {
 		t.Fatal("expected zero attempts", c)
 	}
-
 
 	c = new(EventCorrelator)
 	start.EventId = I(5)
