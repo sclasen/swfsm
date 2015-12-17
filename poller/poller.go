@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	"github.com/pborman/uuid"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -40,17 +41,44 @@ type DecisionTaskPoller struct {
 // Poll polls the task list for a task. If there is no task available, nil is
 // returned. If an error is encountered, no task is returned.
 func (p *DecisionTaskPoller) Poll(taskReady func(*swf.PollForDecisionTaskOutput) bool) (*swf.PollForDecisionTaskOutput, error) {
-	var resp *swf.PollForDecisionTaskOutput
+	var (
+		resp   *swf.PollForDecisionTaskOutput
+		page   int
+		pollId = uuid.New()
+	)
 
-	eachPage := func(out *swf.PollForDecisionTaskOutput, lastPage bool) bool {
-		Log.Println("component=DecisionTaskPoller at=decision-task-page")
+	eachPage := func(out *swf.PollForDecisionTaskOutput, _ bool) bool {
+		page++
+
+		var (
+			firstEventId *int64
+			lastEventId  *int64
+			workflowId   string
+		)
+
+		if len(out.Events) > 0 {
+			firstEventId = out.Events[0].EventId
+			lastEventId = out.Events[len(out.Events)-1].EventId
+		}
+
+		if out.WorkflowExecution != nil {
+			workflowId = LS(out.WorkflowExecution.WorkflowId)
+		} else {
+			workflowId = "no-workflow-execution"
+		}
+
+		Log.Printf("component=DecisionTaskPoller at=decision-task-page poll-id=%q task-list=%q workflow=%q page=%d "+
+			"PreviousStartedEventId=%s StartedEventId=%s NumEvents=%d FirstEventId=%s LastEventId=%s",
+			pollId, p.TaskList, workflowId, page,
+			LL(out.PreviousStartedEventId), LL(out.StartedEventId), len(out.Events), LL(firstEventId), LL(lastEventId))
+
 		if resp == nil {
 			resp = out
 		} else {
 			resp.Events = append(resp.Events, out.Events...)
 		}
-		shouldContinue := !(lastPage || taskReady(resp)) //stop if last page or task ready
-		return shouldContinue
+
+		return !taskReady(resp)
 	}
 
 	err := p.client.PollForDecisionTaskPages(&swf.PollForDecisionTaskInput{
@@ -61,15 +89,17 @@ func (p *DecisionTaskPoller) Poll(taskReady func(*swf.PollForDecisionTaskOutput)
 	}, eachPage)
 
 	if err != nil {
-		Log.Printf("component=DecisionTaskPoller at=error error=%s", err.Error())
+		Log.Printf("component=DecisionTaskPoller poll-id=%q task-list=%q at=error error=%s",
+			pollId, p.TaskList, err.Error())
 		return nil, errors.Trace(err)
 	}
 	if resp != nil && resp.TaskToken != nil {
-		Log.Printf("component=DecisionTaskPoller at=decision-task-received workflow=%s", LS(resp.WorkflowType.Name))
+		Log.Printf("component=DecisionTaskPoller poll-id=%q at=decision-task-received task-list=%q workflow=%q",
+			pollId, p.TaskList, LS(resp.WorkflowExecution.WorkflowId))
 		p.logTaskLatency(resp)
 		return resp, nil
 	}
-	Log.Println("component=DecisionTaskPoller at=decision-task-empty-response")
+	Log.Printf("component=DecisionTaskPoller at=decision-task-empty-response poll-id=%q task-list=%q", pollId, p.TaskList)
 	return nil, nil
 }
 
