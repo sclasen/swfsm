@@ -23,22 +23,22 @@ func SWFSendHandler(polling, heartbeat *http.Client) func(*request.Request) {
 	var reStatusCode = regexp.MustCompile(`^(\d+)`)
 
 	return func(r *request.Request) {
-		client := r.Service.Config.HTTPClient
-		if r.Service.ServiceName == "swf" {
+		client := r.Config.HTTPClient
+		if r.ClientInfo.ServiceName == "swf" {
 			switch r.Operation.Name {
 			case "PollForDecisionTask", "PollForActivityTask":
-				if r.Service.Config.LogLevel.AtLeast(aws.LogDebug) {
-					Log.Printf("using polling client %s %s", r.Service.ServiceName, r.Operation.Name)
+				if r.Config.LogLevel.AtLeast(aws.LogDebug) {
+					Log.Printf("using polling client %s %s", r.ClientInfo.ServiceName, r.Operation.Name)
 				}
 				client = polling
 			case "RecordActivityTaskHeartbeat":
-				if r.Service.Config.LogLevel.AtLeast(aws.LogDebug) {
-					Log.Printf("using heartbeat client %s %s", r.Service.ServiceName, r.Operation.Name)
+				if r.Config.LogLevel.AtLeast(aws.LogDebug) {
+					Log.Printf("using heartbeat client %s %s", r.ClientInfo.ServiceName, r.Operation.Name)
 				}
 				client = heartbeat
 			default:
-				if r.Service.Config.LogLevel.AtLeast(aws.LogDebug) {
-					Log.Printf("using std client %s %s", r.Service.ServiceName, r.Operation.Name)
+				if r.Config.LogLevel.AtLeast(aws.LogDebug) {
+					Log.Printf("using std client %s %s", r.ClientInfo.ServiceName, r.Operation.Name)
 				}
 			}
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/pborman/uuid"
 	. "github.com/sclasen/swfsm/log"
@@ -27,7 +28,7 @@ func TestClient(t *testing.T) {
 		Credentials: credentials.NewEnvCredentials(),
 		Region:      aws.String("us-east-1"),
 	}
-	client := swf.New(config)
+	client := swf.New(session.New(config))
 
 	req := swf.RegisterDomainInput{
 		Name:                                   aws.String("client-test"),

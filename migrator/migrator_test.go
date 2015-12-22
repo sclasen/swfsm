@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/log"
@@ -25,7 +26,7 @@ func TestMigrateDomains(t *testing.T) {
 		Credentials: credentials.NewEnvCredentials(),
 		Region:      aws.String("us-east-1"),
 	}
-	client := swf.New(config)
+	client := swf.New(session.New(config))
 
 	domain := fmt.Sprintf("test-domain-%d", time.Now().UnixNano()) //dont use the testDomain since we deprecate this one
 
@@ -67,7 +68,7 @@ func TestMigrateWorkflowTypes(t *testing.T) {
 		Credentials: credentials.NewEnvCredentials(),
 		Region:      aws.String("us-east-1"),
 	}
-	client := swf.New(config)
+	client := swf.New(session.New(config))
 
 	workflow := fmt.Sprintf("test-workflow-%d", time.Now().UnixNano())
 	version := fmt.Sprintf("test-workflow-version-%d", time.Now().UnixNano())
@@ -116,7 +117,7 @@ func TestMigrateActivityTypes(t *testing.T) {
 		Credentials: credentials.NewEnvCredentials(),
 		Region:      aws.String("us-east-1"),
 	}
-	client := swf.New(config)
+	client := swf.New(session.New(config))
 	activity := fmt.Sprintf("test-activity-%d", time.Now().UnixNano())
 	version := fmt.Sprintf("test-activity-version-%d", time.Now().UnixNano())
 
@@ -163,7 +164,7 @@ func TestMigrateStreams(t *testing.T) {
 		Credentials: credentials.NewEnvCredentials(),
 		Region:      aws.String("us-east-1"),
 	}
-	client := kinesis.New(config)
+	client := kinesis.New(session.New(config))
 
 	sm := StreamMigrator{
 		Streams: []kinesis.CreateStreamInput{
@@ -186,7 +187,7 @@ func createDomain() {
 		Credentials: credentials.NewEnvCredentials(),
 		Region:      aws.String("us-east-1"),
 	}
-	client := swf.New(config)
+	client := swf.New(session.New(config))
 	req := swf.RegisterDomainInput{
 		Name:                                   aws.String(testDomain),
 		Description:                            aws.String("test domain"),

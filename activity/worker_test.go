@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/fsm"
 	. "github.com/sclasen/swfsm/log"
@@ -258,7 +259,7 @@ func TestTypedActivityWorker(t *testing.T) {
 		Region:      aws.String("us-east-1"),
 	}
 
-	client := swf.New(config)
+	client := swf.New(session.New(config))
 
 	domain := "worker-test-domain"
 
