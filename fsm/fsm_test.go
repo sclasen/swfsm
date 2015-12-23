@@ -601,15 +601,15 @@ func TestSerializationInterface(t *testing.T) {
 	f(&FSMContext{})
 }
 
-func TestTaskReady(t *testing.T){
+func TestTaskReady(t *testing.T) {
 	f := testFSM()
 	prevStarted := testHistoryEvent(1, swf.EventTypeDecisionTaskStarted)
 	missed := testHistoryEvent(2, swf.EventTypeWorkflowExecutionSignaled)
-	missed.WorkflowExecutionSignaledEventAttributes = &swf.WorkflowExecutionSignaledEventAttributes{SignalName:"Important"}
+	missed.WorkflowExecutionSignaledEventAttributes = &swf.WorkflowExecutionSignaledEventAttributes{SignalName: S("Important")}
 	state := testHistoryEvent(3, swf.EventTypeMarkerRecorded)
-	state.MarkerRecordedEventAttributes = &swf.MarkerRecordedEventAttributes{MarkerName:StateMarker}
+	state.MarkerRecordedEventAttributes = &swf.MarkerRecordedEventAttributes{MarkerName: S(StateMarker)}
 	correlator := testHistoryEvent(4, swf.EventTypeMarkerRecorded)
-	correlator.MarkerRecordedEventAttributes = &swf.MarkerRecordedEventAttributes{MarkerName:CorrelatorMarker}
+	correlator.MarkerRecordedEventAttributes = &swf.MarkerRecordedEventAttributes{MarkerName: S(CorrelatorMarker)}
 	task := testDecisionTask(1, []*swf.HistoryEvent{correlator, state})
 	if f.taskReady(task) {
 		t.Fatal("task signaled ready, and events were missed")
