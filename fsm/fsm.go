@@ -251,17 +251,22 @@ func (f *FSM) Start() {
 
 // signals the poller to stop reading decision task pages once we have marker events
 func (f *FSM) taskReady(task *swf.PollForDecisionTaskOutput) bool {
-	var state, correlator bool
+	var state, correlator, prev bool
 	for _, e := range task.Events {
 		if f.isStateMarker(e) {
 			state = true
 		}
+
 		if f.isCorrelatorMarker(e) {
 			correlator = true
 		}
 
-		if state && correlator {
-			f.log("workflow=%q fn=taskReady at=state-and-correlator-found eventid=%s",
+		if *e.EventId <= *task.PreviousStartedEventId {
+			prev = true
+		}
+
+		if state && correlator && prev {
+			f.log("workflow=%q fn=taskReady at=state-and-correlator-and-prev-found eventid=%s",
 				s.LS(task.WorkflowExecution.WorkflowId), s.LL(e.EventId))
 			return true
 		}
