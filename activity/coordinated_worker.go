@@ -81,6 +81,10 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 		return nil, err
 	}
 	if err := c.worker.signalStart(activityTask, update); err != nil {
+		//make sure Cancel is called so any goroutines started in Start can get cleaned up.
+		if cerr := c.handler.Cancel(activityTask, update); cerr != nil {
+			Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err err=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), cerr)
+		}
 		return nil, err
 	}
 
