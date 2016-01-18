@@ -298,7 +298,7 @@ func (f *FSM) handleDecisionTask(decisionTask *swf.PollForDecisionTaskOutput) {
 	complete.ExecutionContext = aws.String(state.StateName)
 
 	if _, err := f.SWF.RespondDecisionTaskCompleted(complete); err != nil {
-		f.log("workflow=%s workflow-id=%s action=tick at=decide-request-failed error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), s.LS(decisionTask.WorkflowExecution.RunId), err.Error())
+		f.log("workflow=%s workflow-id=%s run-id=%q action=tick at=decide-request-failed error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), s.LS(decisionTask.WorkflowExecution.RunId), err.Error())
 		return
 	}
 
