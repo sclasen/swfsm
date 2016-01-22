@@ -488,7 +488,7 @@ func ExampleFSM() {
 		WorkflowId: S("your-id"),
 		//you will have previously regiestered a WorkflowType that this FSM will work.
 		WorkflowType: &swf.WorkflowType{Name: S("the-name"), Version: S("the-version")},
-		Input:        S(fsm.Serialize(&StateData{Count: 0, Message: "starting message"})),
+		Input:        StartFSMWorkflowInput(fsm, &StateData{Count: 0, Message: "starting message"}),
 	})
 }
 
