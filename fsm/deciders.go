@@ -334,6 +334,7 @@ func OnActivityCompleted(activityName string, deciders ...Decider) Decider {
 func OnActivityFailed(activityName string, deciders ...Decider) Decider {
 	return OnActivityEvents(activityName, []string{
 		swf.EventTypeActivityTaskFailed,
+		swf.EventTypeScheduleActivityTaskFailed,
 	}, deciders...)
 }
 
@@ -357,6 +358,7 @@ func OnActivityFailedTimedOutCanceled(activityName string, deciders ...Decider) 
 		swf.EventTypeActivityTaskFailed,
 		swf.EventTypeActivityTaskTimedOut,
 		swf.EventTypeActivityTaskCanceled,
+		swf.EventTypeScheduleActivityTaskFailed,
 	}, deciders...)
 }
 
