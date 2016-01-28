@@ -395,6 +395,161 @@ func OnRequestCancelExternalWorkflowExecutionFailed(deciders ...Decider) Decider
 	}
 }
 
+// OnChildStarted builds a composed decider that fires on EventTypeStartChildWorkflowExecutionFailed.
+func OnChildStartFailed(deciders ...Decider) Decider {
+	return onChildEvent("on-child-failed", swf.EventTypeStartChildWorkflowExecutionFailed, deciders...)
+}
+
+// OnChildCompleted builds a composed decider that fires on EventTypeChildWorkflowExecutionCompleted.
+func OnChildCompleted(deciders ...Decider) Decider {
+	return onChildEvent("on-child-completed", swf.EventTypeChildWorkflowExecutionCompleted, deciders...)
+}
+
+func onChildEvent(at string, event string, deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case event:
+			logf(ctx, "at=%s", at)
+			return NewComposedDecider(deciders...)(ctx, h, data)
+		}
+		return ctx.Pass()
+	}
+}
+
+// OnStartTimerFailed builds a composed decider that fires on EventTypeStartTimerFailed.
+func OnStartTimerFailed(timer string, deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeStartTimerFailed:
+			if *h.StartTimerFailedEventAttributes.TimerId == timer {
+				logf(ctx, "at=on-start-timer-failed timer=%q", *h.StartTimerFailedEventAttributes.TimerId)
+				return NewComposedDecider(deciders...)(ctx, h, data)
+			}
+		}
+		return ctx.Pass()
+	}
+}
+
+func OnExternalCancellationResponse(exitDecider Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeRequestCancelExternalWorkflowExecutionFailed:
+			failure := h.RequestCancelExternalWorkflowExecutionFailedEventAttributes
+			if *failure.Cause == swf.RequestCancelExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution {
+				logf(ctx, "at=request-cancel-related-workflows-unknown-workflow-execution workflow-id=%q", *failure.WorkflowId)
+				break // ignore the error on this workflow. break out to make sure no others are in flight
+			} else if ctx.Correlator().AttemptsForCancellation(&CancellationInfo{WorkflowId: *failure.WorkflowId}) >= 5 {
+				logf(ctx, "at=request-cancel-related-workflows-max-retries workflow-id=%q", *failure.WorkflowId)
+				break // reached max attempts on this workflow. break out to make sure no others are in flight
+			} else {
+				// retry
+				logf(ctx, "at=request-cancel-related-workflows-retry workflow-id=%q", *failure.WorkflowId)
+				return ctx.Stay(data, []*swf.Decision{
+					&swf.Decision{
+						DecisionType: S(swf.DecisionTypeRequestCancelExternalWorkflowExecution),
+						RequestCancelExternalWorkflowExecutionDecisionAttributes: &swf.RequestCancelExternalWorkflowExecutionDecisionAttributes{
+							WorkflowId: failure.WorkflowId,
+						},
+					},
+				})
+			}
+		case swf.EventTypeExternalWorkflowExecutionCancelRequested:
+			break // this workflow is ok. break out to make sure no others are in flight
+		default:
+			return ctx.Pass()
+		}
+
+		if len(ctx.Correlator().Cancellations) <= 1 {
+			return exitDecider(ctx, h, data)
+		}
+
+		return ctx.Pass()
+	}
+}
+
+// OnUnknownWorkflowSignaled builds a composed decider that fires if the signal specified by
+// signalName is signaled on an unknown Workflow ID.
+func OnUnknownWorkflowSignaled(signalName string, deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		// event type: failed to signal external workflow
+		if *h.EventType == swf.EventTypeSignalExternalWorkflowExecutionFailed {
+			failure := h.SignalExternalWorkflowExecutionFailedEventAttributes
+
+			// failure cause: external workflow does not exist
+			if *failure.Cause == swf.SignalExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution {
+				info := ctx.SignalInfo(h)
+				// signal name matches
+				if info != nil && info.SignalName == signalName {
+					// ignore the error on this workflow. break out to make sure no others are in flight
+					logf(ctx, "at=signal-external-workflow-unknown-workflow-execution workflow-id=%q", *failure.WorkflowId)
+					return NewComposedDecider(deciders...)(ctx, h, data)
+				}
+			}
+		}
+
+		return ctx.Pass()
+	}
+}
+
+// OnSignalFailedAndNotUnknown passes the event to OnSignalFailed only if the signal
+// specified by signalName matches and the signalling was targeting a known Workflow ID.
+func OnSignalFailedAndNotUnknown(signalName string, deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		// event type: failed to signal external workflow
+		if *h.EventType == swf.EventTypeSignalExternalWorkflowExecutionFailed {
+			failure := h.SignalExternalWorkflowExecutionFailedEventAttributes
+
+			// failure cause: external workflow does not exist
+			if *failure.Cause == swf.SignalExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution {
+				info := ctx.SignalInfo(h)
+				// signal name matches
+				if info != nil && info.SignalName == signalName {
+					// ignore the error on this workflow. break out to make sure no others are in flight
+					logf(ctx, "at=signal-external-workflow-unknown-workflow-execution workflow-id=%q", *failure.WorkflowId)
+					return ctx.Pass()
+				}
+			}
+		}
+
+		return OnSignalFailed(signalName, deciders...)(ctx, h, data)
+	}
+}
+
+// OnChildStartFailedAndNotAlreadyRunning builds a composed decider that fires on
+// EventTypeStartChildWorkflowExecutionFailed and Cause != "WORKFLOW_ALREADY_RUNNING".
+func OnChildStartFailedAndNotAlreadyRunning(deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		if *h.EventType == swf.EventTypeStartChildWorkflowExecutionFailed {
+			failure := h.StartChildWorkflowExecutionFailedEventAttributes
+
+			// failure cause: external workflow does not exist
+			if *failure.Cause == swf.StartChildWorkflowExecutionFailedCauseWorkflowAlreadyRunning {
+				return ctx.Pass()
+			}
+		}
+
+		logf(ctx, "at=child-start-failed-not-already-running workflow-id=%q", *ctx.WorkflowExecution.WorkflowId)
+		return OnChildStartFailed(deciders...)(ctx, h, data)
+	}
+}
+
+func OnChildStartFailedAlreadyRunning(deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		// event type: failed to signal external workflow
+		if *h.EventType == swf.EventTypeStartChildWorkflowExecutionFailed {
+			failure := h.StartChildWorkflowExecutionFailedEventAttributes
+
+			// failure cause: external workflow does not exist
+			if *failure.Cause == swf.StartChildWorkflowExecutionFailedCauseWorkflowAlreadyRunning {
+				logf(ctx, "at=child-start-failed-already-running workflow-id=%q", *failure.WorkflowId)
+				return NewComposedDecider(deciders...)(ctx, h, data)
+			}
+		}
+
+		return ctx.Pass()
+	}
+}
+
 // AddDecision adds a single decision to a ContinueDecider outcome
 func AddDecision(decisionFn DecisionFunc) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
