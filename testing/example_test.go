@@ -82,12 +82,17 @@ func (n *ExampleFSMTestSuite) ExampleSetUpTest(t *testing.T) {
 		*/
 		StubbedWorkflows:   []string{"stubbed-workflow-type"},
 		DefaultWaitTimeout: 5,
+		/*
+			If true, we make all stubbed activities fail once before completing so that
+			you can test failure recovery/retry
+		*/
 		FailActivitiesOnce: true,
 	}
 	n.testListener = NewTestListener(testConfig)
 
 	go n.fsm.Start()
 	go stubFsm.Start()
+	go n.activityWorker.Start()
 
 }
 
