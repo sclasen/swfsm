@@ -1,6 +1,7 @@
 package poller
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -207,6 +208,7 @@ func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 // ShutdownManager facilitates cleanly shutting down pollers when the application decides to exit. When StopPollers() is called it will
 // send to each of the stopChan that have been registered, then recieve from each of the ackChan that have been registered. At this point StopPollers() returns.
 type ShutdownManager struct {
+	rpMu              sync.Mutex // protects registeredPollers
 	registeredPollers map[string]*registeredPoller
 }
 
@@ -229,6 +231,9 @@ func NewShutdownManager() *ShutdownManager {
 
 //StopPollers blocks until it is able to stop all the registered pollers, which can take up to 60 seconds.
 func (p *ShutdownManager) StopPollers() {
+	p.rpMu.Lock()
+	defer p.rpMu.Unlock()
+
 	Log.Printf("component=PollerShutdownManager at=stop-pollers")
 	for _, r := range p.registeredPollers {
 		Log.Printf("component=PollerShutdownManager at=sending-stop name=%s", r.name)
@@ -243,10 +248,14 @@ func (p *ShutdownManager) StopPollers() {
 
 // Register registers a named pair of channels to the shutdown manager. Buffered channels please!
 func (p *ShutdownManager) Register(name string, stopChan chan bool, ackChan chan bool) {
+	p.rpMu.Lock()
+	defer p.rpMu.Unlock()
 	p.registeredPollers[name] = &registeredPoller{name, stopChan, ackChan}
 }
 
 // Deregister removes a registered pair of channels from the shutdown manager.
 func (p *ShutdownManager) Deregister(name string) {
+	p.rpMu.Lock()
+	defer p.rpMu.Unlock()
 	delete(p.registeredPollers, name)
 }
