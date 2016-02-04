@@ -3,6 +3,9 @@ package fsm
 import (
 	"strconv"
 
+	"math/rand"
+	"time"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -86,6 +89,23 @@ func (c *ComposedDecisionInterceptor) AfterDecision(decision *swf.PollForDecisio
 //Interceptor handles ContinueSignal, if 0,0,0,0 Continue, else start ContinueTimer.
 //In continuing, OnStarted re-starts the activity, transition back to steady.
 func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySeconds int) DecisionInterceptor {
+	return ManagedContinuationsWithJitter(historySize, 0, workflowAgeInSec, 0, timerRetrySeconds)
+}
+
+//To avoid stampedes of workflows that are started at the same time being continued at the same time
+//ManagedContinuationsWithJitter will schedule the initial continue randomly between
+//workflowAgeInSec and workflowAgeInSec + maxAgeJitterInSec
+//and will attempt to continue workflows with more than between
+//historySize and historySize + maxSizeJitter events
+func ManagedContinuationsWithJitter(historySize int, maxSizeJitter int, workflowAgeInSec int, maxAgeJitterInSec int, timerRetrySeconds int) DecisionInterceptor {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	//dont blow up on bad values
+	if maxSizeJitter <= 0 {
+		maxSizeJitter = 1
+	}
+	if maxAgeJitterInSec <= 0 {
+		maxAgeJitterInSec = 1
+	}
 	return &FuncInterceptor{
 		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
 			for _, d := range outcome.Decisions {
@@ -104,7 +124,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 					DecisionType: S(swf.DecisionTypeStartTimer),
 					StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
 						TimerId:            S(ContinueTimer),
-						StartToFireTimeout: S(strconv.Itoa(workflowAgeInSec)),
+						StartToFireTimeout: S(strconv.Itoa(workflowAgeInSec + rng.Intn(maxAgeJitterInSec))),
 					},
 				})
 			}
@@ -129,7 +149,7 @@ func ManagedContinuations(historySize int, workflowAgeInSec int, timerRetrySecon
 				}
 			}
 
-			historySizeExceeded := int64(historySize) < *decision.Events[0].EventId
+			historySizeExceeded := int64(historySize+rng.Intn(maxSizeJitter)) < *decision.Events[0].EventId
 
 			//if we pass history size or if we see ContinuteTimer or ContinueSignal fired
 			if continueTimerFired || continueSignalFired || historySizeExceeded {
