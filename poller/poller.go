@@ -244,6 +244,7 @@ func (p *ShutdownManager) StopPollers() {
 		<-r.stopAckChannel
 		Log.Printf("component=PollerShutdownManager at=stop-ack name=%s", r.name)
 	}
+	p.registeredPollers = map[string]*registeredPoller{}
 }
 
 // Register registers a named pair of channels to the shutdown manager. Buffered channels please!
