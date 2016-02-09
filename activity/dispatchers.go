@@ -1,6 +1,13 @@
 package activity
 
-import "github.com/aws/aws-sdk-go/service/swf"
+import (
+	"fmt"
+	"sync/atomic"
+	"time"
+
+	"github.com/aws/aws-sdk-go/service/swf"
+	"github.com/sclasen/swfsm/poller"
+)
 
 //ActivityTaskDispatcher is used by the ActivityWorker machinery to dispatch the handling of ActivityTasks.
 //Different implementations can provide different concurrency models.
@@ -57,4 +64,44 @@ func (b *BoundedGoroutineDispatcher) DispatchTask(task *swf.PollForActivityTaskO
 	}
 
 	b.tasks <- task
+}
+
+type CountdownGoroutineDispatcher struct {
+	Stop     chan bool
+	StopAck  chan bool
+	inFlight int64
+}
+
+var countdownDispatcherNameSeq int64
+
+func countdownDispatcherName() string {
+	seq := atomic.AddInt64(&countdownDispatcherNameSeq, 1)
+	return fmt.Sprintf("countdown-%d", seq)
+}
+
+func RegisterNewCountdownGoroutineDispatcher(mgr poller.ShutdownManager) *CountdownGoroutineDispatcher {
+	g := &CountdownGoroutineDispatcher{
+		Stop:    make(chan bool, 1),
+		StopAck: make(chan bool, 1),
+	}
+	g.Start()
+	mgr.Register(countdownDispatcherName(), g.Stop, g.StopAck)
+	return g
+}
+
+func (m *CountdownGoroutineDispatcher) DispatchTask(t *swf.PollForActivityTaskOutput, f func(*swf.PollForActivityTaskOutput)) {
+	//run tasks in a new goroutine
+	go func() {
+		atomic.AddInt64(&m.inFlight, 1)
+		f(t)
+		atomic.AddInt64(&m.inFlight, -1)
+	}()
+}
+
+func (m *CountdownGoroutineDispatcher) Start() {
+	<-m.Stop
+	for atomic.LoadInt64(&m.inFlight) > 0 {
+		time.Sleep(1 * time.Second)
+	}
+	m.StopAck <- true
 }

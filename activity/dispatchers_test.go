@@ -20,6 +20,22 @@ func TestBoundedGoroutineDispatcher(t *testing.T) {
 	testDispatcher(&BoundedGoroutineDispatcher{NumGoroutines: 8}, t)
 }
 
+func TestCountdownGoroutineDispatcher(t *testing.T) {
+	dispatcher := &CountdownGoroutineDispatcher{
+		Stop:    make(chan bool, 1),
+		StopAck: make(chan bool, 1),
+	}
+	go dispatcher.Start()
+	testDispatcher(dispatcher, t)
+	dispatcher.Stop <- true
+
+	select {
+	case <-dispatcher.Stop:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for tasks to countdown")
+	}
+}
+
 func testDispatcher(dispatcher ActivityTaskDispatcher, t *testing.T) {
 	task := &swf.PollForActivityTaskOutput{}
 	tasksHandled := int32(0)
