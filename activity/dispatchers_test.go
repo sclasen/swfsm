@@ -26,11 +26,12 @@ func TestCountdownGoroutineDispatcher(t *testing.T) {
 		StopAck: make(chan bool, 1),
 	}
 	go dispatcher.Start()
-	testDispatcher(dispatcher, t)
 	dispatcher.Stop <- true
 
+	testDispatcher(dispatcher, t)
+
 	select {
-	case <-dispatcher.Stop:
+	case <-dispatcher.StopAck:
 	case <-time.After(1 * time.Second):
 		t.Fatal("timed out waiting for tasks to countdown")
 	}
