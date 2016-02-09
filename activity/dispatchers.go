@@ -81,7 +81,7 @@ func countdownDispatcherName() string {
 	return fmt.Sprintf("countdown-%d", seq)
 }
 
-//construct a new CountdownGoroutineDispatcher, start it and register it with the given ShutdownManager
+//RegisterNewCountdownGoroutineDispatcher constructs a new CountdownGoroutineDispatcher, start it and register it with the given ShutdownManager
 func RegisterNewCountdownGoroutineDispatcher(mgr poller.ShutdownManager) *CountdownGoroutineDispatcher {
 	g := &CountdownGoroutineDispatcher{
 		Stop:    make(chan bool, 1),
