@@ -66,6 +66,8 @@ func (b *BoundedGoroutineDispatcher) DispatchTask(task *swf.PollForActivityTaskO
 	b.tasks <- task
 }
 
+// CountdownGoroutineDispatcher is a dispatcher that you can register with a  ShutdownManager.  Used in your
+// ActivityWorkers, it will count in-flight activities.  It doesnt ack shutdowns until the number of in-flight activities are zero.
 type CountdownGoroutineDispatcher struct {
 	Stop     chan bool
 	StopAck  chan bool
@@ -79,12 +81,13 @@ func countdownDispatcherName() string {
 	return fmt.Sprintf("countdown-%d", seq)
 }
 
+//construct a new CountdownGoroutineDispatcher, start it and register it with the given ShutdownManager
 func RegisterNewCountdownGoroutineDispatcher(mgr poller.ShutdownManager) *CountdownGoroutineDispatcher {
 	g := &CountdownGoroutineDispatcher{
 		Stop:    make(chan bool, 1),
 		StopAck: make(chan bool, 1),
 	}
-	g.Start()
+	go g.Start()
 	mgr.Register(countdownDispatcherName(), g.Stop, g.StopAck)
 	return g
 }
