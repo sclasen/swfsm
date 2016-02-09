@@ -230,6 +230,7 @@ func NewShutdownManager() *ShutdownManager {
 }
 
 //StopPollers blocks until it is able to stop all the registered pollers, which can take up to 60 seconds.
+//the registered pollers are cleared once all pollers have acked the stop.
 func (p *ShutdownManager) StopPollers() {
 	p.rpMu.Lock()
 	defer p.rpMu.Unlock()
@@ -244,6 +245,7 @@ func (p *ShutdownManager) StopPollers() {
 		<-r.stopAckChannel
 		Log.Printf("component=PollerShutdownManager at=stop-ack name=%s", r.name)
 	}
+	p.registeredPollers = map[string]*registeredPoller{}
 }
 
 // Register registers a named pair of channels to the shutdown manager. Buffered channels please!
