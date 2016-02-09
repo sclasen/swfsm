@@ -25,10 +25,13 @@ func TestCountdownGoroutineDispatcher(t *testing.T) {
 		Stop:    make(chan bool, 1),
 		StopAck: make(chan bool, 1),
 	}
-	go dispatcher.Start()
-	dispatcher.Stop <- true
 
-	testDispatcher(dispatcher, t)
+	go dispatcher.Start()
+
+	go func() {
+		testDispatcher(dispatcher, t)
+		dispatcher.Stop <- true
+	}()
 
 	select {
 	case <-dispatcher.StopAck:
