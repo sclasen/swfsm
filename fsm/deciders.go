@@ -390,7 +390,7 @@ func OnActivityScheduleToCloseTimeout(activityName string, deciders ...Decider) 
 	return OnActivityTimedOut(activityName,
 		func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 			if *h.ActivityTaskTimedOutEventAttributes.TimeoutType == swf.ActivityTaskTimeoutTypeScheduleToClose {
-				logf(ctx, "at=on-activity-schedule-to-start-timeout")
+				logf(ctx, "at=on-activity-schedule-to-close-timeout")
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
 			return ctx.Pass()
@@ -402,7 +402,7 @@ func OnActivityStartToCloseTimeout(activityName string, deciders ...Decider) Dec
 	return OnActivityTimedOut(activityName,
 		func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 			if *h.ActivityTaskTimedOutEventAttributes.TimeoutType == swf.ActivityTaskTimeoutTypeStartToClose {
-				logf(ctx, "at=on-activity-schedule-to-start-timeout")
+				logf(ctx, "at=on-activity-start-to-close-timeout")
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
 			return ctx.Pass()
