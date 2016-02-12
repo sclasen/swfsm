@@ -362,6 +362,54 @@ func OnActivityFailedTimedOutCanceled(activityName string, deciders ...Decider) 
 	}, deciders...)
 }
 
+func OnActivityHeartbeatTimeout(activityName string, deciders ...Decider) Decider {
+	return OnActivityTimedOut(activityName,
+		func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+			if *h.ActivityTaskTimedOutEventAttributes.TimeoutType == swf.ActivityTaskTimeoutTypeHeartbeat {
+				logf(ctx, "at=on-activity-heartbeat-timeout")
+				return NewComposedDecider(deciders...)(ctx, h, data)
+			}
+			return ctx.Pass()
+		},
+	)
+}
+
+func OnActivityScheduleToStartTimeout(activityName string, deciders ...Decider) Decider {
+	return OnActivityTimedOut(activityName,
+		func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+			if *h.ActivityTaskTimedOutEventAttributes.TimeoutType == swf.ActivityTaskTimeoutTypeScheduleToStart {
+				logf(ctx, "at=on-activity-schedule-to-start-timeout")
+				return NewComposedDecider(deciders...)(ctx, h, data)
+			}
+			return ctx.Pass()
+		},
+	)
+}
+
+func OnActivityScheduleToCloseTimeout(activityName string, deciders ...Decider) Decider {
+	return OnActivityTimedOut(activityName,
+		func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+			if *h.ActivityTaskTimedOutEventAttributes.TimeoutType == swf.ActivityTaskTimeoutTypeScheduleToClose {
+				logf(ctx, "at=on-activity-schedule-to-start-timeout")
+				return NewComposedDecider(deciders...)(ctx, h, data)
+			}
+			return ctx.Pass()
+		},
+	)
+}
+
+func OnActivityStartToCloseTimeout(activityName string, deciders ...Decider) Decider {
+	return OnActivityTimedOut(activityName,
+		func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+			if *h.ActivityTaskTimedOutEventAttributes.TimeoutType == swf.ActivityTaskTimeoutTypeStartToClose {
+				logf(ctx, "at=on-activity-schedule-to-start-timeout")
+				return NewComposedDecider(deciders...)(ctx, h, data)
+			}
+			return ctx.Pass()
+		},
+	)
+}
+
 func OnWorkflowCancelRequested(deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
