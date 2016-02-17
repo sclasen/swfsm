@@ -30,7 +30,7 @@ type FSM struct {
 	Identity string
 	// Client used to make SWF api requests.
 	SWF SWFOps
-	// Strategy for replication of state to the systems the build the Query side model.
+	// Strategy for replication of state. Events may be delivered out of order.
 	ReplicationHandler ReplicationHandler
 	// DataType of the data struct associated with this FSM.
 	// The data is automatically peristed to and loaded from workflow history by the FSM.

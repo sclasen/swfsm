@@ -9,6 +9,7 @@ import (
 )
 
 //ReplicationHandler can be configured on an FSM and will be called when a DecisionTask is successfully completed.
+//Note that events can be delivered out of order to the ReplicationHandler.
 type ReplicationHandler func(*FSMContext, *swf.PollForDecisionTaskOutput, *swf.RespondDecisionTaskCompletedInput, *SerializedState) error
 
 //KinesisOps is the subset of kinesis.Kinesis ops required by KinesisReplication
