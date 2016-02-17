@@ -470,7 +470,7 @@ func OnStartTimerFailed(timer string, deciders ...Decider) Decider {
 		switch *h.EventType {
 		case swf.EventTypeStartTimerFailed:
 			if *h.StartTimerFailedEventAttributes.TimerId == timer {
-				logf(ctx, "at=on-start-timer-failed timer=%q", *h.StartTimerFailedEventAttributes.TimerId)
+				logf(ctx, "at=on-start-timer-failed timer=%q cause=%q", *h.StartTimerFailedEventAttributes.TimerId, *h.StartTimerFailedEventAttributes.Cause)
 				return NewComposedDecider(deciders...)(ctx, h, data)
 			}
 		}
