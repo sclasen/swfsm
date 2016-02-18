@@ -1,6 +1,8 @@
 package fsm
 
 import (
+	"sync"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 )
 
@@ -58,4 +60,40 @@ func (b *BoundedGoroutineDispatcher) DispatchTask(task *swf.PollForDecisionTaskO
 	}
 
 	b.tasks <- task
+}
+
+//GoroutinePerWorkflowDispatcher allows a single goroutine per workflow execution (RunID) to run at a time.
+//Tasks are queued for each workflow execution.
+//Any workflow execution with maxPendingTasks can cause DispatchTask to block until at least one of them gets handled.
+func GoroutinePerWorkflowDispatcher(maxPendingTasks int) DecisionTaskDispatcher {
+	return &goroutinePerWorkflowDispatcher{
+		tasks:           make(map[string]chan *swf.PollForDecisionTaskOutput),
+		tasksBufferSize: maxPendingTasks,
+	}
+}
+
+type goroutinePerWorkflowDispatcher struct {
+	tasks           map[string]chan *swf.PollForDecisionTaskOutput
+	tasksBufferSize int
+	tasksMux        sync.Mutex
+}
+
+func (b *goroutinePerWorkflowDispatcher) DispatchTask(task *swf.PollForDecisionTaskOutput, handler func(*swf.PollForDecisionTaskOutput)) {
+	tasks := b.tasksFor(*task.WorkflowExecution.RunId)
+	go func(queue chan *swf.PollForDecisionTaskOutput) {
+		handler(<-queue)
+	}(tasks)
+	tasks <- task // can block if there are maxPendingTasks for this workflow execution
+}
+
+func (b *goroutinePerWorkflowDispatcher) tasksFor(workflowRunID string) chan *swf.PollForDecisionTaskOutput {
+	b.tasksMux.Lock()
+	defer b.tasksMux.Unlock()
+
+	tasks, ok := b.tasks[workflowRunID]
+	if !ok {
+		tasks = make(chan *swf.PollForDecisionTaskOutput, b.tasksBufferSize)
+		b.tasks[workflowRunID] = tasks
+	}
+	return tasks
 }
