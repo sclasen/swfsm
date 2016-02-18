@@ -478,6 +478,20 @@ func OnStartTimerFailed(timer string, deciders ...Decider) Decider {
 	}
 }
 
+// OnTimerCanceled builds a composed decider that fires on EventTypeTimerCanceled.
+func OnTimerCanceled(timer string, deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		switch *h.EventType {
+		case swf.EventTypeTimerCanceled:
+			if *h.TimerCanceledEventAttributes.TimerId == timer {
+				logf(ctx, "at=on-timer-canceled timer=%q", *h.TimerCanceledEventAttributes.TimerId)
+				return NewComposedDecider(deciders...)(ctx, h, data)
+			}
+		}
+		return ctx.Pass()
+	}
+}
+
 func OnExternalCancellationResponse(exitDecider Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
 		switch *h.EventType {
