@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 
 	"time"
@@ -19,9 +20,19 @@ func TestNewGoroutineDispatcher(t *testing.T) {
 func TestBoundedGoroutineDispatcher(t *testing.T) {
 	testDispatcher(&BoundedGoroutineDispatcher{NumGoroutines: 8}, t)
 }
+func TestGoroutinePerWorkflowDispatcher(t *testing.T) {
+	testDispatcher(GoroutinePerWorkflowDispatcher(1000), t)
+}
+func TestGoroutinePerWorkflowDispatcherUnbuffered(t *testing.T) {
+	testDispatcher(GoroutinePerWorkflowDispatcher(0), t)
+}
 
 func testDispatcher(dispatcher DecisionTaskDispatcher, t *testing.T) {
-	task := &swf.PollForDecisionTaskOutput{}
+	task := &swf.PollForDecisionTaskOutput{
+		WorkflowExecution: &swf.WorkflowExecution{
+			RunId: aws.String("workflow-dummy"),
+		},
+	}
 	tasksHandled := int32(0)
 	totalTasks := int32(1000)
 	done := make(chan struct{}, 1)
