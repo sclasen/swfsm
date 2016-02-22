@@ -77,9 +77,10 @@ func ShortStubState() fsm.Decider {
 }
 
 //intercept any attempts to start a workflow and launch the stub workflow instead.
-func TestDecisionInterceptor(testId string, stubbedWorkflows, stubbedShortWorkflows []string) fsm.DecisionInterceptor {
+func TestDecisionInterceptor(testId string, stubbedWorkflows, stubbedShortWorkflows []string, failSignalsOnce bool) fsm.DecisionInterceptor {
 	stubbed := make(map[string]struct{})
 	stubbedShort := make(map[string]struct{})
+	failedSignals := make(map[string]*fsm.SignalInfo)
 	v := struct{}{}
 	for _, s := range stubbedWorkflows {
 		stubbed[s] = v
@@ -88,6 +89,19 @@ func TestDecisionInterceptor(testId string, stubbedWorkflows, stubbedShortWorkfl
 		stubbedShort[s] = v
 	}
 	return &fsm.FuncInterceptor{
+		BeforeDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
+			if failSignalsOnce {
+				for _, h := range decision.Events {
+					if *h.EventType == swf.EventTypeSignalExternalWorkflowExecutionFailed {
+						if info, found := failedSignals[*h.SignalExternalWorkflowExecutionFailedEventAttributes.WorkflowId]; found {
+							h.SignalExternalWorkflowExecutionFailedEventAttributes.WorkflowId = &info.WorkflowId
+							//rewrite workflow not found to throttling.
+							h.SignalExternalWorkflowExecutionFailedEventAttributes.Cause = S(swf.SignalExternalWorkflowExecutionFailedCauseSignalExternalWorkflowExecutionRateExceeded)
+						}
+					}
+				}
+			}
+		},
 		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
 			for _, d := range outcome.Decisions {
 				switch *d.DecisionType {
@@ -108,7 +122,22 @@ func TestDecisionInterceptor(testId string, stubbedWorkflows, stubbedShortWorkfl
 					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testId)}
 				case swf.DecisionTypeContinueAsNewWorkflowExecution:
 					d.ContinueAsNewWorkflowExecutionDecisionAttributes.TaskList = &swf.TaskList{Name: S(testId)}
+				case swf.DecisionTypeSignalExternalWorkflowExecution:
+					if failSignalsOnce {
+						signalWF := *d.SignalExternalWorkflowExecutionDecisionAttributes.WorkflowId
+						signalName := *d.SignalExternalWorkflowExecutionDecisionAttributes.SignalName
+						failer := fmt.Sprintf("fail-on-purpose-%s-%s", signalWF, signalName)
+						if _, found := failedSignals[failer]; !found {
+							//if we havent failed the signal yet, add it and swap the workflow id so it wont fail
+							failedSignals[failer] = &fsm.SignalInfo{WorkflowId: signalWF, SignalName: signalName}
+							d.SignalExternalWorkflowExecutionDecisionAttributes.WorkflowId = S(failer)
+						} else {
+							//we are retrying after the forced failure, remove it
+							delete(failedSignals, failer)
+						}
+					}
 				}
+
 			}
 		},
 	}

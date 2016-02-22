@@ -32,6 +32,7 @@ type TestConfig struct {
 	ShortStubbedWorkflows []string
 	DefaultWaitTimeout    int
 	FailActivitiesOnce    bool
+	FailSignalsOnce       bool
 }
 
 func NewTestListener(t TestConfig) *TestListener {
@@ -55,7 +56,7 @@ func NewTestListener(t TestConfig) *TestListener {
 	t.FSM.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
 	t.FSM.DecisionInterceptor = fsm.NewComposedDecisionInterceptor(
 		t.FSM.DecisionInterceptor,
-		TestDecisionInterceptor(tl.TestId, t.StubbedWorkflows, t.ShortStubbedWorkflows),
+		TestDecisionInterceptor(tl.TestId, t.StubbedWorkflows, t.ShortStubbedWorkflows, t.FailSignalsOnce),
 	)
 	t.FSM.TaskList = tl.TestFsmTaskList()
 
