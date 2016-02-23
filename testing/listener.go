@@ -35,7 +35,7 @@ type TestConfig struct {
 	ThrottleSignalsOnce   bool
 	ThrottleCancelsOnce   bool
 	ThrottleChildrenOnce  bool
-	//ThrottleTimersOnce bool  unclear how to implement this interceptor at.
+	ThrottleTimersOnce    bool
 }
 
 func NewTestListener(t TestConfig) *TestListener {
@@ -73,6 +73,10 @@ func NewTestListener(t TestConfig) *TestListener {
 
 	if t.ThrottleSignalsOnce {
 		interceptors = append(interceptors, TestThrotteSignalsOnceInterceptor())
+	}
+
+	if t.ThrottleTimersOnce {
+		interceptors = append(interceptors, TestThrotteTimersOnceInterceptor(10))
 	}
 
 	t.FSM.DecisionInterceptor = fsm.NewComposedDecisionInterceptor(interceptors...)
