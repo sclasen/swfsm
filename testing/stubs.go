@@ -77,10 +77,9 @@ func ShortStubState() fsm.Decider {
 }
 
 //intercept any attempts to start a workflow and launch the stub workflow instead.
-func TestDecisionInterceptor(testId string, stubbedWorkflows, stubbedShortWorkflows []string, failSignalsOnce bool) fsm.DecisionInterceptor {
+func TestDecisionInterceptor(testId string, stubbedWorkflows, stubbedShortWorkflows []string) fsm.DecisionInterceptor {
 	stubbed := make(map[string]struct{})
 	stubbedShort := make(map[string]struct{})
-	failedSignals := make(map[string]*fsm.SignalInfo)
 	v := struct{}{}
 	for _, s := range stubbedWorkflows {
 		stubbed[s] = v
@@ -89,19 +88,6 @@ func TestDecisionInterceptor(testId string, stubbedWorkflows, stubbedShortWorkfl
 		stubbedShort[s] = v
 	}
 	return &fsm.FuncInterceptor{
-		BeforeDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
-			if failSignalsOnce {
-				for _, h := range decision.Events {
-					if *h.EventType == swf.EventTypeSignalExternalWorkflowExecutionFailed {
-						if info, found := failedSignals[*h.SignalExternalWorkflowExecutionFailedEventAttributes.WorkflowId]; found {
-							h.SignalExternalWorkflowExecutionFailedEventAttributes.WorkflowId = &info.WorkflowId
-							//rewrite workflow not found to throttling.
-							h.SignalExternalWorkflowExecutionFailedEventAttributes.Cause = S(swf.SignalExternalWorkflowExecutionFailedCauseSignalExternalWorkflowExecutionRateExceeded)
-						}
-					}
-				}
-			}
-		},
 		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
 			for _, d := range outcome.Decisions {
 				switch *d.DecisionType {
@@ -122,22 +108,7 @@ func TestDecisionInterceptor(testId string, stubbedWorkflows, stubbedShortWorkfl
 					d.ScheduleActivityTaskDecisionAttributes.TaskList = &swf.TaskList{Name: S(*d.ScheduleActivityTaskDecisionAttributes.TaskList.Name + testId)}
 				case swf.DecisionTypeContinueAsNewWorkflowExecution:
 					d.ContinueAsNewWorkflowExecutionDecisionAttributes.TaskList = &swf.TaskList{Name: S(testId)}
-				case swf.DecisionTypeSignalExternalWorkflowExecution:
-					if failSignalsOnce {
-						signalWF := *d.SignalExternalWorkflowExecutionDecisionAttributes.WorkflowId
-						signalName := *d.SignalExternalWorkflowExecutionDecisionAttributes.SignalName
-						failer := fmt.Sprintf("fail-on-purpose-%s-%s", signalWF, signalName)
-						if _, found := failedSignals[failer]; !found {
-							//if we havent failed the signal yet, add it and swap the workflow id so it wont fail
-							failedSignals[failer] = &fsm.SignalInfo{WorkflowId: signalWF, SignalName: signalName}
-							d.SignalExternalWorkflowExecutionDecisionAttributes.WorkflowId = S(failer)
-						} else {
-							//we are retrying after the forced failure, remove it
-							delete(failedSignals, failer)
-						}
-					}
 				}
-
 			}
 		},
 	}
@@ -166,6 +137,115 @@ func TestFailOnceActivityInterceptor() activity.ActivityInterceptor {
 			msg := fmt.Sprintf("interceptor.test.fail-once at=fail activity-id=%q", *t.ActivityId)
 			Log.Println(msg)
 			return nil, fmt.Errorf(msg)
+		},
+	}
+}
+
+func TestThrotteSignalsOnceInterceptor() fsm.DecisionInterceptor {
+	throttledSignals := make(map[string]*fsm.SignalInfo)
+	return &fsm.FuncInterceptor{
+		BeforeDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
+			for _, h := range decision.Events {
+				if *h.EventType == swf.EventTypeSignalExternalWorkflowExecutionFailed {
+					if info, found := throttledSignals[*h.SignalExternalWorkflowExecutionFailedEventAttributes.WorkflowId]; found {
+						h.SignalExternalWorkflowExecutionFailedEventAttributes.WorkflowId = &info.WorkflowId
+						//rewrite workflow not found to throttling.
+						h.SignalExternalWorkflowExecutionFailedEventAttributes.Cause = S(swf.SignalExternalWorkflowExecutionFailedCauseSignalExternalWorkflowExecutionRateExceeded)
+					}
+				}
+			}
+
+		},
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
+			for _, d := range outcome.Decisions {
+				switch *d.DecisionType {
+				case swf.DecisionTypeSignalExternalWorkflowExecution:
+					signalWF := *d.SignalExternalWorkflowExecutionDecisionAttributes.WorkflowId
+					signalName := *d.SignalExternalWorkflowExecutionDecisionAttributes.SignalName
+					throttle := fmt.Sprintf("fail-on-purpose-%s-%s", signalWF, signalName)
+					if _, found := throttledSignals[throttle]; !found {
+						//if we havent failed the signal yet, add it and swap the workflow id so it wont fail
+						throttledSignals[throttle] = &fsm.SignalInfo{WorkflowId: signalWF, SignalName: signalName}
+						d.SignalExternalWorkflowExecutionDecisionAttributes.WorkflowId = S(throttle)
+					} else {
+						//we are retrying after the forced failure, remove it
+						delete(throttledSignals, throttle)
+					}
+				}
+
+			}
+		},
+	}
+}
+
+func TestThrotteCancelsOnceInterceptor() fsm.DecisionInterceptor {
+	throttledCancels := make(map[string]*fsm.CancellationInfo)
+	return &fsm.FuncInterceptor{
+		BeforeDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
+			for _, h := range decision.Events {
+				if *h.EventType == swf.EventTypeRequestCancelExternalWorkflowExecutionFailed {
+					if info, found := throttledCancels[*h.RequestCancelExternalWorkflowExecutionFailedEventAttributes.WorkflowId]; found {
+						h.RequestCancelExternalWorkflowExecutionFailedEventAttributes.WorkflowId = &info.WorkflowId
+						//rewrite workflow not found to throttling.
+						h.RequestCancelExternalWorkflowExecutionFailedEventAttributes.Cause = S(swf.RequestCancelExternalWorkflowExecutionFailedCauseRequestCancelExternalWorkflowExecutionRateExceeded)
+					}
+				}
+			}
+
+		},
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
+			for _, d := range outcome.Decisions {
+				switch *d.DecisionType {
+				case swf.DecisionTypeRequestCancelExternalWorkflowExecution:
+					cancelWF := *d.RequestCancelExternalWorkflowExecutionDecisionAttributes.WorkflowId
+					throttle := fmt.Sprintf("fail-on-purpose-%s", cancelWF)
+					if _, found := throttledCancels[throttle]; !found {
+						//if we havent failed the signal yet, add it and swap the workflow id so it wont fail
+						throttledCancels[throttle] = &fsm.CancellationInfo{WorkflowId: cancelWF}
+						d.RequestCancelExternalWorkflowExecutionDecisionAttributes.WorkflowId = S(throttle)
+					} else {
+						//we are retrying after the forced failure, remove it
+						delete(throttledCancels, throttle)
+					}
+				}
+
+			}
+		},
+	}
+}
+
+func TestThrotteChildrenOnceInterceptor() fsm.DecisionInterceptor {
+	throttledChildren := make(map[string]*fsm.ChildInfo)
+	return &fsm.FuncInterceptor{
+		BeforeDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
+			for _, h := range decision.Events {
+				if *h.EventType == swf.EventTypeStartChildWorkflowExecutionFailed {
+					if info, found := throttledChildren[*h.StartChildWorkflowExecutionFailedEventAttributes.WorkflowId]; found {
+						h.StartChildWorkflowExecutionFailedEventAttributes.WorkflowId = &info.WorkflowId
+						//rewrite workflow not found to throttling.
+						h.StartChildWorkflowExecutionFailedEventAttributes.Cause = S(swf.StartChildWorkflowExecutionFailedCauseChildCreationRateExceeded)
+					}
+				}
+			}
+
+		},
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
+			for _, d := range outcome.Decisions {
+				switch *d.DecisionType {
+				case swf.DecisionTypeStartChildWorkflowExecution:
+					childWF := *d.StartChildWorkflowExecutionDecisionAttributes.WorkflowId
+					throttle := fmt.Sprintf("fail-on-purpose-%s", childWF)
+					if _, found := throttledChildren[throttle]; !found {
+						//if we havent failed the signal yet, add it and swap the workflow id so it wont fail
+						throttledChildren[throttle] = &fsm.ChildInfo{WorkflowId: childWF}
+						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowId = S(throttle)
+					} else {
+						//we are retrying after the forced failure, remove it
+						delete(throttledChildren, throttle)
+					}
+				}
+
+			}
 		},
 	}
 }
