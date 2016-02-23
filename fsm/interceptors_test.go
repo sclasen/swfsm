@@ -293,6 +293,318 @@ func TestManagedContinuationsInterceptor(t *testing.T) {
 
 }
 
+func TestWorkflowStartCancel(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartChildWorkflowExecution),
+			StartChildWorkflowExecutionDecisionAttributes: &swf.StartChildWorkflowExecutionDecisionAttributes{
+				WorkflowId: S("dyno-foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeRequestCancelExternalWorkflowExecution),
+			RequestCancelExternalWorkflowExecutionDecisionAttributes: &swf.RequestCancelExternalWorkflowExecutionDecisionAttributes{
+				WorkflowId: S("dyno-foobar"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 1 {
+		t.Fatal("more than 1 decision left after interceptor")
+	}
+}
+
+func TestWorkflowCancelStart(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeRequestCancelExternalWorkflowExecution),
+			RequestCancelExternalWorkflowExecutionDecisionAttributes: &swf.RequestCancelExternalWorkflowExecutionDecisionAttributes{
+				WorkflowId: S("dyno-foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartChildWorkflowExecution),
+			StartChildWorkflowExecutionDecisionAttributes: &swf.StartChildWorkflowExecutionDecisionAttributes{
+				WorkflowId: S("dyno-foobar"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 3 {
+		t.Fatal("incorrect number of decisions left after interceptor")
+	}
+
+}
+
+func TestManyWorkflowStarts(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartChildWorkflowExecution),
+			StartChildWorkflowExecutionDecisionAttributes: &swf.StartChildWorkflowExecutionDecisionAttributes{
+				WorkflowId: S("dyno-foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartChildWorkflowExecution),
+			StartChildWorkflowExecutionDecisionAttributes: &swf.StartChildWorkflowExecutionDecisionAttributes{
+				WorkflowId: S("dyno-foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartChildWorkflowExecution),
+			StartChildWorkflowExecutionDecisionAttributes: &swf.StartChildWorkflowExecutionDecisionAttributes{
+				WorkflowId: S("dyno-foobar"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 4 {
+		t.Fatal("incorrect number of start decisions left after interceptor")
+	}
+}
+
+func TestStartCancelDifferingWorkflows(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartChildWorkflowExecution),
+			StartChildWorkflowExecutionDecisionAttributes: &swf.StartChildWorkflowExecutionDecisionAttributes{
+				WorkflowId: S("dyno-foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeRequestCancelExternalWorkflowExecution),
+			RequestCancelExternalWorkflowExecutionDecisionAttributes: &swf.RequestCancelExternalWorkflowExecutionDecisionAttributes{
+				WorkflowId: S("dyno-baz"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 3 {
+		t.Fatal("incorrect number of differing workflow decisions left after interceptor")
+	}
+}
+
+func TestActivityStartCancel(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
+				ActivityId: S("foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeRequestCancelActivityTask),
+			RequestCancelActivityTaskDecisionAttributes: &swf.RequestCancelActivityTaskDecisionAttributes{
+				ActivityId: S("foobar"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 1 {
+		t.Fatal("more than 1 decision left after interceptor")
+	}
+
+}
+
+func TestManyActivityStarts(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
+				ActivityId: S("foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
+				ActivityId: S("foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
+				ActivityId: S("foobar"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 4 {
+		t.Fatal("incorrect number of start decisions left after interceptor")
+	}
+}
+
+func TestStartCancelDifferingActivities(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
+				ActivityId: S("foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeRequestCancelActivityTask),
+			RequestCancelActivityTaskDecisionAttributes: &swf.RequestCancelActivityTaskDecisionAttributes{
+				ActivityId: S("foobar-duex"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 3 {
+		t.Fatal("incorrect number of differing activities decisions left after interceptor")
+	}
+}
+
+func TestTimerStartCancel(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartTimer),
+			StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+				TimerId: S("baz"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeCancelTimer),
+			CancelTimerDecisionAttributes: &swf.CancelTimerDecisionAttributes{
+				TimerId: S("baz"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 1 {
+		t.Fatal("more than 1 timer decision left after interceptor")
+	}
+
+}
+
+func TestManyTimerStarts(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartTimer),
+			StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+				TimerId: S("baz"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartTimer),
+			StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+				TimerId: S("baz"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartTimer),
+			StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+				TimerId: S("baz"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 4 {
+		t.Fatal("incorrect number of timer start decisions left after interceptor")
+	}
+}
+
+func TestStartCancelDifferingTimers(t *testing.T) {
+	ctx := interceptorTestContext()
+
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartTimer),
+			StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+				TimerId: S("baz"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeCancelTimer),
+			CancelTimerDecisionAttributes: &swf.CancelTimerDecisionAttributes{
+				TimerId: S("bar"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+	}
+
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 3 {
+		t.Fatal("incorrect number of differing timer decisions left after interceptor")
+	}
+}
+
+func TestMixedDecisionInterceptions(t *testing.T) {
+	ctx := interceptorTestContext()
+	decisions := []*swf.Decision{
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeStartTimer),
+			StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+				TimerId: S("baz"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeCancelTimer),
+			CancelTimerDecisionAttributes: &swf.CancelTimerDecisionAttributes{
+				TimerId: S("baz"),
+			},
+		},
+		&swf.Decision{DecisionType: S(swf.DecisionTypeRecordMarker)},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
+				ActivityId: S("foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+			ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
+				ActivityId: S("foobar"),
+			},
+		},
+		&swf.Decision{
+			DecisionType: S(swf.DecisionTypeRequestCancelActivityTask),
+			RequestCancelActivityTaskDecisionAttributes: &swf.RequestCancelActivityTaskDecisionAttributes{
+				ActivityId: S("foobar"),
+			},
+		},
+	}
+	decisions = handleStartCancelTypes(decisions, ctx)
+	if len(decisions) != 2 {
+		t.Fatal("incorrect number of mixed decisions left after interceptor")
+	}
+}
+
 func interceptorTestContext() *FSMContext {
 	return NewFSMContext(&FSM{Serializer: &JSONStateSerializer{}},
 		swf.WorkflowType{Name: S("foo"), Version: S("1")},

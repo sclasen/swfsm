@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -179,4 +180,98 @@ func ManagedContinuationsWithJitter(historySize int, maxSizeJitter int, workflow
 			}
 		},
 	}
+}
+
+func StartCancelInterceptor() DecisionInterceptor {
+	return &FuncInterceptor{
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
+			outcome.Decisions = handleStartCancelTypes(outcome.Decisions, ctx)
+		},
+	}
+}
+
+type StartCancelPair struct {
+	idField        string
+	startDecision  string
+	cancelDecision string
+	startId        func(d *swf.Decision) *string
+	cancelId       func(d *swf.Decision) *string
+}
+
+var startCancelPairs = []*StartCancelPair{
+	&StartCancelPair{
+		idField:        "workflow",
+		startDecision:  swf.DecisionTypeStartChildWorkflowExecution,
+		cancelDecision: swf.DecisionTypeRequestCancelExternalWorkflowExecution,
+		startId:        func(d *swf.Decision) *string { return d.StartChildWorkflowExecutionDecisionAttributes.WorkflowId },
+		cancelId: func(d *swf.Decision) *string {
+			return d.RequestCancelExternalWorkflowExecutionDecisionAttributes.WorkflowId
+		},
+	},
+	&StartCancelPair{
+		idField:        "activity",
+		startDecision:  swf.DecisionTypeScheduleActivityTask,
+		cancelDecision: swf.DecisionTypeRequestCancelActivityTask,
+		startId:        func(d *swf.Decision) *string { return d.ScheduleActivityTaskDecisionAttributes.ActivityId },
+		cancelId: func(d *swf.Decision) *string {
+			return d.RequestCancelActivityTaskDecisionAttributes.ActivityId
+		},
+	},
+	&StartCancelPair{
+		idField:        "timer",
+		startDecision:  swf.DecisionTypeStartTimer,
+		cancelDecision: swf.DecisionTypeCancelTimer,
+		startId:        func(d *swf.Decision) *string { return d.StartTimerDecisionAttributes.TimerId },
+		cancelId: func(d *swf.Decision) *string {
+			return d.CancelTimerDecisionAttributes.TimerId
+		},
+	},
+}
+
+func handleStartCancelTypes(in []*swf.Decision, ctx *FSMContext) []*swf.Decision {
+	for _, scp := range startCancelPairs {
+		in = scp.removeStartBeforeCancel(in, ctx)
+	}
+	return in
+}
+
+func (s *StartCancelPair) removeStartBeforeCancel(in []*swf.Decision, ctx *FSMContext) []*swf.Decision {
+	var out []*swf.Decision
+
+	for _, decision := range in {
+		switch *decision.DecisionType {
+		case s.cancelDecision:
+			cancelId := aws.StringValue(s.cancelId(decision))
+			if cancelId == "" {
+				continue
+			}
+			i := s.decisionsContainStartCancel(out, &cancelId)
+			if i >= 0 {
+
+				startDecision := out[i]
+				startId := aws.StringValue(s.startId(startDecision))
+				if startId == "" {
+					continue
+				}
+				out = append(out[:i], out[i+1:]...)
+				logf(ctx, "fn=remove-start-before-cancel at=start-cancel-detected status=removing-start-cancel workflow=%s run=%s start-%s=%s cancel-%s=%s", aws.StringValue(ctx.WorkflowId), aws.StringValue(ctx.RunId), s.idField, startId, s.idField, cancelId)
+			} else {
+				out = append(out, decision)
+			}
+		default:
+			out = append(out, decision)
+		}
+	}
+
+	return out
+}
+
+// This ensures the pairs are of the same workflow/activity/timer ID
+func (s *StartCancelPair) decisionsContainStartCancel(in []*swf.Decision, cancelId *string) int {
+	for i, d := range in {
+		if *d.DecisionType == s.startDecision && *s.startId(d) == *cancelId {
+			return i
+		}
+	}
+	return -1
 }
