@@ -305,6 +305,9 @@ func TestThrotteTimersOnceInterceptor(numTimers int) fsm.DecisionInterceptor {
 				switch *d.DecisionType {
 				case swf.DecisionTypeStartTimer:
 					timerId := *d.StartTimerDecisionAttributes.TimerId
+					if timerId == fsm.ContinueTimer {
+						continue
+					}
 					throttle := <-timerNames
 					if _, found := throttledTimers[throttle]; !found {
 						//if we havent failed the signal yet, add it and swap the workflow id so it wont fail
