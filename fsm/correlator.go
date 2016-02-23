@@ -35,7 +35,7 @@ type ActivityInfo struct {
 type SignalInfo struct {
 	SignalName string
 	WorkflowId string
-	Input *string
+	Input      *string
 }
 
 //TimerInfo holds the Control data from a Timer
@@ -46,14 +46,14 @@ type TimerInfo struct {
 
 //CancellationInfo holds the Control data and workflow that was being canceled
 type CancellationInfo struct {
-	Control *string
+	Control    *string
 	WorkflowId string
 }
 
 //CancellationInfo holds the Control data and workflow that was being canceled
 type ChildInfo struct {
 	WorkflowId string
-	Input *string
+	Input      *string
 	*swf.WorkflowType
 }
 
@@ -72,7 +72,7 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 		a.Activities[a.key(h.EventId)] = &ActivityInfo{
 			ActivityId:   *h.ActivityTaskScheduledEventAttributes.ActivityId,
 			ActivityType: h.ActivityTaskScheduledEventAttributes.ActivityType,
-			Input: h.ActivityTaskScheduledEventAttributes.Input,
+			Input:        h.ActivityTaskScheduledEventAttributes.Input,
 		}
 	}
 
@@ -80,14 +80,14 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 		a.Signals[a.key(h.EventId)] = &SignalInfo{
 			SignalName: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
 			WorkflowId: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowId,
-			Input: h.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input,
+			Input:      h.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input,
 		}
 	}
 
 	if a.nilSafeEq(h.EventType, swf.EventTypeRequestCancelExternalWorkflowExecutionInitiated) {
 		a.Cancellations[a.key(h.EventId)] = &CancellationInfo{
 			WorkflowId: *h.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.WorkflowId,
-			Control: h.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.Control,
+			Control:    h.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.Control,
 		}
 	}
 
@@ -102,7 +102,7 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 		a.Children[a.key(h.EventId)] = &ChildInfo{
 			WorkflowId:   *h.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowId,
 			WorkflowType: h.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType,
-			Input: h.StartChildWorkflowExecutionInitiatedEventAttributes.Input,
+			Input:        h.StartChildWorkflowExecutionInitiatedEventAttributes.Input,
 		}
 	}
 
