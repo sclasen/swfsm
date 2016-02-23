@@ -450,7 +450,7 @@ func TestTimerTracking(t *testing.T) {
 	c.Track(timerStart)
 	//track happens in FSM after Decider
 	info := c.TimerInfo(timerFired)
-	if info == nil || info.Control != "the-control" || info.TimerId != "the-timer" {
+	if info == nil || *info.Control != "the-control" || info.TimerId != "the-timer" {
 		t.Fatal(info)
 	}
 
@@ -464,7 +464,7 @@ func TestTimerTracking(t *testing.T) {
 	c.Track(timerStart2)
 	info = c.TimerInfo(timerCanceled)
 
-	if info == nil || info.Control != "the-control" || info.TimerId != "the-timer" {
+	if info == nil || *info.Control != "the-control" || info.TimerId != "the-timer" {
 		t.Fatal(info)
 	}
 
