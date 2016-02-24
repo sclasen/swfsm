@@ -5,7 +5,6 @@ import (
 
 	"sync"
 
-	"log"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/swf"
@@ -144,6 +143,19 @@ func TestFailOnceActivityInterceptor() activity.ActivityInterceptor {
 	}
 }
 
+/*
+TestThrotteSignalsOnceInterceptor and all the TestThrottleInterceptor work as follows
+
+On the initial decision task, the after decision interceptor rewrites signals/cancels/children/timers such that the subsequent decision task will have a
+corresponding failure. By using a non-existent workflow-id or other similar mechanism.
+
+On the subsequent decision task, the before decision task rewrites the error cause from the relevant "NotFound" to the relevant "Throttling" error.
+
+The FSM handles these errors presumptiviely by rescheduling the signal/timer/cancel/child
+
+On the after decision task the interceptor clears out the state set in the initial decision, used by the subsequent before interceptor, and the signal/timer/cancel/child succeeds/
+*/
+
 func TestThrotteSignalsOnceInterceptor() fsm.DecisionInterceptor {
 	throttledSignals := make(map[string]*fsm.SignalInfo)
 	return &fsm.FuncInterceptor{
@@ -267,7 +279,8 @@ func TestThrotteChildrenOnceInterceptor() fsm.DecisionInterceptor {
 //cause timer id in use failures, that we rewrite to throttles
 func TestThrotteTimersOnceInterceptor(numTimers int) fsm.DecisionInterceptor {
 	timerNames := []string{}
-	throttledTimers := make(map[string]*fsm.TimerInfo)
+	origToReplace := make(map[string]string)
+	replaceToOrig := make(map[string]string)
 	return &fsm.FuncInterceptor{
 		BeforeDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
 			for _, h := range decision.Events {
@@ -275,8 +288,8 @@ func TestThrotteTimersOnceInterceptor(numTimers int) fsm.DecisionInterceptor {
 					break
 				}
 				if *h.EventType == swf.EventTypeStartTimerFailed {
-					if info, found := throttledTimers[*h.StartTimerFailedEventAttributes.TimerId]; found {
-						h.StartTimerFailedEventAttributes.TimerId = &info.TimerId
+					if info, found := replaceToOrig[*h.StartTimerFailedEventAttributes.TimerId]; found {
+						h.StartTimerFailedEventAttributes.TimerId = S(info)
 						//rewrite timer in use to throttling.
 						h.StartTimerFailedEventAttributes.Cause = S(swf.StartTimerFailedCauseTimerCreationRateExceeded)
 					}
@@ -312,17 +325,19 @@ func TestThrotteTimersOnceInterceptor(numTimers int) fsm.DecisionInterceptor {
 					if timerId == fsm.ContinueTimer || strings.HasPrefix(timerId, "throttle-test") {
 						continue
 					}
-					log.Println(len(timerNames))
 
 					throttle := timerNames[0]
 					timerNames = timerNames[1:]
-					if _, found := throttledTimers[throttle]; !found {
+					if _, found := origToReplace[timerId]; !found {
 						//if we havent failed the signal yet, add it and swap the workflow id so it wont fail
-						throttledTimers[throttle] = &fsm.TimerInfo{TimerId: timerId}
+						origToReplace[timerId] = throttle
+						replaceToOrig[throttle] = timerId
 						d.StartTimerDecisionAttributes.TimerId = S(throttle)
 					} else {
 						//we are retrying after the forced failure, remove it
-						delete(throttledTimers, throttle)
+						throttle = origToReplace[timerId]
+						delete(origToReplace, timerId)
+						delete(replaceToOrig, throttle)
 						timerNames = append(timerNames, throttle)
 					}
 				}

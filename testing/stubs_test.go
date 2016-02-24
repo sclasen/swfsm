@@ -9,7 +9,7 @@ import (
 	. "github.com/sclasen/swfsm/sugar"
 )
 
-func TestThrottleSignalInterceptor(t *te.T) {
+func TestThrottleInterceptors(t *te.T) {
 
 	interceptor := fsm.NewComposedDecisionInterceptor(
 		TestThrotteSignalsOnceInterceptor(),
@@ -116,7 +116,41 @@ func TestThrottleSignalInterceptor(t *te.T) {
 		PreviousStartedEventId: L(0),
 	}
 
-	interceptor.BeforeDecision(secondTask, ctx, first)
+	second := &fsm.Outcome{
+		State: "steady",
+		Data:  &TestData{},
+		Decisions: []*swf.Decision{
+			{
+				DecisionType: S(swf.DecisionTypeSignalExternalWorkflowExecution),
+				SignalExternalWorkflowExecutionDecisionAttributes: &swf.SignalExternalWorkflowExecutionDecisionAttributes{
+					SignalName: S("the-signal"),
+					WorkflowId: S("to-signal"),
+				},
+			},
+			{
+				DecisionType: S(swf.DecisionTypeRequestCancelExternalWorkflowExecution),
+				RequestCancelExternalWorkflowExecutionDecisionAttributes: &swf.RequestCancelExternalWorkflowExecutionDecisionAttributes{
+					WorkflowId: S("to-cancel"),
+				},
+			},
+			{
+				DecisionType: S(swf.DecisionTypeStartChildWorkflowExecution),
+				StartChildWorkflowExecutionDecisionAttributes: &swf.StartChildWorkflowExecutionDecisionAttributes{
+					WorkflowId:   S("the-child"),
+					WorkflowType: &swf.WorkflowType{Name: S("foo"), Version: S("1")},
+				},
+			},
+			{
+				DecisionType: S(swf.DecisionTypeStartTimer),
+				StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+					TimerId:            S("the-timer"),
+					StartToFireTimeout: S("12345"),
+				},
+			},
+		},
+	}
+
+	interceptor.BeforeDecision(secondTask, ctx, second)
 
 	if secondTask.Events[0].StartTimerFailedEventAttributes.Cause == nil ||
 		*secondTask.Events[0].StartTimerFailedEventAttributes.Cause != swf.StartTimerFailedCauseTimerCreationRateExceeded {
@@ -136,6 +170,24 @@ func TestThrottleSignalInterceptor(t *te.T) {
 	if secondTask.Events[3].SignalExternalWorkflowExecutionFailedEventAttributes.Cause == nil ||
 		*secondTask.Events[3].SignalExternalWorkflowExecutionFailedEventAttributes.Cause != swf.SignalExternalWorkflowExecutionFailedCauseSignalExternalWorkflowExecutionRateExceeded {
 		t.Fatal("start timer failed not rewriten ", PrettyHistoryEvent(secondTask.Events[3]))
+	}
+
+	interceptor.AfterDecision(secondTask, ctx, second)
+
+	if *second.Decisions[0].SignalExternalWorkflowExecutionDecisionAttributes.WorkflowId != "to-signal" {
+		t.Fatal("signal not cleared in after", PrettyDecision(*second.Decisions[0]))
+	}
+
+	if *second.Decisions[1].RequestCancelExternalWorkflowExecutionDecisionAttributes.WorkflowId != "to-cancel" {
+		t.Fatal("cancel not cleared in after", PrettyDecision(*second.Decisions[1]))
+	}
+
+	if *second.Decisions[2].StartChildWorkflowExecutionDecisionAttributes.WorkflowId != "the-child" {
+		t.Fatal("child not cleared in after", PrettyDecision(*second.Decisions[2]))
+	}
+
+	if *second.Decisions[3].StartTimerDecisionAttributes.TimerId != "the-timer" {
+		t.Fatal("timer not cleared in after", PrettyDecision(*second.Decisions[3]))
 	}
 
 }
