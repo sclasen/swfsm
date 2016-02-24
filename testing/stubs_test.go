@@ -2,10 +2,11 @@ package testing
 
 import (
 	"fmt"
+	te "testing"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/fsm"
 	. "github.com/sclasen/swfsm/sugar"
-	te "testing"
 )
 
 func TestThrottleSignalInterceptor(t *te.T) {

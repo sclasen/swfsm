@@ -5,13 +5,14 @@ import (
 
 	"sync"
 
+	"log"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/activity"
 	"github.com/sclasen/swfsm/fsm"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
-	"log"
-	"strings"
 )
 
 const (
