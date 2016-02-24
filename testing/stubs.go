@@ -10,6 +10,8 @@ import (
 	"github.com/sclasen/swfsm/fsm"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
+	"log"
+	"strings"
 )
 
 const (
@@ -248,6 +250,7 @@ func TestThrotteChildrenOnceInterceptor() fsm.DecisionInterceptor {
 						//if we havent failed the child yet, add it and swap the workflow id so it will fail
 						throttledChildren[throttle] = &fsm.ChildInfo{WorkflowId: childWF}
 						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowId = S(throttle)
+						d.StartChildWorkflowExecutionDecisionAttributes.WorkflowType.Name = S(throttle)
 					} else {
 						//we are retrying after the forced failure, remove it
 						delete(throttledChildren, throttle)
@@ -262,7 +265,7 @@ func TestThrotteChildrenOnceInterceptor() fsm.DecisionInterceptor {
 //This one is a bit weird. OnStart, we need to schedule a bunch of timers that we can use to
 //cause timer id in use failures, that we rewrite to throttles
 func TestThrotteTimersOnceInterceptor(numTimers int) fsm.DecisionInterceptor {
-	timerNames := make(chan string, numTimers*2)
+	timerNames := []string{}
 	throttledTimers := make(map[string]*fsm.TimerInfo)
 	return &fsm.FuncInterceptor{
 		BeforeDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *fsm.FSMContext, outcome *fsm.Outcome) {
@@ -289,7 +292,7 @@ func TestThrotteTimersOnceInterceptor(numTimers int) fsm.DecisionInterceptor {
 				if *h.EventType == swf.EventTypeWorkflowExecutionStarted {
 					for i := 0; i < numTimers; i++ {
 						timer := fmt.Sprintf("throttle-test-%d", i)
-						timerNames <- timer
+						timerNames = append(timerNames, timer)
 						decision := &swf.Decision{
 							DecisionType: S(swf.DecisionTypeStartTimer),
 							StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
@@ -305,10 +308,13 @@ func TestThrotteTimersOnceInterceptor(numTimers int) fsm.DecisionInterceptor {
 				switch *d.DecisionType {
 				case swf.DecisionTypeStartTimer:
 					timerId := *d.StartTimerDecisionAttributes.TimerId
-					if timerId == fsm.ContinueTimer {
+					if timerId == fsm.ContinueTimer || strings.HasPrefix(timerId, "throttle-test") {
 						continue
 					}
-					throttle := <-timerNames
+					log.Println(len(timerNames))
+
+					throttle := timerNames[0]
+					timerNames = timerNames[1:]
 					if _, found := throttledTimers[throttle]; !found {
 						//if we havent failed the signal yet, add it and swap the workflow id so it wont fail
 						throttledTimers[throttle] = &fsm.TimerInfo{TimerId: timerId}
@@ -316,7 +322,7 @@ func TestThrotteTimersOnceInterceptor(numTimers int) fsm.DecisionInterceptor {
 					} else {
 						//we are retrying after the forced failure, remove it
 						delete(throttledTimers, throttle)
-						timerNames <- throttle
+						timerNames = append(timerNames, throttle)
 					}
 				}
 
