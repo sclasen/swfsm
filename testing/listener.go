@@ -32,6 +32,10 @@ type TestConfig struct {
 	ShortStubbedWorkflows []string
 	DefaultWaitTimeout    int
 	FailActivitiesOnce    bool
+	ThrottleSignalsOnce   bool
+	ThrottleCancelsOnce   bool
+	ThrottleChildrenOnce  bool
+	ThrottleTimersOnce    bool
 }
 
 func NewTestListener(t TestConfig) *TestListener {
@@ -53,10 +57,30 @@ func NewTestListener(t TestConfig) *TestListener {
 	}
 
 	t.FSM.ReplicationHandler = TestReplicator(tl.decisionOutcomes)
-	t.FSM.DecisionInterceptor = fsm.NewComposedDecisionInterceptor(
+
+	interceptors := []fsm.DecisionInterceptor{
 		t.FSM.DecisionInterceptor,
 		TestDecisionInterceptor(tl.TestId, t.StubbedWorkflows, t.ShortStubbedWorkflows),
-	)
+	}
+
+	if t.ThrottleCancelsOnce {
+		interceptors = append(interceptors, TestThrotteCancelsOnceInterceptor())
+	}
+
+	if t.ThrottleChildrenOnce {
+		interceptors = append(interceptors, TestThrotteChildrenOnceInterceptor())
+	}
+
+	if t.ThrottleSignalsOnce {
+		interceptors = append(interceptors, TestThrotteSignalsOnceInterceptor())
+	}
+
+	if t.ThrottleTimersOnce {
+		interceptors = append(interceptors, TestThrotteTimersOnceInterceptor(10))
+	}
+
+	t.FSM.DecisionInterceptor = fsm.NewComposedDecisionInterceptor(interceptors...)
+
 	t.FSM.TaskList = tl.TestFsmTaskList()
 
 	if t.StubFSM != nil {
