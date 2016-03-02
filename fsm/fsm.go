@@ -59,14 +59,16 @@ type FSM struct {
 	DecisionErrorHandler DecisionErrorHandler
 	//FSMErrorReporter  is called whenever there is an error within the FSM, usually indicating bad state or configuration of your FSM.
 	FSMErrorReporter FSMErrorReporter
-	states           map[string]*FSMState
-	errorHandlers    map[string]DecisionErrorHandler
-	initialState     *FSMState
-	completeState    *FSMState
-	canceledState    *FSMState
-	stop             chan bool
-	stopAck          chan bool
-	allowPanics      bool //makes testing easier
+	//AllowPanics is mainly for testing, it should be set to false in production.
+	//when true, instead of recovering from panics in deciders, it allows them to propagate.
+	AllowPanics   bool
+	states        map[string]*FSMState
+	errorHandlers map[string]DecisionErrorHandler
+	initialState  *FSMState
+	completeState *FSMState
+	canceledState *FSMState
+	stop          chan bool
+	stopAck       chan bool
 }
 
 // StateSerializer is the implementation of FSMSerializer.StateSerializer()
@@ -353,7 +355,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 	serializedState, err := f.findSerializedState(decisionTask.Events)
 	if err != nil {
 		f.FSMErrorReporter.ErrorFindingStateData(decisionTask, err)
-		if f.allowPanics {
+		if f.AllowPanics {
 			panic(err)
 		}
 		return nil, nil, nil, errors.Trace(err)
@@ -361,7 +363,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 	eventCorrelator, err := f.findSerializedEventCorrelator(decisionTask.Events)
 	if err != nil {
 		f.FSMErrorReporter.ErrorFindingCorrelator(decisionTask, err)
-		if f.allowPanics {
+		if f.AllowPanics {
 			panic(err)
 		}
 		return nil, nil, nil, errors.Trace(err)
@@ -374,7 +376,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 		data := f.zeroStateData()
 		if err = f.Serializer.Deserialize(serializedState.StateData, data); err != nil {
 			f.FSMErrorReporter.ErrorDeserializingStateData(decisionTask, serializedState.StateData, err)
-			if f.allowPanics {
+			if f.AllowPanics {
 				panic(err)
 			}
 			return nil, nil, nil, errors.Trace(err)
@@ -444,7 +446,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 					final, serializedState, err := f.recordStateMarkers(context, outcome, eventCorrelator, errorState)
 					if err != nil {
 						f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
-						if f.allowPanics {
+						if f.AllowPanics {
 							panic(err)
 						}
 						return nil, nil, nil, errors.Trace(err)
@@ -482,7 +484,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 	final, serializedState, err := f.recordStateMarkers(context, outcome, context.eventCorrelator, nil)
 	if err != nil {
 		f.FSMErrorReporter.ErrorSerializingStateData(decisionTask, *outcome, *eventCorrelator, err)
-		if f.allowPanics {
+		if f.AllowPanics {
 			panic(err)
 		}
 		return nil, nil, nil, errors.Trace(err)
@@ -553,7 +555,7 @@ func (f *FSM) mergeOutcomes(final *Outcome, intermediate Outcome) {
 
 func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event *swf.HistoryEvent, data interface{}) (anOutcome Outcome, anErr error) {
 	defer func() {
-		if !f.allowPanics {
+		if !f.AllowPanics {
 			if r := recover(); r != nil {
 				f.log("at=error error=decide-panic-recovery %v", r)
 				if err, ok := r.(error); ok && err != nil {
@@ -563,7 +565,7 @@ func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event *swf.H
 				}
 			}
 		} else {
-			Log.Printf("at=panic-safe-decide-allowing-panic fsm-allow-panics=%t", f.allowPanics)
+			Log.Printf("at=panic-safe-decide-allowing-panic fsm-allow-panics=%t", f.AllowPanics)
 		}
 	}()
 	anOutcome = context.Decide(event, data, state.Decider)
