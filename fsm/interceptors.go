@@ -150,7 +150,8 @@ func ManagedContinuationsWithJitter(historySize int, maxSizeJitter int, workflow
 				}
 			}
 
-			historySizeExceeded := int64(historySize+rng.Intn(maxSizeJitter)) < *decision.Events[0].EventId
+			eventCount := *decision.Events[0].EventId
+			historySizeExceeded := int64(historySize+rng.Intn(maxSizeJitter)) < eventCount
 
 			//if we pass history size or if we see ContinuteTimer or ContinueSignal fired
 			if continueTimerFired || continueSignalFired || historySizeExceeded {
@@ -162,11 +163,11 @@ func ManagedContinuationsWithJitter(historySize int, maxSizeJitter int, workflow
 				children := len(ctx.Correlator().Children)
 				cancels := len(ctx.Correlator().Cancellations)
 				if decisions == 0 && activities == 0 && signals == 0 && children == 0 && cancels == 0 {
-					logf(ctx, "fn=managed-continuations at=able-to-continue action=add-continue-decision")
+					logf(ctx, "fn=managed-continuations at=able-to-continue action=add-continue-decision events=%d", eventCount)
 					outcome.Decisions = append(outcome.Decisions, ctx.ContinueWorkflowDecision(ctx.State, ctx.stateData)) //stateData safe?
 				} else {
 					//re-start the timer for timerRetrySecs
-					logf(ctx, "fn=managed-continuations at=unable-to-continue decisions=%d activities=%d signals=%d children=%d cancels=%d action=start-continue-timer-retry", decisions, activities, signals, children, cancels)
+					logf(ctx, "fn=managed-continuations at=unable-to-continue decisions=%d activities=%d signals=%d children=%d cancels=%d  events=%d action=start-continue-timer-retry", decisions, activities, signals, children, cancels, eventCount)
 					if continueTimerFired || !ctx.Correlator().TimerScheduled(ContinueTimer) {
 						outcome.Decisions = append(outcome.Decisions, &swf.Decision{
 							DecisionType: S(swf.DecisionTypeStartTimer),
