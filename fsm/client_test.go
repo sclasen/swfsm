@@ -63,7 +63,7 @@ func TestClient(t *testing.T) {
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
 		systemSerializer: JSONStateSerializer{},
-		allowPanics:      false,
+		AllowPanics:      false,
 	}
 
 	fsm.AddInitialState(&FSMState{Name: "initial",
@@ -614,7 +614,7 @@ func dummyFsm() *FSM {
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
 		systemSerializer: JSONStateSerializer{},
-		allowPanics:      false,
+		AllowPanics:      false,
 	}
 
 	fsm.AddInitialState(&FSMState{Name: "initial",

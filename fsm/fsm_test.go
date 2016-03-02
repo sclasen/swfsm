@@ -156,7 +156,7 @@ func TestFSMError(t *testing.T) {
 
 	tasks := testDecisionTask(0, events)
 
-	fsm.allowPanics = false
+	fsm.AllowPanics = false
 	_, decisions, _, err := fsm.Tick(tasks)
 
 	if err != nil {
@@ -626,7 +626,7 @@ func testFSM() *FSM {
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
 		systemSerializer: JSONStateSerializer{},
-		allowPanics:      true,
+		AllowPanics:      true,
 	}
 	return fsm
 }
