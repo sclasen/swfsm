@@ -162,33 +162,33 @@ func (f *FSM) DefaultCanceledState() *FSMState {
 
 // DefaultDecisionErrorHandler is the DefaultDecisionErrorHandler
 func (f *FSM) DefaultDecisionErrorHandler(ctx *FSMContext, event *swf.HistoryEvent, stateBeforeEvent interface{}, stateAfterError interface{}, err error) (*Outcome, error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=decider-error err=%q", s.LS(ctx.WorkflowType.Name), s.LS(ctx.WorkflowId), err)
+	f.log("action=tick workflow=%s workflow-id=%s at=decider-error error=%q", s.LS(ctx.WorkflowType.Name), s.LS(ctx.WorkflowId), err)
 	return nil, err
 }
 
 // ErrorFindingStateData is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorFindingStateData(decisionTask *swf.PollForDecisionTaskOutput, err error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-state-failed err=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
+	f.log("action=tick workflow=%s workflow-id=%s at=find-serialized-state-failed error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
 }
 
 // ErrorFindingCorrelator is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorFindingCorrelator(decisionTask *swf.PollForDecisionTaskOutput, err error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error=find-serialized-event-correlator-failed err=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
+	f.log("action=tick workflow=%s workflow-id=%s at=find-serialized-event-correlator-failed error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
 }
 
 // ErrorMissingFSMState is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorMissingFSMState(decisionTask *swf.PollForDecisionTaskOutput, outcome Outcome) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error error=marked-state-not-in-fsm state=%s", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), outcome.State)
+	f.log("action=tick workflow=%s workflow-id=%s at=missing-fsm-state error=marked-state-not-in-fsm state=%s", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), outcome.State)
 }
 
 // ErrorDeserializingStateData is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorDeserializingStateData(decisionTask *swf.PollForDecisionTaskOutput, serializedStateData string, err error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error=deserialize-state-failed err=&s", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
+	f.log("action=tick workflow=%s workflow-id=%s at=deserialize-state-failed error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
 }
 
 // ErrorSerializingStateData is part of the FSM implementation of FSMErrorReporter
 func (f *FSM) ErrorSerializingStateData(decisionTask *swf.PollForDecisionTaskOutput, outcome Outcome, eventCorrelator EventCorrelator, err error) {
-	f.log("action=tick workflow=%s workflow-id=%s at=error error=state-serialization-error err=%q error-type=system", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
+	f.log("action=tick workflow=%s workflow-id=%s at=state-serialization-error error=%q error-type=system", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), err)
 
 }
 
@@ -401,7 +401,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 		if recovery != nil {
 			outcome = recovery
 		} else {
-			logf(context, "at=error error=error-recovery-failed cause=%s", err)
+			logf(context, "at=error-recovery-failed error=%q", err)
 			//bump the unprocessed window, and re-record the error marker
 			errorState.LatestUnprocessedEventId = *decisionTask.StartedEventId
 			final, serializedState, err := f.recordStateMarkers(context, outcome, eventCorrelator, errorState)
@@ -557,7 +557,7 @@ func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event *swf.H
 	defer func() {
 		if !f.AllowPanics {
 			if r := recover(); r != nil {
-				f.log("at=error error=decide-panic-recovery %v", r)
+				f.log("at=decide-panic-recovery error=%q", r)
 				if err, ok := r.(error); ok && err != nil {
 					anErr = errors.Trace(err)
 				} else {

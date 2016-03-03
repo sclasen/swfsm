@@ -90,7 +90,7 @@ func (p *DecisionTaskPoller) Poll(taskReady func(*swf.PollForDecisionTaskOutput)
 	}, eachPage)
 
 	if err != nil {
-		Log.Printf("component=DecisionTaskPoller poll-id=%q task-list=%q at=error error=%s",
+		Log.Printf("component=DecisionTaskPoller poll-id=%q task-list=%q at=error error=%q",
 			pollId, p.TaskList, err.Error())
 		return nil, errors.Trace(err)
 	}
@@ -167,7 +167,7 @@ func (p *ActivityTaskPoller) Poll() (*swf.PollForActivityTaskOutput, error) {
 		TaskList: &swf.TaskList{Name: aws.String(p.TaskList)},
 	})
 	if err != nil {
-		Log.Printf("component=ActivityTaskPoller at=error error=%s", err.Error())
+		Log.Printf("component=ActivityTaskPoller at=error error=%q", err.Error())
 		return nil, errors.Trace(err)
 	}
 	if resp.TaskToken != nil {

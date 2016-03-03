@@ -197,14 +197,14 @@ func (h *ActivityWorker) fail(task *swf.PollForActivityTaskOutput, err error) {
 			}
 		}
 	}
-	Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=fail error=%s ", LS(task.WorkflowExecution.WorkflowId), LS(task.ActivityType.Name), LS(task.ActivityId), err.Error())
+	Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=fail error=%q", LS(task.WorkflowExecution.WorkflowId), LS(task.ActivityType.Name), LS(task.ActivityId), err.Error())
 	_, failErr := h.SWF.RespondActivityTaskFailed(&swf.RespondActivityTaskFailedInput{
 		TaskToken: task.TaskToken,
 		Reason:    S(err.Error()),
 		Details:   S(err.Error()),
 	})
 	if failErr != nil {
-		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=failed-response-fail error=%s ", LS(task.WorkflowExecution.WorkflowId), LS(task.ActivityType.Name), LS(task.ActivityId), failErr.Error())
+		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=failed-response-fail error=%q", LS(task.WorkflowExecution.WorkflowId), LS(task.ActivityType.Name), LS(task.ActivityId), failErr.Error())
 	}
 }
 
@@ -265,7 +265,7 @@ func (h *ActivityWorker) done(resp *swf.PollForActivityTaskOutput, result *strin
 		Result:    result,
 	})
 	if completeErr != nil {
-		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=completed-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowId), LS(resp.ActivityType.Name), LS(resp.ActivityId), completeErr.Error())
+		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=completed-response-fail error=%q", LS(resp.WorkflowExecution.WorkflowId), LS(resp.ActivityType.Name), LS(resp.ActivityId), completeErr.Error())
 	}
 }
 
@@ -277,7 +277,7 @@ func (h *ActivityWorker) canceled(resp *swf.PollForActivityTaskOutput, details *
 		Details:   details,
 	})
 	if canceledErr != nil {
-		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled-response-fail error=%s ", LS(resp.WorkflowExecution.WorkflowId), LS(resp.ActivityType.Name), LS(resp.ActivityId), canceledErr.Error())
+		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled-response-fail error=%q", LS(resp.WorkflowExecution.WorkflowId), LS(resp.ActivityType.Name), LS(resp.ActivityId), canceledErr.Error())
 	}
 }
 
@@ -291,7 +291,7 @@ func (h *ActivityWorker) handleWithRecovery(handler func(*swf.PollForActivityTas
 				} else {
 					anErr = errors.New("panic in activity with nil error")
 				}
-				Log.Printf("component=activity at=error error=activity-panic-recovery msg=%s", r)
+				Log.Printf("component=activity at=activity-panic-recovery-error error=%q", r)
 				h.fail(resp, anErr)
 			}
 		}()
