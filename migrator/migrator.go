@@ -140,7 +140,7 @@ func (d *DomainMigrator) register(rd swf.RegisterDomainInput) {
 func (d *DomainMigrator) isDeprecated(domain *string) bool {
 	desc, err := d.describe(domain)
 	if err != nil {
-		Log.Printf("action=migrate at=is-dep domain=%s error=%s", LS(domain), err.Error())
+		Log.Printf("action=migrate at=is-dep domain=%s error=%q", LS(domain), err.Error())
 		return false
 	}
 
@@ -217,7 +217,7 @@ func (w *WorkflowTypeMigrator) register(rd swf.RegisterWorkflowTypeInput) {
 func (w *WorkflowTypeMigrator) isDeprecated(domain *string, name *string, version *string) bool {
 	desc, err := w.describe(domain, name, version)
 	if err != nil {
-		Log.Printf("action=migrate at=is-dep domain=%s workflow=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
+		Log.Printf("action=migrate at=is-dep domain=%s workflow=%s version=%s error=%q", LS(domain), LS(name), LS(version), err.Error())
 		return false
 	}
 
@@ -294,7 +294,7 @@ func (a *ActivityTypeMigrator) register(rd swf.RegisterActivityTypeInput) {
 func (a *ActivityTypeMigrator) isDeprecated(domain *string, name *string, version *string) bool {
 	desc, err := a.describe(domain, name, version)
 	if err != nil {
-		Log.Printf("action=migrate at=is-dep domain=%s activity=%s version=%s error=%s", LS(domain), LS(name), LS(version), err.Error())
+		Log.Printf("action=migrate at=is-dep domain=%s activity=%s version=%s error=%q", LS(domain), LS(name), LS(version), err.Error())
 		return false
 	}
 
@@ -376,7 +376,7 @@ func (s *StreamMigrator) awaitActive(stream *string, atMostSeconds int) {
 			StreamName: stream,
 		})
 		if err != nil {
-			Log.Printf("component=kinesis-migrator fn=awaitActive at=describe-error error=%s", err)
+			Log.Printf("component=kinesis-migrator fn=awaitActive at=describe-error error=%q", err)
 			panicWithError(err)
 		}
 		Log.Printf("component=kinesis-migrator fn=awaitActive stream=%s at=describe status=%s", *stream, *desc.StreamDescription.StreamStatus)

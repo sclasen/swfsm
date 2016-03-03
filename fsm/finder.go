@@ -282,7 +282,7 @@ func (f *finder) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowEx
 		if ae, ok := err.(awserr.Error); ok {
 			Log.Printf("component=client fn=findExecution at=list-open error-type=%s message=%s", ae.Code(), ae.Message())
 		} else {
-			Log.Printf("component=client fn=findExecution at=list-open error=%s", err)
+			Log.Printf("component=client fn=findExecution at=list-open error=%q", err)
 		}
 		return nil, err
 	}

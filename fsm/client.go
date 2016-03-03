@@ -124,7 +124,7 @@ func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, *sw
 			if ae, ok := err.(awserr.Error); ok {
 				Log.Printf("component=client fn=GetState at=get-history error-type=%s message=%s", ae.Code(), ae.Message())
 			} else {
-				Log.Printf("component=client fn=GetState at=get-history error=%s", err)
+				Log.Printf("component=client fn=GetState at=get-history error=%q", err)
 			}
 			return nil, nil, err
 		}
@@ -150,13 +150,13 @@ func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, *sw
 func (c *client) GetStateForRun(id, run string) (string, interface{}, error) {
 	serialized, _, err := c.GetSerializedStateForRun(id, run)
 	if err != nil {
-		Log.Printf("component=client fn=GetState at=get-serialized-state error=%s", err)
+		Log.Printf("component=client fn=GetState at=get-serialized-state error=%q", err)
 		return "", nil, err
 	}
 	data := c.f.zeroStateData()
 	err = c.f.Serializer.Deserialize(serialized.StateData, data)
 	if err != nil {
-		Log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%s", err)
+		Log.Printf("component=client fn=GetState at=deserialize-serialized-state error=%q", err)
 		return "", nil, err
 	}
 

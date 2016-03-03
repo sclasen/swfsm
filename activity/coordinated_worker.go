@@ -60,7 +60,7 @@ func (c *coordinatedActivityAdapter) heartbeat(activityTask *swf.PollForActivity
 					cancelActivity <- nil
 					return
 				}
-				Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=heartbeat-error error=%s ", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err.Error())
+				Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=heartbeat-error error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err.Error())
 			} else {
 				Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=heartbeat-recorded", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId))
 				if *status.CancelRequested {
@@ -87,7 +87,7 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 			update = input
 		}
 		if cerr := c.handler.Cancel(activityTask, update); cerr != nil {
-			Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err err=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), cerr)
+			Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), cerr)
 		}
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 		select {
 		case cause := <-cancel:
 			if err := c.handler.Cancel(activityTask, input); err != nil {
-				Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err err=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err)
+				Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err)
 			}
 			return nil, cause
 		case <-ticks.C:
