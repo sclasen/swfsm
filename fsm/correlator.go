@@ -40,8 +40,9 @@ type SignalInfo struct {
 
 //TimerInfo holds the Control data from a Timer
 type TimerInfo struct {
-	Control *string
-	TimerId string
+	Control            *string
+	TimerId            string
+	StartToFireTimeout string
 }
 
 //CancellationInfo holds the Control data and workflow that was being canceled
@@ -93,8 +94,9 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 
 	if a.nilSafeEq(h.EventType, swf.EventTypeTimerStarted) {
 		a.Timers[a.key(h.EventId)] = &TimerInfo{
-			Control: h.TimerStartedEventAttributes.Control,
-			TimerId: *h.TimerStartedEventAttributes.TimerId,
+			Control:            h.TimerStartedEventAttributes.Control,
+			TimerId:            *h.TimerStartedEventAttributes.TimerId,
+			StartToFireTimeout: *h.TimerStartedEventAttributes.StartToFireTimeout,
 		}
 	}
 
