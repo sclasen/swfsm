@@ -625,7 +625,7 @@ func testFSM() *FSM {
 		Name:             "test-fsm",
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
-		systemSerializer: JSONStateSerializer{},
+		SystemSerializer: JSONStateSerializer{},
 		AllowPanics:      true,
 	}
 	return fsm

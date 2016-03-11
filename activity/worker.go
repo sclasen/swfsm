@@ -44,7 +44,7 @@ type SWFOps interface {
 
 type ActivityWorker struct {
 	Serializer       fsm.StateSerializer
-	systemSerializer fsm.StateSerializer
+	SystemSerializer fsm.StateSerializer
 	// Domain of the workflow associated with the FSM.
 	Domain string
 	// TaskList that the underlying poller will poll for decision tasks.
@@ -81,8 +81,8 @@ func (a *ActivityWorker) Init() {
 		a.Serializer = fsm.JSONStateSerializer{}
 	}
 
-	if a.systemSerializer == nil {
-		a.systemSerializer = fsm.JSONStateSerializer{}
+	if a.SystemSerializer == nil {
+		a.SystemSerializer = fsm.JSONStateSerializer{}
 	}
 
 	if a.ActivityInterceptor == nil {
@@ -227,7 +227,7 @@ func (h *ActivityWorker) signal(activityTask *swf.PollForActivityTaskOutput, sig
 		state.Input = &ser
 	}
 
-	serializedState, err := h.systemSerializer.Serialize(state)
+	serializedState, err := h.SystemSerializer.Serialize(state)
 	if err != nil {
 		return err
 	}

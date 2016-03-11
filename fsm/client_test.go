@@ -62,7 +62,7 @@ func TestClient(t *testing.T) {
 		Name:             "client-test",
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
-		systemSerializer: JSONStateSerializer{},
+		SystemSerializer: JSONStateSerializer{},
 		AllowPanics:      false,
 	}
 
@@ -613,7 +613,7 @@ func dummyFsm() *FSM {
 		Name:             "test-fsm",
 		DataType:         TestData{},
 		Serializer:       JSONStateSerializer{},
-		systemSerializer: JSONStateSerializer{},
+		SystemSerializer: JSONStateSerializer{},
 		AllowPanics:      false,
 	}
 

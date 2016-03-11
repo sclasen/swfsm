@@ -38,7 +38,7 @@ type FSM struct {
 	// Serializer used to serialize/deserialise fsm state data to/from workflow history.
 	Serializer StateSerializer
 	// Serializer used to serialize/deserialise in json the fsm managed marker recorded events to/from workflow history.
-	systemSerializer StateSerializer
+	SystemSerializer StateSerializer
 	//PollerShutdownManager is used when the FSM is managing the polling
 	ShutdownManager *poller.ShutdownManager
 	//DecisionTaskDispatcher determines the concurrency strategy for processing tasks in your fsm
@@ -220,9 +220,9 @@ func (f *FSM) Init() {
 		f.Serializer = &JSONStateSerializer{}
 	}
 
-	if f.systemSerializer == nil {
+	if f.SystemSerializer == nil {
 		f.log("action=start at=no-system-serializer defaulting-to=JSONSerializer")
-		f.systemSerializer = &JSONStateSerializer{}
+		f.SystemSerializer = &JSONStateSerializer{}
 	}
 
 	if f.ShutdownManager == nil {
@@ -509,11 +509,11 @@ func (f *FSM) ErrorStateTick(decisionTask *swf.PollForDecisionTaskOutput, error 
 	//error.EarliestUnprocessedEventId to error.LatestUnprocessedEventId
 	//are in the decisionTaks.History
 	filteredDecisionTask := new(swf.PollForDecisionTaskOutput)
-	s, e := f.systemSerializer.Serialize(decisionTask)
+	s, e := f.SystemSerializer.Serialize(decisionTask)
 	if e != nil {
 		return nil, e
 	}
-	e = f.systemSerializer.Deserialize(s, filteredDecisionTask)
+	e = f.SystemSerializer.Deserialize(s, filteredDecisionTask)
 	if e != nil {
 		return nil, e
 	}
@@ -592,7 +592,7 @@ func (f *FSM) EventData(event *swf.HistoryEvent, eventData interface{}) {
 			switch *event.WorkflowExecutionSignaledEventAttributes.SignalName {
 			case ActivityStartedSignal, ActivityUpdatedSignal:
 				state := new(SerializedActivityState)
-				f.systemSerializer.Deserialize(*event.WorkflowExecutionSignaledEventAttributes.Input, state)
+				f.SystemSerializer.Deserialize(*event.WorkflowExecutionSignaledEventAttributes.Input, state)
 				if state.Input != nil {
 					serialized = *state.Input
 				}
@@ -635,7 +635,7 @@ func (f *FSM) findSerializedState(events []*swf.HistoryEvent) (*SerializedState,
 func (f *FSM) statefulHistoryEventToSerializedState(event *swf.HistoryEvent) (*SerializedState, error) {
 	if f.isStateMarker(event) {
 		state := &SerializedState{}
-		err := f.systemSerializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, state)
+		err := f.SystemSerializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, state)
 		return state, err
 	} else if *event.EventType == swf.EventTypeWorkflowExecutionStarted {
 		state := &SerializedState{}
@@ -655,14 +655,14 @@ func (f *FSM) findSerializedEventCorrelator(events []*swf.HistoryEvent) (*EventC
 	for _, event := range events {
 		if f.isCorrelatorMarker(event) {
 			correlator := &EventCorrelator{
-				Serializer: f.systemSerializer,
+				Serializer: f.SystemSerializer,
 			}
 			err := f.Serializer.Deserialize(*event.MarkerRecordedEventAttributes.Details, correlator)
 			return correlator, err
 		}
 	}
 	return &EventCorrelator{
-		Serializer: f.systemSerializer,
+		Serializer: f.SystemSerializer,
 	}, nil
 }
 
@@ -710,13 +710,13 @@ func (f *FSM) recordStateMarkers(context *FSMContext, outcome *Outcome, eventCor
 		StateData:    serializedData,
 		WorkflowId:   *context.WorkflowId,
 	}
-	serializedMarker, err := f.systemSerializer.Serialize(state)
+	serializedMarker, err := f.SystemSerializer.Serialize(state)
 
 	if err != nil {
 		return nil, state, errors.Trace(err)
 	}
 
-	serializedCorrelator, err := f.systemSerializer.Serialize(eventCorrelator)
+	serializedCorrelator, err := f.SystemSerializer.Serialize(eventCorrelator)
 
 	if err != nil {
 		return nil, state, errors.Trace(err)
@@ -728,7 +728,7 @@ func (f *FSM) recordStateMarkers(context *FSMContext, outcome *Outcome, eventCor
 	decisions = append(decisions, d, c)
 
 	if errorState != nil {
-		serializedError, err := f.systemSerializer.Serialize(*errorState)
+		serializedError, err := f.SystemSerializer.Serialize(*errorState)
 
 		if err != nil {
 			return nil, state, errors.Trace(err)
