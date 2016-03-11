@@ -38,7 +38,7 @@ func TestInterceptors(t *testing.T) {
 		DataType:            TestData{},
 		DecisionInterceptor: interceptor,
 		Serializer:          JSONStateSerializer{},
-		systemSerializer:    JSONStateSerializer{},
+		SystemSerializer:    JSONStateSerializer{},
 	}
 
 	fsm.AddInitialState(&FSMState{Name: "initial", Decider: func(ctx *FSMContext, e *swf.HistoryEvent, d interface{}) Outcome {
