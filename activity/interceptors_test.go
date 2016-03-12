@@ -50,7 +50,7 @@ func TestInterceptors(t *testing.T) {
 
 	worker.AddHandler(handler)
 
-	worker.handleActivityTask(task)
+	worker.HandleActivityTask(task)
 
 	if !calledBefore {
 		t.Fatal("no before")
@@ -66,7 +66,7 @@ func TestInterceptors(t *testing.T) {
 	calledBefore = false
 	calledComplete = false
 
-	worker.handleActivityTask(task)
+	worker.HandleActivityTask(task)
 
 	if !calledBefore {
 		t.Fatal("no before")
@@ -118,7 +118,7 @@ func TestFailedInterceptor(t *testing.T) {
 	}
 
 	worker.AddHandler(handler)
-	worker.handleActivityTask(task)
+	worker.HandleActivityTask(task)
 	if !calledBefore {
 		t.Fatal("no before")
 	}
@@ -171,7 +171,7 @@ func TestCanceledInterceptor(t *testing.T) {
 	}
 
 	worker.AddHandler(handler)
-	worker.handleActivityTask(task)
+	worker.HandleActivityTask(task)
 	if !calledBefore {
 		t.Fatal("no before")
 	}

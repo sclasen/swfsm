@@ -106,13 +106,20 @@ func (a *ActivityWorker) Start() {
 
 func (a *ActivityWorker) dispatchTask(activityTask *swf.PollForActivityTaskOutput) {
 	if a.AllowPanics {
-		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleActivityTask)
+		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.HandleActivityTask)
 	} else {
-		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleWithRecovery(a.handleActivityTask))
+		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.handleWithRecovery(a.HandleActivityTask))
 	}
 }
 
-func (a *ActivityWorker) handleActivityTask(activityTask *swf.PollForActivityTaskOutput) {
+// HandleActivityTask is the callback passed into the registered ActivityTaskDispatcher.
+// It is exposed so that users can handle polling themselves and call DispatchTask directly
+// with this as the callback.
+//
+// e.g.  activityWorker.ActivityTaskDispatcher.DispatchTask(activityTask, a.HandleActivityTask)
+//
+// Note: You will need to handle recovering from panics if you call this directly.
+func (a *ActivityWorker) HandleActivityTask(activityTask *swf.PollForActivityTaskOutput) {
 	a.ActivityInterceptor.BeforeTask(activityTask)
 	handler := a.handlers[*activityTask.ActivityType.Name]
 

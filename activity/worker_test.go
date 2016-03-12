@@ -382,7 +382,7 @@ func TestStringHandler(t *testing.T) {
 
 	worker.AddHandler(NewActivityHandler("activity", handler))
 	worker.AddHandler(NewActivityHandler("nilactivity", nilHandler))
-	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
+	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType:      &swf.ActivityType{Name: S("activity")},
 		Input:             S("theInput"),
@@ -395,7 +395,7 @@ func TestStringHandler(t *testing.T) {
 	ops.Completed = nil
 	ops.CompletedSet = false
 
-	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
+	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType:      &swf.ActivityType{Name: S("nilactivity")},
 		Input:             S("theInput"),

@@ -32,7 +32,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	worker.AddCoordinatedHandler(1*time.Second, 1*time.Millisecond, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
+	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -54,7 +54,7 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	mockSwf.Completed = nil
 	mockSwf.Canceled = true
 
-	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
+	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -88,7 +88,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 	worker.AddCoordinatedHandler(1*time.Second, 1*time.Millisecond, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
+	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -110,7 +110,7 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 	mockSwf.Completed = nil
 	mockSwf.Canceled = true
 
-	worker.handleActivityTask(&swf.PollForActivityTaskOutput{
+	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -151,7 +151,7 @@ func TestTickRateLimit(t *testing.T) {
 	worker.AddCoordinatedHandler(1*time.Second, 100*time.Millisecond, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	go worker.handleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
