@@ -371,6 +371,20 @@ func TestCountActivityAttemtps(t *testing.T) {
 		t.Fatal(c)
 	}
 
+	c = new(EventCorrelator)
+	c.checkInit()
+	c.Track(start(7))
+	t.Log(info, c.Activities, c.ActivityAttempts)
+	fail.ActivityTaskFailedEventAttributes.ScheduledEventId = I(7)
+	fail.EventId = I(8)
+	info = c.ActivityInfo(fail)
+	c.ForgetCorrelation(fail)
+	c.Track(fail)
+	t.Log(info, c.Activities, c.ActivityAttempts)
+	if c.AttemptsForActivity(info) != 0 {
+		t.Fatal("expected 0 attempts", c)
+	}
+
 }
 
 func TestSignalTracking(t *testing.T) {
@@ -411,6 +425,20 @@ func TestSignalTracking(t *testing.T) {
 	if c.AttemptsForSignal(info) != 0 {
 		t.Fatal("expected zero attempts", c)
 	}
+
+	c = new(EventCorrelator)
+	start.EventId = I(5)
+	c.Track(start)
+	fail.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventId = I(5)
+	fail.EventId = I(5)
+	info = c.SignalInfo(fail)
+	c.ForgetCorrelation(fail)
+	c.Track(fail)
+	t.Log(info, c.Signals, c.SignalAttempts)
+	if c.AttemptsForSignal(info) != 0 {
+		t.Fatal("expected 0 attempts", c)
+	}
+
 }
 
 func TestTimerTracking(t *testing.T) {
@@ -515,6 +543,20 @@ func TestCancelTracking(t *testing.T) {
 	if c.AttemptsForCancellation(info) != 0 {
 		t.Fatal("expected zero attempts", c)
 	}
+
+	c = new(EventCorrelator)
+	start.EventId = I(5)
+	c.Track(start)
+	fail.RequestCancelExternalWorkflowExecutionFailedEventAttributes.InitiatedEventId = I(5)
+	fail.EventId = I(5)
+	info = c.CancellationInfo(fail)
+	c.ForgetCorrelation(fail)
+	c.Track(fail)
+	t.Log(info, c.Cancellations, c.CancelationAttempts)
+	if c.AttemptsForCancellation(info) != 0 {
+		t.Fatal("expected 0 attempts", c)
+	}
+
 }
 
 func TestChildTracking(t *testing.T) {
@@ -560,4 +602,18 @@ func TestChildTracking(t *testing.T) {
 	if c.AttemptsForChild(info) != 0 {
 		t.Fatal("expected zero attempts", c)
 	}
+
+	c = new(EventCorrelator)
+	start.EventId = I(5)
+	c.Track(start)
+	fail.StartChildWorkflowExecutionFailedEventAttributes.InitiatedEventId = I(5)
+	fail.EventId = I(5)
+	info = c.ChildInfo(fail)
+	c.ForgetCorrelation(fail)
+	c.Track(fail)
+	t.Log(info, c.Children, c.ChildrenAttempts)
+	if c.AttemptsForChild(info) != 0 {
+		t.Fatal("expected 0 attempts", c)
+	}
+
 }

@@ -22,6 +22,7 @@ type EventCorrelator struct {
 	Children            map[string]*ChildInfo
 	ChildrenAttempts    map[string]int
 	Serializer          StateSerializer
+	toForget            *swf.HistoryEvent
 }
 
 // ActivityInfo holds the ActivityId and ActivityType for an activity
@@ -103,6 +104,10 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 		}
 	}
 
+}
+
+func (a *EventCorrelator) ForgetCorrelation(h *swf.HistoryEvent) {
+	a.toForget = h
 }
 
 // RemoveCorrelation gcs a mapping of eventId to ActivityType. The HistoryEvent is expected to be of type EventTypeActivityTaskCompleted,EventTypeActivityTaskFailed,EventTypeActivityTaskTimedOut.
@@ -367,6 +372,11 @@ func (a *EventCorrelator) signalIdFromInfo(info *SignalInfo) string {
 
 func (a *EventCorrelator) incrementActivityAttempts(h *swf.HistoryEvent) {
 	id := a.safeActivityId(h)
+	if a.toForget == h {
+		delete(a.ActivityAttempts, id)
+		a.toForget = nil
+		return
+	}
 	if id != "" {
 		a.ActivityAttempts[id]++
 	}
@@ -374,6 +384,11 @@ func (a *EventCorrelator) incrementActivityAttempts(h *swf.HistoryEvent) {
 
 func (a *EventCorrelator) incrementSignalAttempts(h *swf.HistoryEvent) {
 	id := a.safeSignalId(h)
+	if a.toForget == h {
+		delete(a.SignalAttempts, id)
+		a.toForget = nil
+		return
+	}
 	if id != "" {
 		a.SignalAttempts[id]++
 	}
@@ -381,6 +396,11 @@ func (a *EventCorrelator) incrementSignalAttempts(h *swf.HistoryEvent) {
 
 func (a *EventCorrelator) incrementCancellationAttempts(h *swf.HistoryEvent) {
 	id := a.safeCancellationId(h)
+	if a.toForget == h {
+		delete(a.CancelationAttempts, id)
+		a.toForget = nil
+		return
+	}
 	if id != "" {
 		a.CancelationAttempts[id]++
 	}
@@ -388,6 +408,11 @@ func (a *EventCorrelator) incrementCancellationAttempts(h *swf.HistoryEvent) {
 
 func (a *EventCorrelator) incrementChildAttempts(h *swf.HistoryEvent) {
 	id := a.safeChildId(h)
+	if a.toForget == h {
+		delete(a.ChildrenAttempts, id)
+		a.toForget = nil
+		return
+	}
 	if id != "" {
 		a.ChildrenAttempts[id]++
 	}
