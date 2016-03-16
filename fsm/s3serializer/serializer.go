@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pborman/uuid"
 	swfsm "github.com/sclasen/swfsm/fsm"
+	. "github.com/sclasen/swfsm/log"
 )
 
 const (
@@ -51,7 +52,8 @@ func (s *S3Serializer) Serialize(state interface{}) (string, error) {
 		return "", err
 	}
 
-	if len(ser) < minS3Length {
+	slen := len(ser)
+	if slen < minS3Length {
 		return ser, nil
 	}
 
@@ -66,8 +68,10 @@ func (s *S3Serializer) Serialize(state interface{}) (string, error) {
 		Body:   strings.NewReader(ser),
 	})
 	if err != nil {
+		Log.Printf("component=s3serializer bucket=%q key=%q slen=%d at=put-error error=%q", s.s3Bucket, key, slen, err)
 		return "", err
 	}
+	Log.Printf("component=s3serializer bucket=%q key=%q slen=%d at=put-success", s.s3Bucket, key, slen)
 
 	u := &url.URL{}
 	u.Scheme = urlScheme
@@ -102,14 +106,17 @@ func (s *S3Serializer) Deserialize(deser string, state interface{}) error {
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		Log.Printf("component=s3serializer bucket=%q key=%q at=get-error error=%q", s.s3Bucket, key, err)
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		Log.Printf("component=s3serializer bucket=%q key=%q at=get-error error=%q", s.s3Bucket, key, err)
 		return err
 	}
+	Log.Printf("component=s3serializer bucket=%q key=%q slen=%d at=get-success", s.s3Bucket, key, len(b))
 
 	return s.under.Deserialize(string(b), state)
 }
