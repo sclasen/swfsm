@@ -420,11 +420,15 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 			context.State = outcome.State
 			context.stateData = outcome.Data
 			//stash a copy of the state before the decision in case we need to call the error handler
-			stashed := f.Serialize(outcome.Data)
+			js := &JSONStateSerializer{}
+			stashed, err := js.Serialize(outcome.Data)
+			if err != nil {
+				panic(err)
+			}
 			anOutcome, err := f.panicSafeDecide(fsmState, context, e, outcome.Data)
 			if err != nil {
 				stashedData := f.zeroStateData()
-				f.Deserialize(stashed, stashedData)
+				js.Deserialize(stashed, stashedData)
 				handler := f.errorHandlers[fsmState.Name]
 				if handler == nil {
 					handler = f.DecisionErrorHandler
