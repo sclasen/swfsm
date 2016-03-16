@@ -243,7 +243,7 @@ func (f *FSM) Init() {
 		f.FSMErrorReporter = f
 	}
 
-	if f.stasher == nil {
+	if f.stasher == nil && f.DataType != nil {
 		f.stasher = NewStasher(f.zeroStateData())
 	}
 
