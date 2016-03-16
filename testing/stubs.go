@@ -36,10 +36,12 @@ type StateData struct {
 	Data  interface{}
 }
 
+type NoData struct{}
+
 func StubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 	f := &fsm.FSM{
 		SWF:        client,
-		DataType:   make(map[string]interface{}),
+		DataType:   NoData{},
 		Domain:     domain,
 		Name:       StubWorkflow,
 		Serializer: fsm.JSONStateSerializer{},
@@ -60,7 +62,7 @@ func StubState() fsm.Decider {
 func ShortStubFSM(domain string, client fsm.SWFOps) *fsm.FSM {
 	f := &fsm.FSM{
 		SWF:        client,
-		DataType:   make(map[string]interface{}),
+		DataType:   NoData{},
 		Domain:     domain,
 		Name:       ShortStubWorkflow,
 		Serializer: fsm.JSONStateSerializer{},
