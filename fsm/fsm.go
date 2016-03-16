@@ -69,6 +69,8 @@ type FSM struct {
 	canceledState *FSMState
 	stop          chan bool
 	stopAck       chan bool
+	//stasher makes intermediate copies of state for error handling if necessary
+	stasher *Stasher
 }
 
 // StateSerializer is the implementation of FSMSerializer.StateSerializer()
@@ -239,6 +241,10 @@ func (f *FSM) Init() {
 
 	if f.FSMErrorReporter == nil {
 		f.FSMErrorReporter = f
+	}
+
+	if f.stasher == nil {
+		f.stasher = NewStasher(f.zeroStateData())
 	}
 
 }
@@ -420,15 +426,13 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 			context.State = outcome.State
 			context.stateData = outcome.Data
 			//stash a copy of the state before the decision in case we need to call the error handler
-			js := &JSONStateSerializer{}
-			stashed, err := js.Serialize(outcome.Data)
-			if err != nil {
-				panic(err)
-			}
+
+			stashed := f.stasher.Stash(outcome.Data)
+
 			anOutcome, err := f.panicSafeDecide(fsmState, context, e, outcome.Data)
 			if err != nil {
 				stashedData := f.zeroStateData()
-				js.Deserialize(stashed, stashedData)
+				f.stasher.Unstash(stashed, stashedData)
 				handler := f.errorHandlers[fsmState.Name]
 				if handler == nil {
 					handler = f.DecisionErrorHandler

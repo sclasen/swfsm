@@ -620,6 +620,26 @@ func TestTaskReady(t *testing.T) {
 	}
 }
 
+func TestStasher(t *testing.T) {
+	in := &TestData{
+		States: []string{"test123"},
+	}
+
+	stasher := NewStasher(&TestData{})
+	//make a second to verify gob.Register doesnt panic on dupes.
+	stasher = NewStasher(&TestData{})
+
+	buf := stasher.Stash(in)
+
+	out := &TestData{}
+	stasher.Unstash(buf, out)
+
+	if out.States[0] != "test123" {
+		t.Fatal("bad stasher")
+	}
+
+}
+
 func testFSM() *FSM {
 	fsm := &FSM{
 		Name:             "test-fsm",

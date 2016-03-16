@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"strings"
 
+	"encoding/gob"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/golang/protobuf/proto"
@@ -390,4 +392,34 @@ func StartFSMWorkflowInput(serializer Serialization, data interface{}) *string {
 	ss.StateData = stateData
 	serialized := serializer.Serialize(ss)
 	return aws.String(serialized)
+}
+
+//Stasher is used to take snapshots of StateData between each event so that we can have shap
+type Stasher struct {
+	dataType interface{}
+}
+
+func NewStasher(dataType interface{}) *Stasher {
+	gob.Register(dataType)
+	return &Stasher{
+		dataType: dataType,
+	}
+}
+
+func (s *Stasher) Stash(data interface{}) *bytes.Buffer {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	err := enc.Encode(data)
+	if err != nil {
+		panic(err)
+	}
+	return buf
+}
+
+func (s *Stasher) Unstash(stashed *bytes.Buffer, into interface{}) {
+	dec := gob.NewDecoder(stashed)
+	err := dec.Decode(into)
+	if err != nil {
+		panic(err)
+	}
 }
