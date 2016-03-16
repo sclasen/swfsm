@@ -7,6 +7,9 @@ import (
 
 	"encoding/gob"
 
+	"fmt"
+	"reflect"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 
@@ -386,7 +389,7 @@ func (s *Stasher) Stash(data interface{}) *bytes.Buffer {
 	enc := gob.NewEncoder(buf)
 	err := enc.Encode(data)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("type=%s error=%q", reflect.TypeOf(s.dataType), err))
 	}
 	return buf
 }

@@ -584,6 +584,11 @@ func TestStasher(t *testing.T) {
 		t.Fatal("bad stasher")
 	}
 
+	mapIn := make(map[string]interface{})
+	stasher = NewStasher(mapIn)
+	buf = stasher.Stash(mapIn)
+	stasher.Unstash(buf, &mapIn)
+
 }
 
 func testFSM() *FSM {
