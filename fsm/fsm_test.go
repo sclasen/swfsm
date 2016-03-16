@@ -567,15 +567,21 @@ func TestTaskReady(t *testing.T) {
 }
 
 func TestStasher(t *testing.T) {
+
+	mapIn := make(map[string]interface{})
+	stasher := NewStasher(mapIn)
+	buf := stasher.Stash(mapIn)
+	stasher.Unstash(buf, &mapIn)
+
 	in := &TestData{
 		States: []string{"test123"},
 	}
 
-	stasher := NewStasher(&TestData{})
+	stasher = NewStasher(&TestData{})
 	//make a second to verify gob.Register doesnt panic on dupes.
 	stasher = NewStasher(&TestData{})
 
-	buf := stasher.Stash(in)
+	buf = stasher.Stash(in)
 
 	out := &TestData{}
 	stasher.Unstash(buf, out)
