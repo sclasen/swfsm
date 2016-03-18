@@ -6,13 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"fmt"
-
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/swf"
-	"github.com/pborman/uuid"
-	"github.com/sclasen/swfsm/fsm"
-	. "github.com/sclasen/swfsm/sugar"
 )
 
 const (
