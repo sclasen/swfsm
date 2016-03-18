@@ -21,7 +21,7 @@ type EventCorrelator struct {
 	CancelationAttempts map[string]int               //? workflowId + signalName -> attempts
 	Children            map[string]*ChildInfo
 	ChildrenAttempts    map[string]int
-	Serializer          StateSerializer
+	Serializer          StateSerializer `json:"-"`
 }
 
 // ActivityInfo holds the ActivityId and ActivityType for an activity
