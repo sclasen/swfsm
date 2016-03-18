@@ -230,7 +230,8 @@ func TestTrackPendingActivities(t *testing.T) {
 			EventType: S(swf.EventTypeTimerStarted),
 			EventId:   I(12),
 			TimerStartedEventAttributes: &swf.TimerStartedEventAttributes{
-				TimerId: S("foo"),
+				TimerId:            S("foo"),
+				StartToFireTimeout: S("20"),
 			},
 		},
 	}
@@ -426,8 +427,9 @@ func TestTimerTracking(t *testing.T) {
 	})
 
 	timerStart := EventFromPayload(2, &swf.TimerStartedEventAttributes{
-		TimerId: S("the-timer"),
-		Control: S("the-control"),
+		TimerId:            S("the-timer"),
+		Control:            S("the-control"),
+		StartToFireTimeout: S("20"),
 	})
 
 	timerFired := EventFromPayload(3, &swf.TimerFiredEventAttributes{
@@ -435,8 +437,9 @@ func TestTimerTracking(t *testing.T) {
 	})
 
 	timerStart2 := EventFromPayload(4, &swf.TimerStartedEventAttributes{
-		TimerId: S("the-timer"),
-		Control: S("the-control"),
+		TimerId:            S("the-timer"),
+		Control:            S("the-control"),
+		StartToFireTimeout: S("20"),
 	})
 
 	timerCanceled := EventFromPayload(5, &swf.TimerCanceledEventAttributes{
@@ -450,7 +453,7 @@ func TestTimerTracking(t *testing.T) {
 	c.Track(timerStart)
 	//track happens in FSM after Decider
 	info := c.TimerInfo(timerFired)
-	if info == nil || info.Control != "the-control" || info.TimerId != "the-timer" {
+	if info == nil || *info.Control != "the-control" || info.TimerId != "the-timer" {
 		t.Fatal(info)
 	}
 
@@ -464,7 +467,7 @@ func TestTimerTracking(t *testing.T) {
 	c.Track(timerStart2)
 	info = c.TimerInfo(timerCanceled)
 
-	if info == nil || info.Control != "the-control" || info.TimerId != "the-timer" {
+	if info == nil || *info.Control != "the-control" || info.TimerId != "the-timer" {
 		t.Fatal(info)
 	}
 

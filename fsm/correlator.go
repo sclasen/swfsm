@@ -21,35 +21,40 @@ type EventCorrelator struct {
 	CancelationAttempts map[string]int               //? workflowId + signalName -> attempts
 	Children            map[string]*ChildInfo
 	ChildrenAttempts    map[string]int
-	Serializer          StateSerializer
+	Serializer          StateSerializer `json:"-"`
 }
 
 // ActivityInfo holds the ActivityId and ActivityType for an activity
 type ActivityInfo struct {
 	ActivityId string
 	*swf.ActivityType
+	Input *string
 }
 
 // SignalInfo holds the SignalName and Input for an activity
 type SignalInfo struct {
 	SignalName string
 	WorkflowId string
+	Input      *string
 }
 
 //TimerInfo holds the Control data from a Timer
 type TimerInfo struct {
-	Control string
-	TimerId string
+	Control            *string
+	TimerId            string
+	StartToFireTimeout string
 }
 
 //CancellationInfo holds the Control data and workflow that was being canceled
 type CancellationInfo struct {
+	Control    *string
 	WorkflowId string
 }
 
-//CancellationInfo holds the Control data and workflow that was being canceled
+//ChildInfo holds the Input data and Workflow info for the child workflow being started
 type ChildInfo struct {
 	WorkflowId string
+	Input      *string
 	*swf.WorkflowType
 }
 
@@ -68,6 +73,7 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 		a.Activities[a.key(h.EventId)] = &ActivityInfo{
 			ActivityId:   *h.ActivityTaskScheduledEventAttributes.ActivityId,
 			ActivityType: h.ActivityTaskScheduledEventAttributes.ActivityType,
+			Input:        h.ActivityTaskScheduledEventAttributes.Input,
 		}
 	}
 
@@ -75,24 +81,22 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 		a.Signals[a.key(h.EventId)] = &SignalInfo{
 			SignalName: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.SignalName,
 			WorkflowId: *h.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowId,
+			Input:      h.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input,
 		}
 	}
 
 	if a.nilSafeEq(h.EventType, swf.EventTypeRequestCancelExternalWorkflowExecutionInitiated) {
 		a.Cancellations[a.key(h.EventId)] = &CancellationInfo{
 			WorkflowId: *h.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.WorkflowId,
+			Control:    h.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.Control,
 		}
 	}
 
 	if a.nilSafeEq(h.EventType, swf.EventTypeTimerStarted) {
-		control := ""
-		if h.TimerStartedEventAttributes.Control != nil {
-			control = *h.TimerStartedEventAttributes.Control
-		}
-
 		a.Timers[a.key(h.EventId)] = &TimerInfo{
-			Control: control,
-			TimerId: *h.TimerStartedEventAttributes.TimerId,
+			Control:            h.TimerStartedEventAttributes.Control,
+			TimerId:            *h.TimerStartedEventAttributes.TimerId,
+			StartToFireTimeout: *h.TimerStartedEventAttributes.StartToFireTimeout,
 		}
 	}
 
@@ -100,6 +104,7 @@ func (a *EventCorrelator) Correlate(h *swf.HistoryEvent) {
 		a.Children[a.key(h.EventId)] = &ChildInfo{
 			WorkflowId:   *h.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowId,
 			WorkflowType: h.StartChildWorkflowExecutionInitiatedEventAttributes.WorkflowType,
+			Input:        h.StartChildWorkflowExecutionInitiatedEventAttributes.Input,
 		}
 	}
 
