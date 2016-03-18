@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"fmt"
+
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/pborman/uuid"
@@ -191,7 +192,7 @@ func TestSerialize_HugeCorrelator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sinput, err := ss.Serialize(&fsm.SerializedState{StateName:"initial", StateVersion: 0, StateData: ssdata})
+	sinput, err := ss.Serialize(&fsm.SerializedState{StateName: "initial", StateVersion: 0, StateData: ssdata})
 
 	if err != nil {
 		t.Fatal(err)
