@@ -51,7 +51,7 @@ type CancellationInfo struct {
 	WorkflowId string
 }
 
-//CancellationInfo holds the Control data and workflow that was being canceled
+//ChildInfo holds the Input data and Workflow info for the child workflow being started
 type ChildInfo struct {
 	WorkflowId string
 	Input      *string
