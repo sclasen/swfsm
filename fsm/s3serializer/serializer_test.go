@@ -6,7 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"fmt"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/swf"
+	"github.com/pborman/uuid"
+	"github.com/sclasen/swfsm/fsm"
+	. "github.com/sclasen/swfsm/sugar"
 )
 
 const (
@@ -152,6 +157,117 @@ func TestDeserialize_Magic(t *testing.T) {
 	if want, got := prefix+"/some-key", *s3c.get.input.Key; want != got {
 		t.Fatalf("expected S3 get to key %q, got %q", want, got)
 	}
+}
+
+func TestSerialize_HugeCorrelator(t *testing.T) {
+	s3c := &fakeS3{}
+	under := &fsm.JSONStateSerializer{}
+	ss := New(s3c, bucket, prefix, under)
+	testFsm := fsm.FSM{
+		Serializer:       ss,
+		SystemSerializer: ss,
+		DataType:         TestData{},
+		AllowPanics:      true,
+	}
+
+	testFsm.AddInitialState(&fsm.FSMState{Name: "initial", Decider: func(ctx *fsm.FSMContext, h *swf.HistoryEvent, data interface{}) fsm.Outcome {
+		return ctx.Stay(data, ctx.EmptyDecisions())
+	}})
+	testFsm.Init()
+	task := &swf.PollForDecisionTaskOutput{
+		StartedEventId:         L(20000),
+		PreviousStartedEventId: L(9998),
+		WorkflowExecution:      &swf.WorkflowExecution{WorkflowId: S("id"), RunId: S("run")},
+		WorkflowType:           &swf.WorkflowType{Name: S("foo"), Version: S("foo")},
+	}
+
+	sdata := &TestData{}
+	for i := 0; i < 10; i++ {
+		sdata.Fields = append(sdata.Fields, uuid.NewRandom().String())
+	}
+
+	ssdata, err := ss.Serialize(sdata)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sinput, err := ss.Serialize(&fsm.SerializedState{StateName:"initial", StateVersion: 0, StateData: ssdata})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	start := &swf.HistoryEvent{
+		EventId:   L(1),
+		EventType: S(swf.EventTypeWorkflowExecutionStarted),
+		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
+			WorkflowType: &swf.WorkflowType{Name: S("foo"), Version: S("foo")},
+			Input:        S(sinput),
+		},
+	}
+
+	task.Events = append(task.Events, start)
+
+	evt := func(id int64) *swf.HistoryEvent {
+		data := &TestData{}
+		for i := 0; i < 100; i++ {
+			data.Fields = append(data.Fields, uuid.NewRandom().String())
+		}
+		input, err := ss.Serialize(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &swf.HistoryEvent{
+			EventId:   L(id),
+			EventType: S(swf.EventTypeActivityTaskScheduled),
+			ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
+				ActivityId:   S(fmt.Sprintf("%d", id)),
+				ActivityType: &swf.ActivityType{Name: S("foo"), Version: S("foo")},
+				Input:        S(input),
+			},
+		}
+	}
+
+	for i := 9999; i < 19999; i++ {
+		task.Events = append(task.Events, evt(int64(i)))
+	}
+
+	_, decisions, _, _ := testFsm.Tick(task)
+
+	for _, d := range decisions {
+		t.Log(d)
+		if d.RecordMarkerDecisionAttributes != nil && *d.RecordMarkerDecisionAttributes.MarkerName == fsm.CorrelatorMarker {
+			if strings.HasPrefix(*d.RecordMarkerDecisionAttributes.Details, "s3") {
+				for i := 9999; i < 19999; i++ {
+					if !strings.Contains(s3c.put.body, fmt.Sprintf("%d", i)) {
+						t.Fatalf("cant find %d in %s", i, s3c.put.body)
+					}
+				}
+				s3c.get.body = s3c.put.body
+
+				correlator := &fsm.EventCorrelator{}
+
+				err = ss.Deserialize(*d.RecordMarkerDecisionAttributes.Details, correlator)
+
+				if err != nil {
+					t.Fatal(err)
+				}
+				if l := len(correlator.Activities); l != 10000 {
+					t.Fatalf("Deserialized correlator only had %d activities", l)
+				}
+				return
+			} else {
+				t.Fatal("Correlator not s3")
+			}
+		}
+	}
+
+	t.Fatal("No S3 Correlator marker", s3c.put.body)
+
+}
+
+type TestData struct {
+	Fields []string
 }
 
 type fakeS3 struct {
