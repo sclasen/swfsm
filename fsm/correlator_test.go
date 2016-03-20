@@ -349,12 +349,16 @@ func TestCountActivityAttemtps(t *testing.T) {
 	c.Track(fail)
 	c.Track(start(3))
 	info := c.ActivityInfo(timeout)
+	if c.Attempts(timeout) != 1 {
+		t.Fatal(PrettyHistoryEvent(start(1)), PrettyHistoryEvent(fail), PrettyHistoryEvent(timeout), info, c.ActivityAttempts, c.Activities)
+	}
 	c.Track(timeout)
 	Log.Println("=====")
 	Log.Printf("%+v", c.ActivityAttempts)
 	if c.AttemptsForActivity(info) != 2 {
 		t.Fatal(PrettyHistoryEvent(start(1)), PrettyHistoryEvent(fail), PrettyHistoryEvent(timeout), c)
 	}
+
 	cancel := EventFromPayload(6, &swf.ActivityTaskCanceledEventAttributes{
 		ScheduledEventId: I(5),
 	})
@@ -365,10 +369,16 @@ func TestCountActivityAttemtps(t *testing.T) {
 	if c.AttemptsForActivity(info) != 0 {
 		t.Fatal(c)
 	}
+	if c.Attempts(cancel) != 0 {
+		t.Fatal(c)
+	}
 
 	c.Track(start(7))
 
 	if c.AttemptsForActivity(info) != 0 {
+		t.Fatal(c)
+	}
+	if c.Attempts(start(7)) != 0 {
 		t.Fatal(c)
 	}
 
@@ -406,10 +416,16 @@ func TestSignalTracking(t *testing.T) {
 	if c.AttemptsForSignal(info) != 1 {
 		t.Fatal(c.SignalAttempts)
 	}
+	if c.Attempts(start) != 1 {
+		t.Fatal(c.SignalAttempts)
+	}
 	info = c.SignalInfo(ok)
 	c.Track(ok)
 
 	if c.AttemptsForSignal(info) != 0 {
+		t.Fatal("expected zero attempts", c)
+	}
+	if c.Attempts(ok) != 0 {
 		t.Fatal("expected zero attempts", c)
 	}
 }
@@ -512,10 +528,17 @@ func TestCancelTracking(t *testing.T) {
 	if c.AttemptsForCancellation(info) != 1 {
 		t.Fatal("attempts not", info, c.AttemptsForCancellation(info), c.Cancellations, c.CancelationAttempts)
 	}
+	if c.Attempts(start) != 1 {
+		t.Fatal("attempts not", start, c.Attempts(start), c.Cancellations, c.CancelationAttempts)
+	}
+
 	info = c.CancellationInfo(ok)
 	c.Track(ok)
 
 	if c.AttemptsForCancellation(info) != 0 {
+		t.Fatal("expected zero attempts", c)
+	}
+	if c.Attempts(ok) != 0 {
 		t.Fatal("expected zero attempts", c)
 	}
 }
@@ -557,10 +580,16 @@ func TestChildTracking(t *testing.T) {
 	if c.AttemptsForChild(info) != 1 {
 		t.Fatal("attempts not", info, c.AttemptsForChild(info), c.Children, c.ChildrenAttempts)
 	}
+	if c.Attempts(start) != 1 {
+		t.Fatal("attempts not", info, c.Attempts(start), c.Children, c.ChildrenAttempts)
+	}
 	info = c.ChildInfo(ok)
 	c.Track(ok)
 
 	if c.AttemptsForChild(info) != 0 {
+		t.Fatal("expected zero attempts", c)
+	}
+	if c.Attempts(ok) != 0 {
 		t.Fatal("expected zero attempts", c)
 	}
 }

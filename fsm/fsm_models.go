@@ -298,6 +298,10 @@ func (f *FSMContext) Correlator() *EventCorrelator {
 	return f.eventCorrelator
 }
 
+func (f *FSMContext) Attempts(h *swf.HistoryEvent) int {
+	return f.eventCorrelator.Attempts(h)
+}
+
 // ContinueWorkflowDecision will build a ContinueAsNewWorkflow decision that has the expected SerializedState marshalled to json as its input.
 // This decision should be used when it is appropriate to Continue your workflow.
 // You are unable to ContinueAsNew a workflow that has running activites, so you should assure there are none running before using this.

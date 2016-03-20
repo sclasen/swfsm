@@ -12,16 +12,16 @@ import (
 // end of an activity or signal  hits your Decider.  This is missing from the SWF api.
 // Activities and Signals are string instead of int64 beacuse json.
 type EventCorrelator struct {
-	Activities          map[string]*ActivityInfo     //schedueledEventId -> info
-	ActivityAttempts    map[string]int               //activityId -> attempts
-	Signals             map[string]*SignalInfo       //schedueledEventId -> info
-	SignalAttempts      map[string]int               //? workflowId + signalName -> attempts
-	Timers              map[string]*TimerInfo        //startedEventId -> info
-	Cancellations       map[string]*CancellationInfo //schedueledEventId -> info
-	CancelationAttempts map[string]int               //? workflowId + signalName -> attempts
-	Children            map[string]*ChildInfo
-	ChildrenAttempts    map[string]int
-	Serializer          StateSerializer `json:"-"`
+	Activities          map[string]*ActivityInfo     // schedueledEventId -> info
+	ActivityAttempts    map[string]int               // activityId -> attempts
+	Signals             map[string]*SignalInfo       // schedueledEventId -> info
+	SignalAttempts      map[string]int               // workflowId + signalName -> attempts
+	Timers              map[string]*TimerInfo        // startedEventId -> info
+	Cancellations       map[string]*CancellationInfo // schedueledEventId -> info
+	CancelationAttempts map[string]int               // workflowId -> attempts
+	Children            map[string]*ChildInfo        // initiatedEventID -> info
+	ChildrenAttempts    map[string]int               // workflowID -> attempts
+	Serializer          StateSerializer              `json:"-"`
 }
 
 // ActivityInfo holds the ActivityId and ActivityType for an activity
@@ -117,6 +117,7 @@ func (a *EventCorrelator) RemoveCorrelation(h *swf.HistoryEvent) {
 		return
 	}
 	switch *h.EventType {
+	/*Activities*/
 	case swf.EventTypeActivityTaskCompleted:
 		delete(a.ActivityAttempts, a.safeActivityId(h))
 		delete(a.Activities, a.key(h.ActivityTaskCompletedEventAttributes.ScheduledEventId))
@@ -129,6 +130,7 @@ func (a *EventCorrelator) RemoveCorrelation(h *swf.HistoryEvent) {
 	case swf.EventTypeActivityTaskCanceled:
 		delete(a.ActivityAttempts, a.safeActivityId(h))
 		delete(a.Activities, a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventId))
+	/*Signals*/
 	case swf.EventTypeExternalWorkflowExecutionSignaled:
 		key := a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventId)
 		info := a.Signals[key]
@@ -137,10 +139,12 @@ func (a *EventCorrelator) RemoveCorrelation(h *swf.HistoryEvent) {
 	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
 		a.incrementSignalAttempts(h)
 		delete(a.Signals, a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventId))
+	/*Timers*/
 	case swf.EventTypeTimerFired:
 		delete(a.Timers, a.key(h.TimerFiredEventAttributes.StartedEventId))
 	case swf.EventTypeTimerCanceled:
 		delete(a.Timers, a.key(h.TimerCanceledEventAttributes.StartedEventId))
+	/*Cancels*/
 	case swf.EventTypeRequestCancelExternalWorkflowExecutionFailed:
 		a.incrementCancellationAttempts(h)
 		delete(a.Cancellations, a.key(h.RequestCancelExternalWorkflowExecutionFailedEventAttributes.InitiatedEventId))
@@ -149,6 +153,7 @@ func (a *EventCorrelator) RemoveCorrelation(h *swf.HistoryEvent) {
 		info := a.Cancellations[key]
 		delete(a.CancelationAttempts, info.WorkflowId)
 		delete(a.Cancellations, key)
+	/*Children*/
 	case swf.EventTypeStartChildWorkflowExecutionFailed:
 		a.incrementChildAttempts(h)
 		delete(a.Children, a.key(h.StartChildWorkflowExecutionFailedEventAttributes.InitiatedEventId))
@@ -202,6 +207,9 @@ func (a *EventCorrelator) ChildInfo(h *swf.HistoryEvent) *ChildInfo {
 //It will return 0 if the activity has never failed, has been canceled, or has been completed successfully
 func (a *EventCorrelator) AttemptsForActivity(info *ActivityInfo) int {
 	a.checkInit()
+	if info == nil || info.ActivityId == "" {
+		return 0
+	}
 	return a.ActivityAttempts[info.ActivityId]
 }
 
@@ -209,6 +217,9 @@ func (a *EventCorrelator) AttemptsForActivity(info *ActivityInfo) int {
 //It will return 0 if the signal has never failed, or has been completed successfully
 func (a *EventCorrelator) AttemptsForSignal(signalInfo *SignalInfo) int {
 	a.checkInit()
+	if signalInfo == nil {
+		return 0
+	}
 	return a.SignalAttempts[a.signalIdFromInfo(signalInfo)]
 }
 
@@ -230,6 +241,31 @@ func (a *EventCorrelator) AttemptsForChild(info *ChildInfo) int {
 		return 0
 	}
 	return a.ChildrenAttempts[info.WorkflowId]
+}
+
+func (a *EventCorrelator) Attempts(h *swf.HistoryEvent) int {
+	switch *h.EventType {
+	/*Activities*/
+	case swf.EventTypeActivityTaskCanceled, swf.EventTypeActivityTaskCancelRequested, swf.EventTypeActivityTaskTimedOut,
+		swf.EventTypeActivityTaskCompleted, swf.EventTypeActivityTaskFailed, swf.EventTypeActivityTaskStarted:
+		return a.AttemptsForActivity(a.ActivityInfo(h))
+	/*Signals*/
+	case swf.EventTypeSignalExternalWorkflowExecutionInitiated, swf.EventTypeSignalExternalWorkflowExecutionFailed,
+		swf.EventTypeExternalWorkflowExecutionSignaled:
+		return a.AttemptsForSignal(a.SignalInfo(h))
+	/*Timers*/
+	case swf.EventTypeTimerCanceled, swf.EventTypeTimerFired, swf.EventTypeTimerStarted:
+		return 0 //should we count timer fails somehow?
+	/*Children*/
+	case swf.EventTypeChildWorkflowExecutionStarted, swf.EventTypeStartChildWorkflowExecutionFailed, swf.EventTypeStartChildWorkflowExecutionInitiated:
+		return a.AttemptsForChild(a.ChildInfo(h))
+	/*Cancels*/
+	case swf.EventTypeRequestCancelExternalWorkflowExecutionFailed, swf.EventTypeRequestCancelExternalWorkflowExecutionInitiated,
+		swf.EventTypeExternalWorkflowExecutionCancelRequested:
+		return a.AttemptsForCancellation(a.CancellationInfo(h))
+	}
+
+	return 0
 }
 
 func (a *EventCorrelator) checkInit() {
@@ -264,6 +300,11 @@ func (a *EventCorrelator) checkInit() {
 
 func (a *EventCorrelator) getId(h *swf.HistoryEvent) (id string) {
 	switch *h.EventType {
+	/*Activities*/
+	case swf.EventTypeActivityTaskScheduled:
+		if h.EventId != nil {
+			id = a.key(h.EventId)
+		}
 	case swf.EventTypeActivityTaskCompleted:
 		if h.ActivityTaskCompletedEventAttributes != nil {
 			id = a.key(h.ActivityTaskCompletedEventAttributes.ScheduledEventId)
@@ -280,18 +321,27 @@ func (a *EventCorrelator) getId(h *swf.HistoryEvent) (id string) {
 		if h.ActivityTaskCanceledEventAttributes != nil {
 			id = a.key(h.ActivityTaskCanceledEventAttributes.ScheduledEventId)
 		}
-	//might want to get info on started too
 	case swf.EventTypeActivityTaskStarted:
 		if h.ActivityTaskStartedEventAttributes != nil {
 			id = a.key(h.ActivityTaskStartedEventAttributes.ScheduledEventId)
 		}
+	/*Signals*/
 	case swf.EventTypeExternalWorkflowExecutionSignaled:
 		if h.ExternalWorkflowExecutionSignaledEventAttributes != nil {
 			id = a.key(h.ExternalWorkflowExecutionSignaledEventAttributes.InitiatedEventId)
 		}
+	case swf.EventTypeSignalExternalWorkflowExecutionInitiated:
+		if h.EventId != nil {
+			id = a.key(h.EventId)
+		}
 	case swf.EventTypeSignalExternalWorkflowExecutionFailed:
 		if h.SignalExternalWorkflowExecutionFailedEventAttributes != nil {
 			id = a.key(h.SignalExternalWorkflowExecutionFailedEventAttributes.InitiatedEventId)
+		}
+	/*Cancels*/
+	case swf.EventTypeRequestCancelExternalWorkflowExecutionInitiated:
+		if h.EventId != nil {
+			id = a.key(h.EventId)
 		}
 	case swf.EventTypeRequestCancelExternalWorkflowExecutionFailed:
 		if h.RequestCancelExternalWorkflowExecutionFailedEventAttributes != nil {
@@ -301,6 +351,7 @@ func (a *EventCorrelator) getId(h *swf.HistoryEvent) (id string) {
 		if h.ExternalWorkflowExecutionCancelRequestedEventAttributes != nil {
 			id = a.key(h.ExternalWorkflowExecutionCancelRequestedEventAttributes.InitiatedEventId)
 		}
+	/*Timers*/
 	case swf.EventTypeTimerFired:
 		if h.TimerFiredEventAttributes != nil {
 			id = a.key(h.TimerFiredEventAttributes.StartedEventId)
@@ -309,6 +360,20 @@ func (a *EventCorrelator) getId(h *swf.HistoryEvent) (id string) {
 		if h.TimerCanceledEventAttributes != nil {
 			id = a.key(h.TimerCanceledEventAttributes.StartedEventId)
 		}
+	/*Children*/
+	case swf.EventTypeChildWorkflowExecutionStarted:
+		if h.ChildWorkflowExecutionStartedEventAttributes != nil {
+			id = a.key(h.ChildWorkflowExecutionStartedEventAttributes.InitiatedEventId)
+		}
+	case swf.EventTypeStartChildWorkflowExecutionFailed:
+		if h.StartChildWorkflowExecutionFailedEventAttributes != nil {
+			id = a.key(h.StartChildWorkflowExecutionFailedEventAttributes.InitiatedEventId)
+		}
+	case swf.EventTypeStartChildWorkflowExecutionInitiated:
+		if h.EventId != nil {
+			id = a.key(h.EventId)
+		}
+	/*Received Signal*/
 	case swf.EventTypeWorkflowExecutionSignaled:
 		event := h.WorkflowExecutionSignaledEventAttributes
 		if event != nil && event.SignalName != nil && event.Input != nil {
@@ -320,14 +385,6 @@ func (a *EventCorrelator) getId(h *swf.HistoryEvent) (id string) {
 			default:
 				id = a.key(event.ExternalInitiatedEventId)
 			}
-		}
-	case swf.EventTypeChildWorkflowExecutionStarted:
-		if h.ChildWorkflowExecutionStartedEventAttributes != nil {
-			id = a.key(h.ChildWorkflowExecutionStartedEventAttributes.InitiatedEventId)
-		}
-	case swf.EventTypeStartChildWorkflowExecutionFailed:
-		if h.StartChildWorkflowExecutionFailedEventAttributes != nil {
-			id = a.key(h.StartChildWorkflowExecutionFailedEventAttributes.InitiatedEventId)
 		}
 	}
 
