@@ -86,9 +86,7 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 			// TODO: calling Cancel with nil input blows up
 			update = input
 		}
-		if cerr := c.handler.Cancel(activityTask, update); cerr != nil {
-			Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), cerr)
-		}
+		c.cancel(activityTask, update)
 		return nil, err
 	}
 
@@ -103,13 +101,12 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 	for {
 		select {
 		case cause := <-cancel:
-			if err := c.handler.Cancel(activityTask, input); err != nil {
-				Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err)
-			}
+			c.cancel(activityTask, input)
 			return nil, cause
 		case <-ticks.C:
 			cont, res, err := c.handler.Tick(activityTask, input)
 			if !cont {
+				c.cancel(activityTask, input)
 				return res, err
 			}
 			if res != nil {
@@ -122,6 +119,12 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 				Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId))
 			}
 		}
+	}
+}
+
+func (c *coordinatedActivityAdapter) cancel(activityTask *swf.PollForActivityTaskOutput, input interface{}) {
+	if err := c.handler.Cancel(activityTask, input); err != nil {
+		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err)
 	}
 }
 
