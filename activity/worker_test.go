@@ -24,6 +24,7 @@ type MockSWF struct {
 	CompletedSet bool
 	History      *swf.GetWorkflowExecutionHistoryOutput
 	Canceled     bool
+	SignalFail   bool
 }
 
 func (m *MockSWF) RecordActivityTaskHeartbeat(req *swf.RecordActivityTaskHeartbeatInput) (*swf.RecordActivityTaskHeartbeatOutput, error) {
@@ -52,6 +53,9 @@ func (m *MockSWF) GetWorkflowExecutionHistory(req *swf.GetWorkflowExecutionHisto
 }
 
 func (m *MockSWF) SignalWorkflowExecution(req *swf.SignalWorkflowExecutionInput) (*swf.SignalWorkflowExecutionOutput, error) {
+	if m.SignalFail {
+		return nil, errors.New("signaling failed")
+	}
 	return nil, nil
 }
 

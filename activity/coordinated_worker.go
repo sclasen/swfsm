@@ -76,19 +76,13 @@ func (c *coordinatedActivityAdapter) heartbeat(activityTask *swf.PollForActivity
 }
 
 func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+	defer c.finish(activityTask, input)
+
 	update, err := c.handler.Start(activityTask, input)
 	if err != nil {
 		return nil, err
 	}
 	if err := c.worker.signalStart(activityTask, update); err != nil {
-		//make sure Cancel is called so any goroutines started in Start can get cleaned up.
-		if update == nil {
-			// TODO: calling Cancel with nil input blows up
-			update = input
-		}
-		if cerr := c.handler.Cancel(activityTask, update); cerr != nil {
-			Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), cerr)
-		}
 		return nil, err
 	}
 
@@ -103,9 +97,7 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 	for {
 		select {
 		case cause := <-cancel:
-			if err := c.handler.Cancel(activityTask, input); err != nil {
-				Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err)
-			}
+			c.cancel(activityTask, input)
 			return nil, cause
 		case <-ticks.C:
 			cont, res, err := c.handler.Tick(activityTask, input)
@@ -122,6 +114,18 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 				Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=signal-update", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId))
 			}
 		}
+	}
+}
+
+func (c *coordinatedActivityAdapter) cancel(activityTask *swf.PollForActivityTaskOutput, input interface{}) {
+	if err := c.handler.Cancel(activityTask, input); err != nil {
+		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err)
+	}
+}
+
+func (c *coordinatedActivityAdapter) finish(activityTask *swf.PollForActivityTaskOutput, input interface{}) {
+	if err := c.handler.Finish(activityTask, input); err != nil {
+		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-finish-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err)
 	}
 }
 
