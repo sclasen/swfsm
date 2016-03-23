@@ -1,6 +1,7 @@
 package activity
 
 import (
+	"errors"
 	"testing"
 
 	"time"
@@ -68,7 +69,6 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	if !hc.canceled {
 		t.Fatal("Not Canceled")
 	}
-
 }
 
 func TestTypedCoordinatedActivityHandler(t *testing.T) {
@@ -125,7 +125,49 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 	if !hc.canceled {
 		t.Fatal("Not Canceled")
 	}
+}
 
+func TestCoordinatedActivityHandler_CancelOnTickError(t *testing.T) {
+	hc := &TestCoordinatedTaskHandler{
+		t: t,
+	}
+
+	handler := &CoordinatedActivityHandler{
+		Input:    TestInput{},
+		Activity: "activity",
+		Start:    hc.Start,
+		Tick:     hc.Tick,
+		Cancel:   hc.Cancel,
+	}
+
+	mockSwf := &MockSWF{}
+	worker := ActivityWorker{
+		SWF: mockSwf,
+	}
+
+	t.Log("test complete")
+	worker.AddCoordinatedHandler(1*time.Second, 1*time.Millisecond, handler)
+	worker.Init()
+	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
+	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+		TaskToken:         S("token"),
+		WorkflowExecution: &swf.WorkflowExecution{},
+		ActivityType: &swf.ActivityType{
+			Name: S("activity"),
+		},
+		ActivityId: S("id"),
+		Input:      S(input),
+	})
+
+	hc.terr = errors.New("this is an error")
+	time.Sleep(100 * time.Millisecond)
+	if !mockSwf.CompletedSet {
+		t.Fatal("Not Completed")
+	}
+
+	if !hc.canceled {
+		t.Fatal("Not Canceled")
+	}
 }
 
 func TestTickRateLimit(t *testing.T) {
@@ -201,7 +243,11 @@ func (c *TypedCoordinatedTaskHandler) Stop(a *swf.PollForActivityTaskOutput, d *
 }
 
 type TestCoordinatedTaskHandler struct {
-	t        *testing.T
+	t *testing.T
+
+	// error returned by Tick
+	terr error
+
 	cont     bool
 	canceled bool
 }
@@ -214,10 +260,10 @@ func (c *TestCoordinatedTaskHandler) Start(a *swf.PollForActivityTaskOutput, d i
 func (c *TestCoordinatedTaskHandler) Tick(a *swf.PollForActivityTaskOutput, d interface{}) (bool, interface{}, error) {
 	c.t.Log("TICK")
 	time.Sleep(100 * time.Millisecond)
-	if c.cont {
+	if c.cont && c.terr == nil {
 		return true, nil, nil
 	}
-	return false, &TestOutput{Name: "done"}, nil
+	return false, &TestOutput{Name: "done"}, c.terr
 }
 
 func (c *TestCoordinatedTaskHandler) Cancel(a *swf.PollForActivityTaskOutput, d interface{}) error {
