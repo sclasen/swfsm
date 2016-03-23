@@ -1,18 +1,18 @@
 package activity
 
 import (
+	"errors"
+	"log"
 	"testing"
-
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
 
-func TestCoordinatedActivityHandler(t *testing.T) {
+func TestCoordinatedActivityHandler_Complete(t *testing.T) {
 	hc := &TestCoordinatedTaskHandler{
-		t:        t,
-		canceled: false,
+		t: t,
 	}
 
 	handler := &CoordinatedActivityHandler{
@@ -29,10 +29,11 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	}
 
 	t.Log("test complete")
-	worker.AddCoordinatedHandler(1*time.Second, 1*time.Millisecond, handler)
+	worker.AddCoordinatedHandler(5*time.Millisecond, 1*time.Millisecond, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+
+	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -42,19 +43,85 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 		Input:      S(input),
 	})
 
-	hc.cont = false
+	time.Sleep(50 * time.Millisecond)
+
+	hc.stop = true
+
 	time.Sleep(100 * time.Millisecond)
+
 	if !mockSwf.CompletedSet {
 		t.Fatal("Not Completed")
 	}
+}
+
+func TestCoordinatedActivityHandler_Cancel(t *testing.T) {
+	hc := &TestCoordinatedTaskHandler{
+		t: t,
+	}
+
+	handler := &CoordinatedActivityHandler{
+		Input:    TestInput{},
+		Activity: "activity",
+		Start:    hc.Start,
+		Tick:     hc.Tick,
+		Cancel:   hc.Cancel,
+	}
+
+	mockSwf := &MockSWF{}
+	worker := ActivityWorker{
+		SWF: mockSwf,
+	}
 
 	t.Log("test cancel")
-	hc.cont = true
-	mockSwf.CompletedSet = false
-	mockSwf.Completed = nil
+	worker.AddCoordinatedHandler(5*time.Millisecond, 1*time.Millisecond, handler)
+	worker.Init()
+	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
+
+	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+		TaskToken:         S("token"),
+		WorkflowExecution: &swf.WorkflowExecution{},
+		ActivityType: &swf.ActivityType{
+			Name: S("activity"),
+		},
+		ActivityId: S("id"),
+		Input:      S(input),
+	})
+
+	time.Sleep(30 * time.Millisecond)
+
 	mockSwf.Canceled = true
 
-	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	time.Sleep(500 * time.Millisecond)
+
+	if !hc.canceled {
+		t.Fatal("Not Canceled")
+	}
+}
+
+func TestCoordinatedActivityHandler_StartError(t *testing.T) {
+	hc := &TestCoordinatedTaskHandler{
+		t:        t,
+		startErr: errors.New("start failed"),
+	}
+
+	handler := &CoordinatedActivityHandler{
+		Input:    TestInput{},
+		Activity: "activity",
+		Start:    hc.Start,
+		Tick:     hc.Tick,
+		Cancel:   hc.Cancel,
+	}
+
+	mockSwf := &MockSWF{}
+	worker := ActivityWorker{
+		SWF: mockSwf,
+	}
+
+	worker.AddCoordinatedHandler(5*time.Millisecond, 1*time.Millisecond, handler)
+	worker.Init()
+	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
+
+	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -65,16 +132,15 @@ func TestCoordinatedActivityHandler(t *testing.T) {
 	})
 
 	time.Sleep(100 * time.Millisecond)
-	if !hc.canceled {
-		t.Fatal("Not Canceled")
-	}
 
+	if !mockSwf.Failed {
+		t.Fatal("did not fail")
+	}
 }
 
-func TestTypedCoordinatedActivityHandler(t *testing.T) {
+func TestTypedCoordinatedActivityHandler_Complete(t *testing.T) {
 	hc := &TypedCoordinatedTaskHandler{
-		t:        t,
-		canceled: false,
+		t: t,
 	}
 
 	handler := NewCoordinatedActivityHandler("activity", hc.Begin, hc.Work, hc.Stop)
@@ -85,10 +151,11 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 	}
 
 	t.Log("test complete")
-	worker.AddCoordinatedHandler(1*time.Second, 1*time.Millisecond, handler)
+	worker.AddCoordinatedHandler(5*time.Millisecond, 1*time.Millisecond, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+
+	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -98,19 +165,35 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 		Input:      S(input),
 	})
 
-	hc.cont = false
+	time.Sleep(50 * time.Millisecond)
+
+	hc.stop = true
+
 	time.Sleep(100 * time.Millisecond)
+
 	if !mockSwf.CompletedSet {
 		t.Fatal("Not Completed")
 	}
+}
+
+func TestTypedCoordinatedActivityHandler_Cancel(t *testing.T) {
+	hc := &TypedCoordinatedTaskHandler{
+		t: t,
+	}
+
+	handler := NewCoordinatedActivityHandler("activity", hc.Begin, hc.Work, hc.Stop)
+
+	mockSwf := &MockSWF{}
+	worker := ActivityWorker{
+		SWF: mockSwf,
+	}
 
 	t.Log("test cancel")
-	hc.cont = true
-	mockSwf.CompletedSet = false
-	mockSwf.Completed = nil
-	mockSwf.Canceled = true
+	worker.AddCoordinatedHandler(5*time.Millisecond, 1*time.Millisecond, handler)
+	worker.Init()
+	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 
-	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -120,19 +203,54 @@ func TestTypedCoordinatedActivityHandler(t *testing.T) {
 		Input:      S(input),
 	})
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(30 * time.Millisecond)
+
+	mockSwf.Canceled = true
+
+	time.Sleep(500 * time.Millisecond)
 
 	if !hc.canceled {
-		t.Fatal("Not Canceled")
+		t.Fatal("was not canceled")
+	}
+}
+
+func TestTypedCoordinatedActivityHandler_StartError(t *testing.T) {
+	hc := &TypedCoordinatedTaskHandler{
+		t:        t,
+		startErr: errors.New("start failed"),
 	}
 
+	handler := NewCoordinatedActivityHandler("activity", hc.Begin, hc.Work, hc.Stop)
+
+	mockSwf := &MockSWF{}
+	worker := ActivityWorker{
+		SWF: mockSwf,
+	}
+
+	worker.AddCoordinatedHandler(5*time.Millisecond, 1*time.Millisecond, handler)
+	worker.Init()
+	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
+
+	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+		TaskToken:         S("token"),
+		WorkflowExecution: &swf.WorkflowExecution{},
+		ActivityType: &swf.ActivityType{
+			Name: S("activity"),
+		},
+		ActivityId: S("id"),
+		Input:      S(input),
+	})
+
+	time.Sleep(500 * time.Millisecond)
+
+	if !mockSwf.Failed {
+		t.Fatal("did not fail")
+	}
 }
 
 func TestTickRateLimit(t *testing.T) {
-	hc := &NoopCounterTaskHandler{
-		t:        t,
-		cont:     true,
-		canceled: false,
+	hc := &TestCoordinatedTaskHandler{
+		t: t,
 	}
 
 	handler := &CoordinatedActivityHandler{
@@ -163,7 +281,7 @@ func TestTickRateLimit(t *testing.T) {
 
 	// let it run for 500ms
 	time.Sleep(500 * time.Millisecond)
-	hc.cont = false
+	hc.stop = true
 
 	time.Sleep(100 * time.Millisecond)
 	if !mockSwf.CompletedSet {
@@ -174,50 +292,27 @@ func TestTickRateLimit(t *testing.T) {
 	}
 }
 
-type TypedCoordinatedTaskHandler struct {
-	t        *testing.T
-	cont     bool
-	canceled bool
-}
-
-func (c *TypedCoordinatedTaskHandler) Begin(a *swf.PollForActivityTaskOutput, d *TestInput) (*TestOutput, error) {
-	c.t.Log("START")
-	return nil, nil
-}
-
-func (c *TypedCoordinatedTaskHandler) Work(a *swf.PollForActivityTaskOutput, d *TestInput) (bool, *TestOutput, error) {
-	c.t.Log("TICK")
-	time.Sleep(100 * time.Millisecond)
-	if c.cont {
-		return true, nil, nil
-	}
-	return false, &TestOutput{Name: "done"}, nil
-}
-
-func (c *TypedCoordinatedTaskHandler) Stop(a *swf.PollForActivityTaskOutput, d *TestInput) error {
-	c.t.Log("CANCEL")
-	c.canceled = true
-	return nil
-}
-
 type TestCoordinatedTaskHandler struct {
 	t        *testing.T
-	cont     bool
+	startErr error
+	stop     bool
 	canceled bool
+	ticks    int
 }
 
 func (c *TestCoordinatedTaskHandler) Start(a *swf.PollForActivityTaskOutput, d interface{}) (interface{}, error) {
-	c.t.Log("START")
-	return nil, nil
+	log.Println("START")
+	return nil, c.startErr
 }
 
 func (c *TestCoordinatedTaskHandler) Tick(a *swf.PollForActivityTaskOutput, d interface{}) (bool, interface{}, error) {
+	c.ticks++
 	c.t.Log("TICK")
 	time.Sleep(100 * time.Millisecond)
-	if c.cont {
-		return true, nil, nil
+	if c.stop {
+		return false, &TestOutput{Name: "done"}, nil
 	}
-	return false, &TestOutput{Name: "done"}, nil
+	return true, nil, nil
 }
 
 func (c *TestCoordinatedTaskHandler) Cancel(a *swf.PollForActivityTaskOutput, d interface{}) error {
@@ -226,28 +321,28 @@ func (c *TestCoordinatedTaskHandler) Cancel(a *swf.PollForActivityTaskOutput, d 
 	return nil
 }
 
-type NoopCounterTaskHandler struct {
+type TypedCoordinatedTaskHandler struct {
 	t        *testing.T
-	ticks    int
-	cont     bool
+	startErr error
+	stop     bool
 	canceled bool
 }
 
-func (c *NoopCounterTaskHandler) Start(a *swf.PollForActivityTaskOutput, d interface{}) (interface{}, error) {
+func (c *TypedCoordinatedTaskHandler) Begin(a *swf.PollForActivityTaskOutput, d *TestInput) (*TestOutput, error) {
 	c.t.Log("START")
-	return nil, nil
+	return nil, c.startErr
 }
 
-func (c *NoopCounterTaskHandler) Tick(a *swf.PollForActivityTaskOutput, d interface{}) (bool, interface{}, error) {
+func (c *TypedCoordinatedTaskHandler) Work(a *swf.PollForActivityTaskOutput, d *TestInput) (bool, *TestOutput, error) {
 	c.t.Log("TICK")
-	c.ticks++
-	if c.cont {
-		return true, nil, nil
+	time.Sleep(100 * time.Millisecond)
+	if c.stop {
+		return false, &TestOutput{Name: "done"}, nil
 	}
-	return false, &TestOutput{Name: "done"}, nil
+	return true, nil, nil
 }
 
-func (c *NoopCounterTaskHandler) Cancel(a *swf.PollForActivityTaskOutput, d interface{}) error {
+func (c *TypedCoordinatedTaskHandler) Stop(a *swf.PollForActivityTaskOutput, d *TestInput) error {
 	c.t.Log("CANCEL")
 	c.canceled = true
 	return nil
