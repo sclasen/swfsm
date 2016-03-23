@@ -408,10 +408,6 @@ func TestStringHandler(t *testing.T) {
 }
 
 func TestBackoff(t *testing.T) {
-	if os.Getenv("TEST_BACKOFF") != "1" {
-		t.Log("TEST_BACKOFF != 1  skipping test")
-	}
-
 	serializer := fsm.JSONStateSerializer{}
 
 	correlator := new(fsm.EventCorrelator)
