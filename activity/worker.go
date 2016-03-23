@@ -145,7 +145,6 @@ func (a *ActivityWorker) HandleActivityTask(activityTask *swf.PollForActivityTas
 				return
 			}
 		}
-
 	} else {
 		deserialized = nil
 	}
