@@ -52,6 +52,10 @@ func TestCoordinatedActivityHandler_Complete(t *testing.T) {
 	if !mockSwf.CompletedSet {
 		t.Fatal("Not Completed")
 	}
+
+	if !hc.canceled {
+		t.Fatal("was not canceled")
+	}
 }
 
 func TestCoordinatedActivityHandler_Cancel(t *testing.T) {
@@ -173,6 +177,10 @@ func TestTypedCoordinatedActivityHandler_Complete(t *testing.T) {
 
 	if !mockSwf.CompletedSet {
 		t.Fatal("Not Completed")
+	}
+
+	if !hc.canceled {
+		t.Fatal("was not canceled")
 	}
 }
 
