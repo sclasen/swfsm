@@ -208,6 +208,14 @@ func completeWorkflowPredicate(d *swf.Decision) bool {
 	return *d.DecisionType == "CompleteWorkflowExecution"
 }
 
+func cancelWorkflowPredicate(d *swf.Decision) bool {
+	return *d.DecisionType == "CancelWorkflowExecution"
+}
+
+func failWorkflowPredicate(d *swf.Decision) bool {
+	return *d.DecisionType == "FailWorkflowExecution"
+}
+
 func startTimerPredicate(d *swf.Decision) bool {
 	return *d.DecisionType == "StartTimer"
 }
@@ -534,6 +542,32 @@ func TestCompleteState(t *testing.T) {
 	}
 
 	if *outcome.Decisions[0].DecisionType != swf.DecisionTypeCompleteWorkflowExecution {
+		t.Fatal(outcome)
+	}
+}
+
+func TestFailState(t *testing.T) {
+	fsm := testFSM()
+
+	ctx := testContext(fsm)
+
+	event := &swf.HistoryEvent{
+		EventId:   I(1),
+		EventType: S("WorkflowExecutionStarted"),
+		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
+			Input: StartFSMWorkflowInput(fsm, new(TestData)),
+		},
+	}
+
+	fsm.AddInitialState(fsm.DefaultFailedState())
+	fsm.Init()
+	outcome := fsm.failedState.Decider(ctx, event, new(TestData))
+
+	if len(outcome.Decisions) != 1 {
+		t.Fatal(outcome)
+	}
+
+	if *outcome.Decisions[0].DecisionType != swf.DecisionTypeFailWorkflowExecution {
 		t.Fatal(outcome)
 	}
 }
