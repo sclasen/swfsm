@@ -208,6 +208,14 @@ func completeWorkflowPredicate(d *swf.Decision) bool {
 	return *d.DecisionType == "CompleteWorkflowExecution"
 }
 
+func cancelWorkflowPredicate(d *swf.Decision) bool {
+	return *d.DecisionType == "CancelWorkflowExecution"
+}
+
+func failWorkflowPredicate(d *swf.Decision) bool {
+	return *d.DecisionType == "FailWorkflowExecution"
+}
+
 func startTimerPredicate(d *swf.Decision) bool {
 	return *d.DecisionType == "StartTimer"
 }
