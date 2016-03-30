@@ -66,6 +66,7 @@ type FSM struct {
 	errorHandlers map[string]DecisionErrorHandler
 	initialState  *FSMState
 	completeState *FSMState
+	failedState   *FSMState
 	canceledState *FSMState
 	stop          chan bool
 	stopAck       chan bool
@@ -98,17 +99,24 @@ func (f *FSM) AddState(state *FSMState) {
 }
 
 // AddCompleteState adds a state to the FSM and uses it as the final state of a workflow.
-// it will only receive events if you returned FSMContext.Complete(...) and the workflow was unable to complete.
+// It will only receive events if you returned FSMContext.Complete(...) and the workflow was unable to complete.
 func (f *FSM) AddCompleteState(state *FSMState) {
 	f.AddState(state)
 	f.completeState = state
 }
 
 // AddCanceledState adds a state to the FSM and uses it as the final state of a workflow.
-// it will only receive events if you returned FSMContext.CancelWorkflow(...) and the workflow was unable to cancel.
+// It will only receive events if you returned FSMContext.CancelWorkflow(...) and the workflow was unable to cancel.
 func (f *FSM) AddCanceledState(state *FSMState) {
 	f.AddState(state)
 	f.canceledState = state
+}
+
+// AddFailedState adds a state to the FSM and uses it as the final state of a workflow.
+// It will only receive events if you returned FSMContext.FailWorkflow(...) and the workflow was unable to fail.
+func (f *FSM) AddFailedState(state *FSMState) {
+	f.AddState(state)
+	f.failedState = state
 }
 
 // AddInitialStateWithHandler adds a state to the FSM and uses it as the initial state when a workflow execution is started.
@@ -156,8 +164,22 @@ func (f *FSM) DefaultCanceledState() *FSMState {
 	return &FSMState{
 		Name: CanceledState,
 		Decider: func(fsm *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
-			f.log("state=complete at=attempt-cancel event=%s", h)
+			f.log("state=cancel at=attempt-cancel event=%s", h)
 			return fsm.CancelWorkflow(data, s.S("default-canceled-state"))
+		},
+	}
+}
+
+// DefaultFailedState is the failed state used in an FSM if one has not been set.
+// It simply responds with a FailWorkflow which attempts to Fail the workflow.
+// This state will only get events if you previously attempted to fail the workflow and
+// the call failed.
+func (f *FSM) DefaultFailedState() *FSMState {
+	return &FSMState{
+		Name: FailedState,
+		Decider: func(fsm *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+			f.log("state=fail at=attempt-fail event=%s", h)
+			return fsm.FailWorkflow(data, s.S("default-failed-state"))
 		},
 	}
 }
@@ -207,6 +229,10 @@ func (f *FSM) Init() {
 
 	if f.canceledState == nil {
 		f.AddCanceledState(f.DefaultCanceledState())
+	}
+
+	if f.failedState == nil {
+		f.AddFailedState(f.DefaultFailedState())
 	}
 
 	if f.stop == nil {
