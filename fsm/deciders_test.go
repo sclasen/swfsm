@@ -7,6 +7,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
+	"github.com/stretchr/testify/assert"
+
 	s "github.com/sclasen/swfsm/sugar"
 )
 
@@ -438,6 +440,26 @@ func TestUpdateState(t *testing.T) {}
 func TestTransition(t *testing.T) {}
 
 func TestCompleteWorkflow(t *testing.T) {}
+
+func TestFailWorkflow(t *testing.T) {
+	// arrange
+	data := &TestingType{"Some data"}
+	fsmContext := NewFSMContext(nil,
+		swf.WorkflowType{Name: s.S("foo"), Version: s.S("1")},
+		swf.WorkflowExecution{WorkflowId: s.S("id"), RunId: s.S("runid")},
+		nil, "state", nil, 1)
+	details := "Some failure message"
+	// act
+	failDecider := FailWorkflow(s.S(details))
+	outcome := failDecider(fsmContext, nil, data)
+
+	// assert
+	assert.Equal(t, data, outcome.Data, "Expected data to be passed into failed outcome")
+	failDecision := FindDecision(outcome.Decisions, failWorkflowPredicate)
+	assert.NotNil(t, failDecision, "Expected to find a fail workflow decision in the outcome")
+	assert.Equal(t, details, *failDecision.FailWorkflowExecutionDecisionAttributes.Details,
+		"Expected details in the fail decision to match what was passed in")
+}
 
 func TestStay(t *testing.T) {}
 

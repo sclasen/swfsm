@@ -667,6 +667,14 @@ func CancelWorkflow(details *string) Decider {
 	}
 }
 
+// FailWorkflow fails the workflow
+func FailWorkflow(details *string) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		Log.Printf("at=fail-workflow workflowId=%s", LS(ctx.WorkflowId))
+		return ctx.FailWorkflow(data, details)
+	}
+}
+
 // Stay keeps the fsm in the same state, and terminates the decider.
 func Stay() Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
