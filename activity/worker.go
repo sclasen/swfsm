@@ -205,9 +205,12 @@ func (h *ActivityWorker) fail(task *swf.PollForActivityTaskOutput, err error) {
 		}
 	}
 	Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=fail error=%q", LS(task.WorkflowExecution.WorkflowId), LS(task.ActivityType.Name), LS(task.ActivityId), err.Error())
+	if len(err.Error()) > FailureReasonMaxChars {
+		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=truncating-failure-reason error=%q", LS(task.WorkflowExecution.WorkflowId), LS(task.ActivityType.Name), LS(task.ActivityId), err.Error())
+	}
 	_, failErr := h.SWF.RespondActivityTaskFailed(&swf.RespondActivityTaskFailedInput{
 		TaskToken: task.TaskToken,
-		Reason:    S(err.Error()),
+		Reason:    S(truncate(err.Error(), FailureReasonMaxChars)),
 		Details:   S(err.Error()),
 	})
 	if failErr != nil {
@@ -286,6 +289,14 @@ func (h *ActivityWorker) canceled(resp *swf.PollForActivityTaskOutput, details *
 	if canceledErr != nil {
 		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=canceled-response-fail error=%q", LS(resp.WorkflowExecution.WorkflowId), LS(resp.ActivityType.Name), LS(resp.ActivityId), canceledErr.Error())
 	}
+}
+
+func truncate(s string, i int) string {
+	runes := []rune(s)
+	if len(runes) > i {
+		return string(runes[:i])
+	}
+	return s
 }
 
 // HandleWithRecovery is used to wrap handler functions (such as HandleActivityTask)
