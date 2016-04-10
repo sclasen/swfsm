@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/rand"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,11 +16,13 @@ import (
 	. "github.com/sclasen/swfsm/log"
 	"github.com/sclasen/swfsm/migrator"
 	. "github.com/sclasen/swfsm/sugar"
+	"github.com/stretchr/testify/assert"
 )
 
 type MockSWF struct {
 	Activity     *swf.PollForActivityTaskOutput
 	Failed       bool
+	FailedReason *string
 	Completed    *string
 	CompletedSet bool
 	History      *swf.GetWorkflowExecutionHistoryOutput
@@ -42,6 +45,7 @@ func (m *MockSWF) RespondActivityTaskCompleted(req *swf.RespondActivityTaskCompl
 }
 func (m *MockSWF) RespondActivityTaskFailed(req *swf.RespondActivityTaskFailedInput) (*swf.RespondActivityTaskFailedOutput, error) {
 	m.Failed = true
+	m.FailedReason = req.Reason
 	return nil, nil
 }
 func (m *MockSWF) PollForActivityTask(req *swf.PollForActivityTaskInput) (*swf.PollForActivityTaskOutput, error) {
@@ -456,4 +460,58 @@ func TestBackoff(t *testing.T) {
 	case <-failed:
 		t.Fatal("fail finished before 2 seconds")
 	}
+}
+
+func TestFailWhenErrorMoreThanMaxCharactersExpectsErrorTruncated(t *testing.T) {
+	// arrange
+	ops := &MockSWF{}
+	worker := &ActivityWorker{
+		SWF:        ops,
+		Serializer: fsm.JSONStateSerializer{},
+	}
+	longErrorMessage := `Lorem ipsum dolor sitamet, consectetur adipisicing elit, sed do eiusmod
+tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
+consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
+dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident,
+sunt in culpa qui officia deserunt mollit anim id est laborum.`
+
+	// act
+	worker.fail(&swf.PollForActivityTaskOutput{
+		WorkflowExecution: &swf.WorkflowExecution{},
+		ActivityType:      &swf.ActivityType{Name: S("activity")},
+		ActivityId:        S("the-id"),
+		Input:             S("theInput"),
+	}, errors.New(longErrorMessage))
+
+	// assert
+	assert.EqualValues(t, FailureReasonMaxChars, len(*ops.FailedReason),
+		"Expected long error message to be truncated to the max characters allowed.")
+	assert.Equal(t, longErrorMessage[:FailureReasonMaxChars], *ops.FailedReason,
+		"Expected failure reason to match the first "+strconv.Itoa(FailureReasonMaxChars)+
+			" characters of the long error message")
+}
+
+func TestFailWhenErrorLessThanMaxCharactersExpectsErrorNotTruncated(t *testing.T) {
+	// arrange
+	ops := &MockSWF{}
+	worker := &ActivityWorker{
+		SWF:        ops,
+		Serializer: fsm.JSONStateSerializer{},
+	}
+	shortErrorMessage := `Lorem ipsum dolor sitamet`
+
+	// act
+	worker.fail(&swf.PollForActivityTaskOutput{
+		WorkflowExecution: &swf.WorkflowExecution{},
+		ActivityType:      &swf.ActivityType{Name: S("activity")},
+		ActivityId:        S("the-id"),
+		Input:             S("theInput"),
+	}, errors.New(shortErrorMessage))
+
+	// assert
+	assert.EqualValues(t, len(shortErrorMessage), len(*ops.FailedReason),
+		"Expected short error message to not be truncated because it is below the max character limit.")
+	assert.Equal(t, shortErrorMessage, *ops.FailedReason,
+		"Expected failure reason to match the short error message")
 }
