@@ -5,10 +5,16 @@ import (
 	"testing"
 	"time"
 
+	"errors"
+	"reflect"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
+	"github.com/sclasen/swfsm/testing/mocks"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 //Todo add tests of error handling mechanism
@@ -624,6 +630,163 @@ func TestStasher(t *testing.T) {
 		t.Fatal("bad stasher")
 	}
 
+}
+
+func TestInitWhenTaskErrorHandlerNotSetExpectsDefaultUsed(t *testing.T) {
+	// arrange
+	f := testFSM()
+	f.AddInitialState(f.DefaultCompleteState())
+
+	// act
+	f.Init()
+
+	// assert
+	assert.Equal(t, reflect.ValueOf(f.DefaultTaskErrorHandler).Pointer(), reflect.ValueOf(f.TaskErrorHandler).Pointer(),
+		"Expected TaskErrorHandler to default to the DefaultTaskErrorHandler upon Init() if none is set")
+}
+
+func TestInitWhenTaskErrorHandlerSetExpectsSetFuncUsed(t *testing.T) {
+	// arrange
+	f := testFSM()
+	f.AddInitialState(f.DefaultCompleteState())
+	expectedHandler := func(decisionTask *swf.PollForDecisionTaskOutput, err error) {}
+	f.TaskErrorHandler = expectedHandler
+
+	// act
+	f.Init()
+
+	// assert
+	assert.Equal(t, reflect.ValueOf(expectedHandler).Pointer(), reflect.ValueOf(f.TaskErrorHandler).Pointer(),
+		"Expected FSM to use the set handler after Init()")
+}
+
+func TestHandleDecisionTaskWhenTickErrorsExpectsTaskErrorHandlerCalled(t *testing.T) {
+	// arrange
+	f := testFSM()
+	f.AddInitialState(f.DefaultCompleteState())
+	handlerCalled := false
+	expectedHandler := func(decisionTask *swf.PollForDecisionTaskOutput, err error) {
+		handlerCalled = true
+	}
+	f.TaskErrorHandler = expectedHandler
+	events := []*swf.HistoryEvent{
+		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventId: I(3)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventId: I(2)},
+	}
+	decisionTask := testDecisionTask(1, events)
+	f.Init()
+	f.AllowPanics = false
+
+	// act
+	f.handleDecisionTask(decisionTask)
+
+	// assert
+	assert.True(t, handlerCalled, "Expected handler called because Tick errored")
+}
+
+func TestHandleDecisionTaskWhenRespondingToSWFErrorsExpectsTaskErrorHandlerCalled(t *testing.T) {
+	// arrange
+	f := testFSM()
+	f.AddInitialState(f.DefaultCompleteState())
+
+	handlerCalled := false
+	expectedHandler := func(decisionTask *swf.PollForDecisionTaskOutput, err error) {
+		handlerCalled = true
+	}
+	f.TaskErrorHandler = expectedHandler
+
+	events := []*swf.HistoryEvent{
+		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventId: I(3)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventId: I(2)},
+		EventFromPayload(1, &swf.WorkflowExecutionStartedEventAttributes{
+			Input: StartFSMWorkflowInput(f, new(TestData)),
+		}),
+	}
+	decisionTask := testDecisionTask(0, events)
+
+	f.AllowPanics = false
+	mockSWFAPI := &mocks.SWFAPI{}
+	expectedError := errors.New("Some SWF error")
+	mockSWFAPI.MockOn_RespondDecisionTaskCompleted(mock.Anything).Return(nil, expectedError)
+	f.SWF = mockSWFAPI
+
+	// act
+	f.Init()
+	f.handleDecisionTask(decisionTask)
+
+	// assert
+	assert.True(t, handlerCalled, "Expected handler called because RespondDecisionTaskCompleted errored")
+}
+
+func TestHandleDecisionTaskReplicationErrorsExpectsTaskErrorHandlerCalled(t *testing.T) {
+	// arrange
+	f := testFSM()
+	f.AddInitialState(f.DefaultCompleteState())
+
+	handlerCalled := false
+	expectedHandler := func(decisionTask *swf.PollForDecisionTaskOutput, err error) {
+		handlerCalled = true
+	}
+	f.TaskErrorHandler = expectedHandler
+
+	events := []*swf.HistoryEvent{
+		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventId: I(3)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventId: I(2)},
+		EventFromPayload(1, &swf.WorkflowExecutionStartedEventAttributes{
+			Input: StartFSMWorkflowInput(f, new(TestData)),
+		}),
+	}
+	decisionTask := testDecisionTask(0, events)
+
+	f.AllowPanics = false
+	mockSWFAPI := &mocks.SWFAPI{}
+	mockSWFAPI.MockOn_RespondDecisionTaskCompleted(mock.Anything).Return(nil, nil)
+	f.SWF = mockSWFAPI
+	f.ReplicationHandler = func(*FSMContext, *swf.PollForDecisionTaskOutput, *swf.RespondDecisionTaskCompletedInput, *SerializedState) error {
+		return errors.New("Some replication error")
+	}
+
+	// act
+	f.Init()
+	f.handleDecisionTask(decisionTask)
+
+	// assert
+	assert.True(t, handlerCalled, "Expected handler called because there was a replication error")
+}
+
+func TestHandleDecisionTaskWhenNoErrorsExpectsTaskErrorHandlerNotCalled(t *testing.T) {
+	// arrange
+	f := testFSM()
+	f.AddInitialState(f.DefaultCompleteState())
+
+	handlerCalled := false
+	expectedHandler := func(decisionTask *swf.PollForDecisionTaskOutput, err error) {
+		handlerCalled = true
+	}
+	f.TaskErrorHandler = expectedHandler
+
+	events := []*swf.HistoryEvent{
+		&swf.HistoryEvent{EventType: S("DecisionTaskStarted"), EventId: I(3)},
+		&swf.HistoryEvent{EventType: S("DecisionTaskScheduled"), EventId: I(2)},
+		EventFromPayload(1, &swf.WorkflowExecutionStartedEventAttributes{
+			Input: StartFSMWorkflowInput(f, new(TestData)),
+		}),
+	}
+	decisionTask := testDecisionTask(0, events)
+
+	mockSWFAPI := &mocks.SWFAPI{}
+	mockSWFAPI.MockOn_RespondDecisionTaskCompleted(mock.Anything).Return(nil, nil)
+	f.SWF = mockSWFAPI
+	f.ReplicationHandler = func(*FSMContext, *swf.PollForDecisionTaskOutput, *swf.RespondDecisionTaskCompletedInput, *SerializedState) error {
+		return nil
+	}
+
+	// act
+	f.Init()
+	f.handleDecisionTask(decisionTask)
+
+	// assert
+	assert.False(t, handlerCalled, "Expected handler not called because nothing errored")
 }
 
 func testFSM() *FSM {
