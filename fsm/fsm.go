@@ -57,6 +57,13 @@ type FSM struct {
 	//If there is a good outcome, then we use that as the starting point from which to grab and Decide on the range of unprocessed
 	//events. If this works out fine, we then process the initiating decisionTask range of events.
 	DecisionErrorHandler DecisionErrorHandler
+	// TaskErrorHandler is called when an error occurs
+	// outside of the Decider machinery.  When this handler is called the decision
+	// task has been abandoned and the task will timeout without any further intervention.
+	//
+	// If unset, the DefaultTaskErrorHandler will be used.
+	// If more "cleanup" is desired, set this field with a custom TaskErrorHandler.
+	TaskErrorHandler TaskErrorHandler
 	//FSMErrorReporter  is called whenever there is an error within the FSM, usually indicating bad state or configuration of your FSM.
 	FSMErrorReporter FSMErrorReporter
 	//AllowPanics is mainly for testing, it should be set to false in production.
@@ -184,10 +191,19 @@ func (f *FSM) DefaultFailedState() *FSMState {
 	}
 }
 
-// DefaultDecisionErrorHandler is the DefaultDecisionErrorHandler
+// DefaultDecisionErrorHandler is the default DecisionErrorHandler that is used
+// if a handler is not set on the FSM or a handler is not associated with the
+// current state.  This default handler simply logs the error and the decision task will timeout.
 func (f *FSM) DefaultDecisionErrorHandler(ctx *FSMContext, event *swf.HistoryEvent, stateBeforeEvent interface{}, stateAfterError interface{}, err error) (*Outcome, error) {
 	f.log("action=tick workflow=%s workflow-id=%s at=decider-error error=%q", s.LS(ctx.WorkflowType.Name), s.LS(ctx.WorkflowId), err)
 	return nil, err
+}
+
+// DefaultTaskErrorHandler is the default TaskErrorHandler that is used if a
+// TaskErrorHandler is not set on this FSM.  DefaultTaskErrorHandler simply logs the error.
+// With no further intervention the decision task will timeout.
+func (f *FSM) DefaultTaskErrorHandler(decisionTask *swf.PollForDecisionTaskOutput, err error) {
+	f.log("workflow=%s workflow-id=%s run-id=%s action=tick at=handle-task-error status=abandoning-task error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), s.LS(decisionTask.WorkflowExecution.RunId), err.Error())
 }
 
 // ErrorFindingStateData is part of the FSM implementation of FSMErrorReporter
@@ -265,6 +281,10 @@ func (f *FSM) Init() {
 		f.DecisionErrorHandler = f.DefaultDecisionErrorHandler
 	}
 
+	if f.TaskErrorHandler == nil {
+		f.TaskErrorHandler = f.DefaultTaskErrorHandler
+	}
+
 	if f.FSMErrorReporter == nil {
 		f.FSMErrorReporter = f
 	}
@@ -321,7 +341,7 @@ func (f *FSM) dispatchTask(decisionTask *swf.PollForDecisionTaskOutput) {
 func (f *FSM) handleDecisionTask(decisionTask *swf.PollForDecisionTaskOutput) {
 	context, decisions, state, err := f.Tick(decisionTask)
 	if err != nil {
-		f.log("workflow=%s workflow-id=%s run-id=%s action=tick at=tick-error status=abandoning-task error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), s.LS(decisionTask.WorkflowExecution.RunId), err.Error())
+		f.TaskErrorHandler(decisionTask, err)
 		return
 	}
 	complete := &swf.RespondDecisionTaskCompletedInput{
@@ -332,14 +352,14 @@ func (f *FSM) handleDecisionTask(decisionTask *swf.PollForDecisionTaskOutput) {
 	complete.ExecutionContext = aws.String(state.StateName)
 
 	if _, err := f.SWF.RespondDecisionTaskCompleted(complete); err != nil {
-		f.log("workflow=%s workflow-id=%s run-id=%q action=tick at=decide-request-failed error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), s.LS(decisionTask.WorkflowExecution.RunId), err.Error())
+		f.TaskErrorHandler(decisionTask, err)
 		return
 	}
 
 	if f.ReplicationHandler != nil {
 		repErr := f.ReplicationHandler(context, decisionTask, complete, state)
 		if repErr != nil {
-			f.log("workflow=%s workflow-id=%s action=tick at=replication-handler-failed error=%q", s.LS(decisionTask.WorkflowType.Name), s.LS(decisionTask.WorkflowExecution.WorkflowId), s.LS(decisionTask.WorkflowExecution.RunId), repErr.Error())
+			f.TaskErrorHandler(decisionTask, err)
 		}
 	}
 

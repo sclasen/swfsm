@@ -67,6 +67,13 @@ type FSMState struct {
 //If your DecisionErrorHandler does not return a non nil Outcome, any further attempt to process the decisionTask is abandoned and the task will time out.
 type DecisionErrorHandler func(ctx *FSMContext, event *swf.HistoryEvent, stateBeforeEvent interface{}, stateAfterError interface{}, err error) (*Outcome, error)
 
+// TaskErrorHandler is the error handling contract for errors that occur
+// outside of the Decider machinery when handling receiving incoming tasks,
+// sending outgoing decisions for tasks, or replicating state.
+// This handler is called when a decision task has been abandoned and the task
+// will timeout without any further intervention.
+type TaskErrorHandler func(decisionTask *swf.PollForDecisionTaskOutput, err error)
+
 //FSMErrorHandler is the error handling contract for errors in the FSM machinery itself.
 //These are generally a misconfiguration of your FSM or mismatch between struct and serialized form and cant be resolved without config/code changes
 //the paramaters to each method provide all availabe info at the time of the error so you can diagnose issues.
