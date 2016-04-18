@@ -8,20 +8,17 @@ all: ready test
 
 travis: tidy test
 
-install: godep
-	 godep go install ./...
+install:
+	 go install ./...
 
 forego:
 	go get github.com/ddollar/forego
 
-godep:
-	go get github.com/tools/godep
-
 test: install
-	godep go test ./...
+	go test ./...
 
 test-aws: install forego
-	forego run godep go test
+	forego run go test
 
 tidy:
 	go get golang.org/x/tools/cmd/goimports
