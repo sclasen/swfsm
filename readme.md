@@ -32,4 +32,4 @@ Please see the godoc for detailed documentation and examples.
 versions
 --------
 
-Please see Godeps/Godeps.json for the version of aws-sdk-go that this lib currently supports.
+Please see vendor/vendor.js for the version of aws-sdk-go that this lib currently supports.
