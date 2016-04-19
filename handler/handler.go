@@ -43,15 +43,21 @@ func SWFSendHandler(polling, heartbeat *http.Client) func(*request.Request) {
 			}
 
 		}
+
 		var err error
 		r.HTTPResponse, err = client.Do(r.HTTPRequest)
 		if err != nil {
+			// Prevent leaking if an HTTPResponse was returned. Clean up
+			// the body.
+			if r.HTTPResponse != nil {
+				r.HTTPResponse.Body.Close()
+			}
 			// Capture the case where url.Error is returned for error processing
 			// response. e.g. 301 without location header comes back as string
 			// error and r.HTTPResponse is nil. Other url redirect errors will
 			// comeback in a similar method.
-			if e, ok := err.(*url.Error); ok {
-				if s := reStatusCode.FindStringSubmatch(e.Error()); s != nil {
+			if e, ok := err.(*url.Error); ok && e.Err != nil {
+				if s := reStatusCode.FindStringSubmatch(e.Err.Error()); s != nil {
 					code, _ := strconv.ParseInt(s[1], 10, 64)
 					r.HTTPResponse = &http.Response{
 						StatusCode: int(code),
@@ -59,6 +65,15 @@ func SWFSendHandler(polling, heartbeat *http.Client) func(*request.Request) {
 						Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
 					}
 					return
+				}
+			}
+			if r.HTTPResponse == nil {
+				// Add a dummy request response object to ensure the HTTPResponse
+				// value is consistent.
+				r.HTTPResponse = &http.Response{
+					StatusCode: int(0),
+					Status:     http.StatusText(int(0)),
+					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
 				}
 			}
 			// Catch all other request errors.
