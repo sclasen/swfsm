@@ -1,6 +1,6 @@
-GO_PACKAGES := $(shell go list ./... | sed 's_github.com/sclasen/swfsm_._')
-GODEPS_SRC_DIR := ./Godeps/_workspace/src
-AWS_SERVICES_DIR := $(GODEPS_SRC_DIR)/github.com/aws/aws-sdk-go/service
+GOVENDOR_DIR := ./vendor
+GO_PACKAGES := $(shell go list ./... | grep -v $(GOVENDOR_DIR) | sed 's_github.com/sclasen/swfsm_._')
+AWS_SERVICES_DIR := $(GOVENDOR_DIR)/github.com/aws/aws-sdk-go/service
 LIB_MOCKS_DIR := ./testing/mocks
 MOCK_NOTE := "AUTO-GENERATED MOCK. DO NOT EDIT.\nUSE make mocks TO REGENERATE."
 
@@ -8,33 +8,31 @@ all: ready test
 
 travis: tidy test
 
-install: godep
-	 godep go install ./...
+install:
+	 go install ./...
 
 forego:
 	go get github.com/ddollar/forego
 
-godep:
-	go get github.com/tools/godep
-
 test: install
-	godep go test ./...
+	go test ./...
 
 test-aws: install forego
-	forego run godep go test
+	forego run go test
 
 tidy:
 	go get golang.org/x/tools/cmd/goimports
 	test -z "$$(goimports -l -d $(GO_PACKAGES) | tee /dev/stderr)"
 
 lint:
+	go get github.com/golang/lint/golint
 	test -z "$$(golint ./... | tee /dev/stderr)"
 	go vet ./...
 
 
 imports:
-	go get github.com/golang/lint/golint
-	goimports -w .
+	go get golang.org/x/tools/cmd/goimports
+	goimports -d $(GO_PACKAGES) -w .
 
 fmt:
 	go fmt ./...
