@@ -29,13 +29,12 @@ lint:
 	test -z "$$(golint ./... | tee /dev/stderr)"
 	go vet ./...
 
-
 imports:
 	go get golang.org/x/tools/cmd/goimports
-	goimports -d $(GO_PACKAGES) -w .
+	goimports -w -d $(GO_PACKAGES)
 
 fmt:
-	go fmt ./...
+	go fmt $(GO_PACKAGES)
 
 ready: fmt imports tidy
 
