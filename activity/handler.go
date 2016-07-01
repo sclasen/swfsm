@@ -28,6 +28,11 @@ type CoordinatedActivityHandler struct {
 	Start CoordinatedActivityHandlerStartFunc
 
 	// Tick is called regularly to process a running activity.
+	// Tick that returns false, nil, nil just expresses that the job is still running.
+	// Tick that returns false, &SomeStruct{}, nil will express that the job is still running and also send an 'ActivityUpdated' signal back to the FSM with SomeStruct{} as the Input.
+	// Tick that returns true, &SomeStruct{}, nil, expresses that the job/activity is done and send SomeStruct{} back as the result. as well as stops heartbeating.
+	// Tick that returns true, nil, nil, expresses that the job is done and send no result back, as well as stops heartbeating.
+	// Tick that returns false, nil, err expresses that the job/activity failed and sends back err as the reason. as well as stops heartbeating.
 	Tick CoordinatedActivityHandlerTickFunc
 
 	// Cancel is called when a running activity receives a request to cancel
