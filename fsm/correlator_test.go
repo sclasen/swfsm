@@ -609,9 +609,9 @@ func TestActivityInfoFromSignalEvent(t *testing.T) {
 
 	sched := EventFromPayload(2, &swf.ActivityTaskScheduledEventAttributes{
 		ActivityId: S("the-activity"),
-		Input: S("the-input"),
+		Input:      S("the-input"),
 		ActivityType: &swf.ActivityType{
-			Name: S("activity-name"),
+			Name:    S("activity-name"),
 			Version: S("activity-verions"),
 		},
 	})
@@ -621,26 +621,23 @@ func TestActivityInfoFromSignalEvent(t *testing.T) {
 
 	state := &SerializedActivityState{
 		ActivityId: "the-activity",
-		Input: S("the-update"),
+		Input:      S("the-update"),
 	}
 
 	ser, _ := c.Serializer.Serialize(state)
 
-
 	update := EventFromPayload(4, &swf.WorkflowExecutionSignaledEventAttributes{
 		SignalName: S(ActivityUpdatedSignal),
-		Input: S(ser),
+		Input:      S(ser),
 	})
-
-
 
 	c.Track(start)
 	c.Track(sched)
 
 	info := c.ActivityInfo(update)
 	if info == nil {
-		s, _:= c.Serializer.Serialize(c.Activities)
-		t.Fatalf("didnt find the activity! %s",s)
+		s, _ := c.Serializer.Serialize(c.Activities)
+		t.Fatalf("didnt find the activity! %s", s)
 	}
 
 }
