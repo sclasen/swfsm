@@ -381,7 +381,12 @@ func (a *EventCorrelator) getId(h *swf.HistoryEvent) (id string) {
 			case ActivityStartedSignal, ActivityUpdatedSignal:
 				state := new(SerializedActivityState)
 				a.Serializer.Deserialize(*event.Input, state)
-				id = state.ActivityId
+				for key, info := range a.Activities {
+					if info.ActivityId == state.ActivityId {
+						id = key
+						break
+					}
+				}
 			default:
 				id = a.key(event.ExternalInitiatedEventId)
 			}
