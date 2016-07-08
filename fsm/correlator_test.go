@@ -616,13 +616,23 @@ func TestActivityInfoFromSignalEvent(t *testing.T) {
 		},
 	})
 
-	update := EventFromPayload(4, &swf.WorkflowExecutionSignaledEventAttributes{
-		SignalName: S(ActivityUpdatedSignal),
-		Input: S("signal-input"),
-	})
-
 	c := new(EventCorrelator)
 	c.Serializer = JSONStateSerializer{}
+
+	state := &SerializedActivityState{
+		ActivityId: "the-activity",
+		Input: S("the-update"),
+	}
+
+	ser, _ := c.Serializer.Serialize(state)
+
+
+	update := EventFromPayload(4, &swf.WorkflowExecutionSignaledEventAttributes{
+		SignalName: S(ActivityUpdatedSignal),
+		Input: S(ser),
+	})
+
+
 
 	c.Track(start)
 	c.Track(sched)
