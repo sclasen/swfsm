@@ -593,3 +593,44 @@ func TestChildTracking(t *testing.T) {
 		t.Fatal("expected zero attempts", c)
 	}
 }
+
+func TestActivityInfoFromSignalEvent(t *testing.T) {
+	event := func(eventId int, payload interface{}) *swf.HistoryEvent {
+		return EventFromPayload(eventId, payload)
+	}
+
+	start := event(1, &swf.StartChildWorkflowExecutionInitiatedEventAttributes{
+		WorkflowId: S("the-workflow"),
+		WorkflowType: &swf.WorkflowType{
+			Name:    S("the-name"),
+			Version: S("the-version"),
+		},
+	})
+
+	sched := EventFromPayload(2, &swf.ActivityTaskScheduledEventAttributes{
+		ActivityId: S("the-activity"),
+		Input: S("the-input"),
+		ActivityType: &swf.ActivityType{
+			Name: S("activity-name"),
+			Version: S("activity-verions"),
+		},
+	})
+
+	update := EventFromPayload(4, &swf.WorkflowExecutionSignaledEventAttributes{
+		SignalName: S(ActivityUpdatedSignal),
+		Input: S("signal-input"),
+	})
+
+	c := new(EventCorrelator)
+	c.Serializer = JSONStateSerializer{}
+
+	c.Track(start)
+	c.Track(sched)
+
+	info := c.ActivityInfo(update)
+	if info == nil {
+		s, _:= c.Serializer.Serialize(c.Activities)
+		t.Fatalf("didnt find the activity! %s",s)
+	}
+
+}
