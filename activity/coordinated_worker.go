@@ -86,7 +86,7 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 		return nil, err
 	}
 
-	cancel := make(chan error, 1)
+	cancel := make(chan error, 2)
 	stopHeartbeating := make(chan struct{})
 
 	go c.heartbeat(activityTask, stopHeartbeating, cancel)
