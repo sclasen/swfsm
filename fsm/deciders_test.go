@@ -227,6 +227,39 @@ func TestOnData(t *testing.T) {
 	}
 }
 
+func TestOnDataUnless(t *testing.T) {
+	decider := Transition("some-state")
+	typed := Typed(new(TestingType))
+	data := &TestingType{Field: "no"}
+	ctx := deciderTestContext()
+
+	predicate := typed.PredicateFunc(func(data *TestingType) bool {
+		return data.Field == "yes"
+	})
+
+	composedDecider := OnDataUnless(predicate, decider)
+
+	event := &swf.HistoryEvent{
+		EventId:        s.L(129),
+		EventTimestamp: aws.Time(time.Now()),
+		EventType:      s.S(swf.EventTypeWorkflowExecutionStarted),
+	}
+
+	outcome := composedDecider(ctx, event, data)
+	expected := decider(ctx, event, data)
+
+	if !reflect.DeepEqual(outcome, expected) {
+		t.Fatal("Outcomes not equal", outcome, expected)
+	}
+
+	data.Field = "yes"
+	outcome = composedDecider(ctx, event, data)
+
+	if reflect.DeepEqual(outcome, expected) {
+		t.Fatal("Outcomes should not be equal", outcome, expected)
+	}
+}
+
 func TestOnSignalReceived(t *testing.T) {
 	signal := "the-signal"
 	ctx := deciderTestContext()
