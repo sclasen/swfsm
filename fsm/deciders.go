@@ -236,6 +236,15 @@ func OnData(predicate PredicateFunc, deciders ...Decider) Decider {
 	}
 }
 
+// OnDataUnless builds a composed decider that fires on when the PredicateFunc is NOT satisfied.
+func OnDataUnless(predicate PredicateFunc, deciders ...Decider) Decider {
+	unlessPredicate := func(data interface{}) bool {
+		return !predicate(data)
+	}
+
+	return OnData(unlessPredicate, deciders...)
+}
+
 // OnSignalsReceived builds a composed decider that fires on when one of the matching signal is received.
 func OnSignalsReceived(signalNames []string, deciders ...Decider) Decider {
 	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
