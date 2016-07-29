@@ -403,6 +403,8 @@ func (f *FSM) Tick(ctx context.Context, decisionTask *swf.PollForDecisionTaskOut
 			opentracing.ChildOf(sp.Context()))
 	}
 	defer sp.Finish()
+	sp.SetTag("WorkflowType", *decisionTask.WorkflowType)
+	sp.SetTag("WorkflowID", *decisionTask.WorkflowExecution)
 
 	//BeforeDecision interceptor invocation
 	if f.DecisionInterceptor != nil {
