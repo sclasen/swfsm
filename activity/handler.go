@@ -17,13 +17,13 @@ type ActivityHandler struct {
 	Input       interface{}
 }
 
-type CoordinatedActivityHandlerStartFunc func(*swf.PollForActivityTaskOutput, interface{}) (interface{}, error)
+type CoordinatedActivityHandlerStartFunc func(context.Context, *swf.PollForActivityTaskOutput, interface{}) (interface{}, error)
 
-type CoordinatedActivityHandlerTickFunc func(*swf.PollForActivityTaskOutput, interface{}) (bool, interface{}, error)
+type CoordinatedActivityHandlerTickFunc func(context.Context, *swf.PollForActivityTaskOutput, interface{}) (bool, interface{}, error)
 
-type CoordinatedActivityHandlerCancelFunc func(*swf.PollForActivityTaskOutput, interface{}) error
+type CoordinatedActivityHandlerCancelFunc func(context.Context, *swf.PollForActivityTaskOutput, interface{}) error
 
-type CoordinatedActivityHandlerFinishFunc func(*swf.PollForActivityTaskOutput, interface{}) error
+type CoordinatedActivityHandlerFinishFunc func(context.Context, *swf.PollForActivityTaskOutput, interface{}) error
 
 type CoordinatedActivityHandler struct {
 	// Start is called when a new activity is ready to be handled.
@@ -66,17 +66,17 @@ func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
 }
 
 func NewCoordinatedActivityHandler(activity string, start interface{}, tick interface{}, cancel interface{}, finish interface{}) *CoordinatedActivityHandler {
-	input := inputType(tick, 1)
+	input := inputType(tick, 2)
 	newType := input
 	if input.Kind() == reflect.Ptr {
 		newType = input.Elem()
 	}
 	output := outputType(tick, 1)
 
-	typeCheck(start, []string{"*swf.PollForActivityTaskOutput", input.String()}, []string{output, "error"})
-	typeCheck(tick, []string{"*swf.PollForActivityTaskOutput", input.String()}, []string{"bool", output, "error"})
-	typeCheck(cancel, []string{"*swf.PollForActivityTaskOutput", input.String()}, []string{"error"})
-	typeCheck(finish, []string{"*swf.PollForActivityTaskOutput", input.String()}, []string{"error"})
+	typeCheck(start, []string{"context.Context", "*swf.PollForActivityTaskOutput", input.String()}, []string{output, "error"})
+	typeCheck(tick, []string{"context.Context", "*swf.PollForActivityTaskOutput", input.String()}, []string{"bool", output, "error"})
+	typeCheck(cancel, []string{"context.Context", "*swf.PollForActivityTaskOutput", input.String()}, []string{"error"})
+	typeCheck(finish, []string{"context.Context", "*swf.PollForActivityTaskOutput", input.String()}, []string{"error"})
 
 	return &CoordinatedActivityHandler{
 		Activity: activity,
@@ -102,27 +102,27 @@ func (m marshalledFunc) activityHandlerFunc(ctx context.Context, task *swf.PollF
 	return outputValue(ret[0]), errorValue(ret[1])
 }
 
-func (m marshalledFunc) longRunningActivityHandlerFunc(task *swf.PollForActivityTaskOutput, input interface{}) {
-	m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
+func (m marshalledFunc) longRunningActivityHandlerFunc(ctx context.Context, task *swf.PollForActivityTaskOutput, input interface{}) {
+	m.v.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(task), reflect.ValueOf(input)})
 }
 
-func (m marshalledFunc) handleCoordinatedActivityStart(task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
-	ret := m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
+func (m marshalledFunc) handleCoordinatedActivityStart(ctx context.Context, task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+	ret := m.v.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(task), reflect.ValueOf(input)})
 	return outputValue(ret[0]), errorValue(ret[1])
 }
 
-func (m marshalledFunc) handleCoordinatedActivityTick(task *swf.PollForActivityTaskOutput, input interface{}) (bool, interface{}, error) {
-	ret := m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
+func (m marshalledFunc) handleCoordinatedActivityTick(ctx context.Context, task *swf.PollForActivityTaskOutput, input interface{}) (bool, interface{}, error) {
+	ret := m.v.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(task), reflect.ValueOf(input)})
 	return outputValue(ret[0]).(bool), outputValue(ret[1]), errorValue(ret[2])
 }
 
-func (m marshalledFunc) handleCoordinatedActivityCancel(task *swf.PollForActivityTaskOutput, input interface{}) error {
-	ret := m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
+func (m marshalledFunc) handleCoordinatedActivityCancel(ctx context.Context, task *swf.PollForActivityTaskOutput, input interface{}) error {
+	ret := m.v.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(task), reflect.ValueOf(input)})
 	return errorValue(ret[0])
 }
 
-func (m marshalledFunc) handleCoordinatedActivityFinish(task *swf.PollForActivityTaskOutput, input interface{}) error {
-	ret := m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
+func (m marshalledFunc) handleCoordinatedActivityFinish(ctx context.Context, task *swf.PollForActivityTaskOutput, input interface{}) error {
+	ret := m.v.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(task), reflect.ValueOf(input)})
 	return errorValue(ret[0])
 }
 

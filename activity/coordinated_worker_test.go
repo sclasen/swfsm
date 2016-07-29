@@ -411,12 +411,12 @@ type TestCoordinatedTaskHandler struct {
 	ticks    int
 }
 
-func (c *TestCoordinatedTaskHandler) Start(a *swf.PollForActivityTaskOutput, d interface{}) (interface{}, error) {
+func (c *TestCoordinatedTaskHandler) Start(ctx context.Context, a *swf.PollForActivityTaskOutput, d interface{}) (interface{}, error) {
 	c.t.Log("START")
 	return nil, c.startErr
 }
 
-func (c *TestCoordinatedTaskHandler) Tick(a *swf.PollForActivityTaskOutput, d interface{}) (bool, interface{}, error) {
+func (c *TestCoordinatedTaskHandler) Tick(ctx context.Context, a *swf.PollForActivityTaskOutput, d interface{}) (bool, interface{}, error) {
 	c.ticks++
 	c.t.Log("TICK")
 	time.Sleep(100 * time.Millisecond)
@@ -426,13 +426,13 @@ func (c *TestCoordinatedTaskHandler) Tick(a *swf.PollForActivityTaskOutput, d in
 	return true, nil, nil
 }
 
-func (c *TestCoordinatedTaskHandler) Cancel(a *swf.PollForActivityTaskOutput, d interface{}) error {
+func (c *TestCoordinatedTaskHandler) Cancel(ctx context.Context, a *swf.PollForActivityTaskOutput, d interface{}) error {
 	c.t.Log("CANCEL")
 	c.canceled = true
 	return nil
 }
 
-func (c *TestCoordinatedTaskHandler) Finish(a *swf.PollForActivityTaskOutput, d interface{}) error {
+func (c *TestCoordinatedTaskHandler) Finish(ctx context.Context, a *swf.PollForActivityTaskOutput, d interface{}) error {
 	c.t.Log("FINISH")
 	c.finished = true
 	return nil
@@ -446,12 +446,12 @@ type TypedCoordinatedTaskHandler struct {
 	finished bool
 }
 
-func (c *TypedCoordinatedTaskHandler) Begin(a *swf.PollForActivityTaskOutput, d *TestInput) (*TestOutput, error) {
+func (c *TypedCoordinatedTaskHandler) Begin(ctx context.Context, a *swf.PollForActivityTaskOutput, d *TestInput) (*TestOutput, error) {
 	c.t.Log("START")
 	return nil, c.startErr
 }
 
-func (c *TypedCoordinatedTaskHandler) Work(a *swf.PollForActivityTaskOutput, d *TestInput) (bool, *TestOutput, error) {
+func (c *TypedCoordinatedTaskHandler) Work(ctx context.Context, a *swf.PollForActivityTaskOutput, d *TestInput) (bool, *TestOutput, error) {
 	c.t.Log("TICK")
 	time.Sleep(100 * time.Millisecond)
 	if c.stop {
@@ -460,13 +460,13 @@ func (c *TypedCoordinatedTaskHandler) Work(a *swf.PollForActivityTaskOutput, d *
 	return true, nil, nil
 }
 
-func (c *TypedCoordinatedTaskHandler) Stop(a *swf.PollForActivityTaskOutput, d *TestInput) error {
+func (c *TypedCoordinatedTaskHandler) Stop(ctx context.Context, a *swf.PollForActivityTaskOutput, d *TestInput) error {
 	c.t.Log("CANCEL")
 	c.canceled = true
 	return nil
 }
 
-func (c *TypedCoordinatedTaskHandler) Finish(a *swf.PollForActivityTaskOutput, d *TestInput) error {
+func (c *TypedCoordinatedTaskHandler) Finish(ctx context.Context, a *swf.PollForActivityTaskOutput, d *TestInput) error {
 	c.t.Log("FINISH")
 	c.finished = true
 	return nil
