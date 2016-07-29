@@ -3,13 +3,15 @@ package fsm
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
+	"golang.org/x/net/context"
 
 	. "github.com/sclasen/swfsm/sugar"
 )
 
 // FSMContext is populated by the FSM machinery and passed to Deciders.
 type FSMContext struct {
-	serialization Serialization
+	requestContext context.Context
+	serialization  Serialization
 	swf.WorkflowType
 	swf.WorkflowExecution
 	eventCorrelator *EventCorrelator
@@ -20,11 +22,13 @@ type FSMContext struct {
 
 // NewFSMContext constructs an FSMContext.
 func NewFSMContext(
+	ctx context.Context,
 	serialization Serialization,
 	wfType swf.WorkflowType, wfExec swf.WorkflowExecution,
 	eventCorrelator *EventCorrelator,
 	state string, stateData interface{}, stateVersion uint64) *FSMContext {
 	return &FSMContext{
+		requestContext:    ctx,
 		serialization:     serialization,
 		WorkflowType:      wfType,
 		WorkflowExecution: wfExec,
@@ -33,6 +37,12 @@ func NewFSMContext(
 		stateData:         stateData,
 		stateVersion:      stateVersion,
 	}
+}
+
+// RequestContext returns the context.Context associated with the SWF task
+// request poll
+func (f *FSMContext) RequestContext() context.Context {
+	return f.requestContext
 }
 
 func (f *FSMContext) InitialState() string {

@@ -3,6 +3,8 @@ package activity
 import (
 	"time"
 
+	"golang.org/x/net/context"
+
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -75,7 +77,7 @@ func (c *coordinatedActivityAdapter) heartbeat(activityTask *swf.PollForActivity
 	}
 }
 
-func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+func (c *coordinatedActivityAdapter) coordinate(ctx context.Context, activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 	defer c.finish(activityTask, input)
 
 	update, err := c.handler.Start(activityTask, input)

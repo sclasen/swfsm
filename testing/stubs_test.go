@@ -4,6 +4,8 @@ import (
 	"fmt"
 	te "testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/fsm"
 	. "github.com/sclasen/swfsm/sugar"
@@ -193,7 +195,8 @@ func TestThrottleInterceptors(t *te.T) {
 }
 
 func interceptorTestContext() *fsm.FSMContext {
-	return fsm.NewFSMContext(&fsm.FSM{Serializer: &fsm.JSONStateSerializer{}},
+	return fsm.NewFSMContext(context.Background(),
+		&fsm.FSM{Serializer: &fsm.JSONStateSerializer{}},
 		swf.WorkflowType{Name: S("foo"), Version: S("1")},
 		swf.WorkflowExecution{WorkflowId: S("id"), RunId: S("runid")},
 		&fsm.EventCorrelator{}, "state", "data", 1)

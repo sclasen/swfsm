@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
@@ -74,7 +76,7 @@ func TestKinesisReplication(t *testing.T) {
 	}
 	decisionTask := testDecisionTask(0, events)
 
-	fsm.handleDecisionTask(decisionTask)
+	fsm.handleDecisionTask(context.Background(), decisionTask)
 
 	if client.putRecords == nil || len(client.putRecords) != 1 {
 		t.Fatalf("expected only one state to be replicated, got: %v", client.putRecords)

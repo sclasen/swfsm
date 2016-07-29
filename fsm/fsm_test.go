@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"errors"
 	"reflect"
 
@@ -90,7 +92,7 @@ func TestFSM(t *testing.T) {
 
 	first := testDecisionTask(0, events)
 
-	_, decisions, _, err := fsm.Tick(first)
+	_, decisions, _, err := fsm.Tick(context.Background(), first)
 
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +123,7 @@ func TestFSM(t *testing.T) {
 
 	second := testDecisionTask(3, secondEvents)
 
-	_, secondDecisions, _, err := fsm.Tick(second)
+	_, secondDecisions, _, err := fsm.Tick(context.Background(), second)
 
 	if err != nil {
 		t.Fatal(err)
@@ -162,7 +164,7 @@ func TestFSMError(t *testing.T) {
 	tasks := testDecisionTask(0, events)
 
 	fsm.AllowPanics = false
-	_, decisions, _, err := fsm.Tick(tasks)
+	_, decisions, _, err := fsm.Tick(context.Background(), tasks)
 
 	if err != nil {
 		t.Fatal(err)
@@ -482,7 +484,7 @@ func TestContinuedWorkflows(t *testing.T) {
 	}})
 
 	Log.Printf("%+v", resp)
-	_, decisions, updatedState, _ := fsm.Tick(resp)
+	_, decisions, updatedState, _ := fsm.Tick(context.Background(), resp)
 
 	Log.Println(updatedState)
 
@@ -678,7 +680,7 @@ func TestHandleDecisionTaskWhenTickErrorsExpectsTaskErrorHandlerCalled(t *testin
 	f.AllowPanics = false
 
 	// act
-	f.handleDecisionTask(decisionTask)
+	f.handleDecisionTask(context.Background(), decisionTask)
 
 	// assert
 	assert.True(t, handlerCalled, "Expected handler called because Tick errored")
@@ -712,7 +714,7 @@ func TestHandleDecisionTaskWhenRespondingToSWFErrorsExpectsTaskErrorHandlerCalle
 
 	// act
 	f.Init()
-	f.handleDecisionTask(decisionTask)
+	f.handleDecisionTask(context.Background(), decisionTask)
 
 	// assert
 	assert.True(t, handlerCalled, "Expected handler called because RespondDecisionTaskCompleted errored")
@@ -748,7 +750,7 @@ func TestHandleDecisionTaskReplicationErrorsExpectsTaskErrorHandlerCalled(t *tes
 
 	// act
 	f.Init()
-	f.handleDecisionTask(decisionTask)
+	f.handleDecisionTask(context.Background(), decisionTask)
 
 	// assert
 	assert.True(t, handlerCalled, "Expected handler called because there was a replication error")
@@ -783,7 +785,7 @@ func TestHandleDecisionTaskWhenNoErrorsExpectsTaskErrorHandlerNotCalled(t *testi
 
 	// act
 	f.Init()
-	f.handleDecisionTask(decisionTask)
+	f.handleDecisionTask(context.Background(), decisionTask)
 
 	// assert
 	assert.False(t, handlerCalled, "Expected handler not called because nothing errored")
@@ -802,6 +804,7 @@ func testFSM() *FSM {
 
 func testContext(fsm *FSM) *FSMContext {
 	return NewFSMContext(
+		context.Background(),
 		fsm,
 		swf.WorkflowType{Name: S("test-workflow"), Version: S("1")},
 		swf.WorkflowExecution{WorkflowId: S("test-workflow-1"), RunId: S("123123")},

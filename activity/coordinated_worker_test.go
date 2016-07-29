@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -32,7 +34,7 @@ func TestCoordinatedActivityHandler_Complete(t *testing.T) {
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 
-	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -80,7 +82,7 @@ func TestCoordinatedActivityHandler_Cancel(t *testing.T) {
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 
-	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -129,7 +131,7 @@ func TestCoordinatedActivityHandler_StartError(t *testing.T) {
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 
-	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -175,7 +177,7 @@ func TestCoordinatedActivityHandler_SendStartSignalError(t *testing.T) {
 
 	mockSwf.SignalFail = true
 
-	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -212,7 +214,7 @@ func TestTypedCoordinatedActivityHandler_Complete(t *testing.T) {
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 
-	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -253,7 +255,7 @@ func TestTypedCoordinatedActivityHandler_Cancel(t *testing.T) {
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 
-	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -295,7 +297,7 @@ func TestTypedCoordinatedActivityHandler_StartError(t *testing.T) {
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
 
-	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -334,7 +336,7 @@ func TestTypedCoordinatedActivityHandler_SendStartSignalError(t *testing.T) {
 
 	mockSwf.SignalFail = true
 
-	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{
@@ -377,7 +379,7 @@ func TestTickRateLimit(t *testing.T) {
 	worker.AddCoordinatedHandler(1*time.Second, 100*time.Millisecond, handler)
 	worker.Init()
 	input, _ := worker.Serializer.Serialize(&TestInput{Name: "Foo"})
-	go worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	go worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		TaskToken:         S("token"),
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType: &swf.ActivityType{

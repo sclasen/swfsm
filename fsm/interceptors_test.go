@@ -3,6 +3,8 @@ package fsm
 import (
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -62,7 +64,7 @@ func TestInterceptors(t *testing.T) {
 		},
 	}
 
-	_, ds, _, _ := fsm.Tick(decisionTask)
+	_, ds, _, _ := fsm.Tick(context.Background(), decisionTask)
 
 	if calledBefore == false {
 		t.Fatalf("before not called")
@@ -606,7 +608,7 @@ func TestMixedDecisionInterceptions(t *testing.T) {
 }
 
 func interceptorTestContext() *FSMContext {
-	return NewFSMContext(&FSM{Serializer: &JSONStateSerializer{}},
+	return NewFSMContext(context.Background(), &FSM{Serializer: &JSONStateSerializer{}},
 		swf.WorkflowType{Name: S("foo"), Version: S("1")},
 		swf.WorkflowExecution{WorkflowId: S("id"), RunId: S("runid")},
 		&EventCorrelator{}, "state", "data", 1)

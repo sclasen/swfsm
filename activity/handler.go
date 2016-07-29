@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"reflect"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 )
 
-type ActivityHandlerFunc func(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error)
+type ActivityHandlerFunc func(ctx context.Context, activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error)
 
 type ActivityHandler struct {
 	Activity    string
@@ -49,13 +51,13 @@ type CoordinatedActivityHandler struct {
 }
 
 func NewActivityHandler(activity string, handler interface{}) *ActivityHandler {
-	input := inputType(handler, 1)
+	input := inputType(handler, 2)
 	output := outputType(handler, 0)
 	newType := input
 	if input.Kind() == reflect.Ptr {
 		newType = input.Elem()
 	}
-	typeCheck(handler, []string{"*swf.PollForActivityTaskOutput", input.String()}, []string{output, "error"})
+	typeCheck(handler, []string{"context.Context", "*swf.PollForActivityTaskOutput", input.String()}, []string{output, "error"})
 	return &ActivityHandler{
 		Activity:    activity,
 		HandlerFunc: marshalledFunc{reflect.ValueOf(handler)}.activityHandlerFunc,
@@ -95,8 +97,8 @@ type marshalledFunc struct {
 	v reflect.Value
 }
 
-func (m marshalledFunc) activityHandlerFunc(task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
-	ret := m.v.Call([]reflect.Value{reflect.ValueOf(task), reflect.ValueOf(input)})
+func (m marshalledFunc) activityHandlerFunc(ctx context.Context, task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+	ret := m.v.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(task), reflect.ValueOf(input)})
 	return outputValue(ret[0]), errorValue(ret[1])
 }
 
