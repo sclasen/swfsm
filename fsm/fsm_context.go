@@ -3,6 +3,7 @@ package fsm
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
+	"github.com/opentracing/opentracing-go"
 	"golang.org/x/net/context"
 
 	. "github.com/sclasen/swfsm/sugar"
@@ -43,6 +44,16 @@ func NewFSMContext(
 // request poll
 func (f *FSMContext) RequestContext() context.Context {
 	return f.requestContext
+}
+
+// RequestSpan returns the opentracing.Span associated with the SWF task
+// request poll, or a new root span if that is not set
+func (f *FSMContext) RequestSpan() opentracing.Span {
+	sp := opentracing.SpanFromContext(f.requestContext)
+	if sp == nil {
+		sp, f.requestContext = opentracing.StartSpanFromContext(f.requestContext, "fsm_context")
+	}
+	return sp
 }
 
 func (f *FSMContext) InitialState() string {
