@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
@@ -41,15 +42,18 @@ type DecisionTaskPoller struct {
 	TaskList string
 }
 
-// Poll polls the task list for a task. If there is no task available, nil is
+// p polls the task list for a task. If there is no task available, nil is
 // returned. If an error is encountered, no task is returned.
-func (p *DecisionTaskPoller) Poll(taskReady func(*swf.PollForDecisionTaskOutput) bool) (context.Context, *swf.PollForDecisionTaskOutput, error) {
+func (p *DecisionTaskPoller) poll(ctx context.Context, pollId string, taskReady func(*swf.PollForDecisionTaskOutput) bool) (*swf.PollForDecisionTaskOutput, error) {
 	var (
-		resp   *swf.PollForDecisionTaskOutput
-		page   int
-		pollId = uuid.New()
-		ctx    = context.WithValue(context.Background(), "requestID", pollId)
+		resp *swf.PollForDecisionTaskOutput
+		page int
 	)
+
+	sp := opentracing.StartSpan(
+		"poll_for_decision_task_output",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()))
+	defer sp.Finish()
 
 	eachPage := func(out *swf.PollForDecisionTaskOutput, _ bool) bool {
 		page++
@@ -95,20 +99,21 @@ func (p *DecisionTaskPoller) Poll(taskReady func(*swf.PollForDecisionTaskOutput)
 	if err != nil {
 		Log.Printf("component=DecisionTaskPoller poll-id=%q task-list=%q at=error error=%q",
 			pollId, p.TaskList, err.Error())
-		return nil, nil, errors.Trace(err)
+		return nil, errors.Trace(err)
 	}
 	if resp != nil && resp.TaskToken != nil {
 		Log.Printf("component=DecisionTaskPoller poll-id=%q at=decision-task-received task-list=%q workflow=%q",
 			pollId, p.TaskList, LS(resp.WorkflowExecution.WorkflowId))
 		p.logTaskLatency(resp)
-		return ctx, resp, nil
+		sp.LogEventWithPayload("events_found", len(resp.Events))
+		return resp, nil
 	}
 	Log.Printf("component=DecisionTaskPoller at=decision-task-empty-response poll-id=%q task-list=%q", pollId, p.TaskList)
-	return nil, nil, nil
+	return nil, nil
 }
 
 // PollUntilShutdownBy will poll until signaled to shutdown by the PollerShutdownManager. this func blocks, so run it in a goroutine if necessary.
-// The implementation calls Poll() and invokes the callback whenever a valid PollForDecisionTaskResponse is received.
+// The implementation calls poll() and invokes the callback whenever a valid PollForDecisionTaskResponse is received.
 func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerName string, onTask func(context.Context, *swf.PollForDecisionTaskOutput), taskReady func(*swf.PollForDecisionTaskOutput) bool) {
 	stop := make(chan bool, 1)
 	stopAck := make(chan bool, 1)
@@ -120,7 +125,11 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 			stopAck <- true
 			return
 		default:
-			ctx, task, err := p.Poll(taskReady)
+			pollID := uuid.New()
+			ctx := context.WithValue(context.Background(), "RequestID", pollID)
+			// Start a span. Discard it unless we process to handling tasks
+			sp, ctx := opentracing.StartSpanFromContext(ctx, "decision_task_poll")
+			task, err := p.poll(ctx, pollID, taskReady)
 			if err != nil {
 				Log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
 				continue
@@ -130,6 +139,7 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 				continue
 			}
 			onTask(ctx, task)
+			sp.Finish()
 		}
 	}
 }
