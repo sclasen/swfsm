@@ -129,6 +129,7 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 			ctx := context.WithValue(context.Background(), "RequestID", pollID)
 			// Start a span. Discard it unless we process to handling tasks
 			sp, ctx := opentracing.StartSpanFromContext(ctx, "decision_task_poll")
+			sp.SetTag("RequestID", pollID)
 			task, err := p.poll(ctx, pollID, taskReady)
 			if err != nil {
 				Log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
