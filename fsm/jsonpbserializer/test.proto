@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package jsonpbserializer;
+
+message TestMessage {
+  string Item1 = 1;
+  string Item2 = 2;
+}
