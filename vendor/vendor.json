@@ -120,31 +120,31 @@
 		},
 		{
 			"path": "github.com/aws/aws-sdk-go/internal/endpoints",
-			"revision": "",
+			"revision": "v1.1.18",
 			"version": "v1.1.18",
 			"versionExact": "v1.1.18"
 		},
 		{
 			"path": "github.com/aws/aws-sdk-go/internal/protocol/json/jsonutil",
-			"revision": "",
+			"revision": "v1.1.18",
 			"version": "v1.1.18",
 			"versionExact": "v1.1.18"
 		},
 		{
 			"path": "github.com/aws/aws-sdk-go/internal/protocol/jsonrpc",
-			"revision": "",
+			"revision": "v1.1.18",
 			"version": "v1.1.18",
 			"versionExact": "v1.1.18"
 		},
 		{
 			"path": "github.com/aws/aws-sdk-go/internal/protocol/rest",
-			"revision": "",
+			"revision": "v1.1.18",
 			"version": "v1.1.18",
 			"versionExact": "v1.1.18"
 		},
 		{
 			"path": "github.com/aws/aws-sdk-go/internal/signer/v4",
-			"revision": "",
+			"revision": "v1.1.18",
 			"version": "v1.1.18",
 			"versionExact": "v1.1.18"
 		},
@@ -301,21 +301,6 @@
 			"comment": "v0-56-g03e0e7d",
 			"path": "github.com/go-ini/ini",
 			"revision": "03e0e7d51a13a91c765d8d0161246bc14a38001a"
-		},
-		{
-			"checksumSHA1": "JbAEOAt4zHGOTmRCJsHl1SXQZ3U=",
-			"path": "github.com/golang/protobuf/proto",
-			"revision": "aece6fb931241ad332956db4f62798dfbea944b3"
-		},
-		{
-			"checksumSHA1": "/r044HcS9hElG0zUJxkOF3wfdNI=",
-			"path": "github.com/golang/protobuf/proto/proto3_proto",
-			"revision": "aece6fb931241ad332956db4f62798dfbea944b3"
-		},
-		{
-			"checksumSHA1": "AtBNiWmjGzoBWkEGm7P6OnVbdLY=",
-			"path": "github.com/golang/protobuf/proto/testdata",
-			"revision": "aece6fb931241ad332956db4f62798dfbea944b3"
 		},
 		{
 			"checksumSHA1": "3/Bhy+ua/DCv2ElMD5GzOYSGN6g=",
