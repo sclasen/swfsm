@@ -6,6 +6,8 @@
 package jsonpbserializer
 
 import (
+	"strings"
+
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	swfsm "github.com/sclasen/swfsm/fsm"
@@ -53,7 +55,7 @@ func (j JSONPBStateSerializer) Serialize(state interface{}) (string, error) {
 func (j JSONPBStateSerializer) Deserialize(serialized string, state interface{}) error {
 	pm, ok := state.(proto.Message)
 	if ok {
-		return jsonpb.UnmarshalString(serialized, pm)
+		return j.u.Unmarshal(strings.NewReader(serialized), pm)
 	}
 	return j.fbss.Deserialize(serialized, state)
 }
