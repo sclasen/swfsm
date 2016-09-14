@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/swf"
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/sclasen/swfsm/sugar"
 )
 
@@ -602,6 +604,229 @@ func TestMixedDecisionInterceptions(t *testing.T) {
 	decisions = handleStartCancelTypes(decisions, ctx)
 	if len(decisions) != 2 {
 		t.Fatal("incorrect number of mixed decisions left after interceptor")
+	}
+}
+
+func TestDedupeWorkflowCompletesExpectsOneCompleteReturned(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{completeDecision(), completeDecision(), completeDecision()},
+	}
+	interceptor := DedupeWorkflowCompletes()
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Len(t, outcome.Decisions, 1, "Expected outcome to only have 1 decision because completes were deduped")
+}
+
+func TestDedupeWorkflowCancellationsExpectsOneCancelReturned(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{cancelDecision(), cancelDecision(), cancelDecision()},
+	}
+	interceptor := DedupeWorkflowCancellations()
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Len(t, outcome.Decisions, 1, "Expected outcome to only have 1 decision because cancellations were deduped")
+}
+
+func TestDedupeWorkflowFailuresExpectsOneFailureReturned(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{failDecision(), failDecision(), failDecision()},
+	}
+	interceptor := DedupeWorkflowFailures()
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Len(t, outcome.Decisions, 1, "Expected outcome to only have 1 decision because failures were deduped")
+}
+
+func TestDedupeDecisionsExpectsLastDuplicateToRemain(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{completeDecision(), failDecision(), completeDecision(), cancelDecision(), completeDecision(), cancelDecision()},
+	}
+	interceptor := DedupeDecisions(swf.DecisionTypeCompleteWorkflowExecution)
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Len(t, outcome.Decisions, 4, "Expected outcome to have 4 decisions after deduping"+
+		" 'completes' because it started with 6 decisions, 3 of which were 'complete' type")
+	assert.Equal(t, []*swf.Decision{failDecision(), cancelDecision(), completeDecision(), cancelDecision()},
+		outcome.Decisions, "Expected outcome decisions to match the expected list of decisions that have 'completes' deduped.")
+}
+
+func TestDedupeWorkflowCloseDecisionsExpectsDuplicatesRemoved(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{completeDecision(), completeDecision(), cancelDecision(), cancelDecision(), failDecision(), failDecision()},
+	}
+	interceptor := DedupeWorkflowCloseDecisions()
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Len(t, outcome.Decisions, 3, "Expected outcome to have 3 decisions after deduping"+
+		" because it started with 6 decisions, 3 of which were duplicate close decisions")
+	assert.Equal(t, []*swf.Decision{completeDecision(), cancelDecision(), failDecision()},
+		outcome.Decisions, "Expected outcome decisions to match the expected list of decisions that have 'close decisions' deduped.")
+}
+
+func TestMoveDecisionsToEndExpectsAllDecisionsOfTypeAtEnd(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{completeDecision(), failDecision(), completeDecision(), cancelDecision(), completeDecision(), cancelDecision()},
+	}
+	interceptor := MoveDecisionsToEnd(swf.DecisionTypeCompleteWorkflowExecution)
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Equal(t, []*swf.Decision{failDecision(), cancelDecision(), cancelDecision(), completeDecision(), completeDecision(), completeDecision()},
+		outcome.Decisions, "Expected outcome decisions to have all 'complete' decisions at the end")
+}
+
+func TestMoveDecisionsToEndWhenNoMatchingDecisionsExpectsNoChange(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{failDecision(), cancelDecision(), cancelDecision()},
+	}
+	interceptor := MoveDecisionsToEnd(swf.DecisionTypeCompleteWorkflowExecution)
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Equal(t, []*swf.Decision{failDecision(), cancelDecision(), cancelDecision()},
+		outcome.Decisions, "Expected outcome decisions to have stayed the same because no matching types are in the list")
+}
+
+func TestMoveWorkflowCloseDecisionsToEndExpectsFailDecisionAtEnd(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{failDecision(), timerDecision()},
+	}
+	interceptor := MoveWorkflowCloseDecisionsToEnd()
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Equal(t, []*swf.Decision{timerDecision(), failDecision()},
+		outcome.Decisions, "Expected fail decision to have moved to the end because it is 'workflow closing' decision")
+}
+
+func TestMoveWorkflowCloseDecisionsToEndExpectsCancelDecisionAtEnd(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{cancelDecision(), timerDecision()},
+	}
+	interceptor := MoveWorkflowCloseDecisionsToEnd()
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Equal(t, []*swf.Decision{timerDecision(), cancelDecision()},
+		outcome.Decisions, "Expected cancel decision to have moved to the end because it is 'workflow closing' decision")
+}
+
+func TestMoveWorkflowCloseDecisionsToEndExpectsCompleteDecisionAtEnd(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{completeDecision(), timerDecision()},
+	}
+	interceptor := MoveWorkflowCloseDecisionsToEnd()
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Equal(t, []*swf.Decision{timerDecision(), completeDecision()},
+		outcome.Decisions, "Expected complete decision to have moved to the end because it is 'workflow closing' decision")
+}
+
+func TestRemoveLowerPriorityDecisionsExpectsLowerPriorityRemoved(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State: "state",
+		Data:  "data",
+		Decisions: []*swf.Decision{completeDecision(), timerDecision(), completeDecision(),
+			cancelDecision(), completeDecision(), timerDecision(), cancelDecision()},
+	}
+	interceptor := RemoveLowerPriorityDecisions(
+		swf.DecisionTypeFailWorkflowExecution,
+		swf.DecisionTypeCompleteWorkflowExecution,
+		swf.DecisionTypeCancelWorkflowExecution)
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Len(t, outcome.Decisions, 5, "Expected 5 decisions because two cancel decisions should have been removed")
+	assert.Equal(t, []*swf.Decision{completeDecision(), timerDecision(), completeDecision(), completeDecision(), timerDecision()},
+		outcome.Decisions, "Expected lower priority decisions to have been removed")
+}
+
+func completeDecision() *swf.Decision {
+	return &swf.Decision{
+		CompleteWorkflowExecutionDecisionAttributes: &swf.CompleteWorkflowExecutionDecisionAttributes{},
+		DecisionType:                                S(swf.DecisionTypeCompleteWorkflowExecution),
+	}
+}
+
+func cancelDecision() *swf.Decision {
+	return &swf.Decision{
+		CancelWorkflowExecutionDecisionAttributes: &swf.CancelWorkflowExecutionDecisionAttributes{},
+		DecisionType:                              S(swf.DecisionTypeCancelWorkflowExecution),
+	}
+}
+
+func failDecision() *swf.Decision {
+	return &swf.Decision{
+		FailWorkflowExecutionDecisionAttributes: &swf.FailWorkflowExecutionDecisionAttributes{},
+		DecisionType:                            S(swf.DecisionTypeFailWorkflowExecution),
+	}
+}
+
+func timerDecision() *swf.Decision {
+	return &swf.Decision{
+		DecisionType: S(swf.DecisionTypeStartTimer),
+		StartTimerDecisionAttributes: &swf.StartTimerDecisionAttributes{
+			TimerId: S("baz"),
+		},
 	}
 }
 

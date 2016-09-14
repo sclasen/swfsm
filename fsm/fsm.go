@@ -43,7 +43,8 @@ type FSM struct {
 	ShutdownManager *poller.ShutdownManager
 	//DecisionTaskDispatcher determines the concurrency strategy for processing tasks in your fsm
 	DecisionTaskDispatcher DecisionTaskDispatcher
-	// DecisionInterceptor fsm will call BeforeDecision/AfterDecision
+	// DecisionInterceptor fsm will call BeforeDecision/AfterDecision.  If unset
+	// will use DefaultDecisionInterceptor.
 	DecisionInterceptor DecisionInterceptor
 	//DecisionErrorHandler  is called whenever there is a panic in your decider.
 	//if it returns a nil *Outcome, the attempt to handle the DecisionTask is abandoned.
@@ -191,6 +192,27 @@ func (f *FSM) DefaultFailedState() *FSMState {
 	}
 }
 
+// DefaultDecisionInterceptor is an interceptor that handles removing
+// duplicate close decisions, moving close decisions to the end of the decision list
+// for an outcome, and making sure the highest priority close decision is the one
+// returned to SWF.
+//
+// Close decision types in priority order are:
+// swf.DecisionTypeFailWorkflowExecution
+// swf.DecisionTypeCompleteWorkflowExecution
+// swf.DecisionTypeCancelWorkflowExecution
+func (f *FSM) DefaultDecisionInterceptor() DecisionInterceptor {
+	return NewComposedDecisionInterceptor(
+		DedupeWorkflowCloseDecisions(),
+		MoveWorkflowCloseDecisionsToEnd(),
+		RemoveLowerPriorityDecisions(
+			swf.DecisionTypeFailWorkflowExecution,
+			swf.DecisionTypeCompleteWorkflowExecution,
+			swf.DecisionTypeCancelWorkflowExecution,
+		),
+	)
+}
+
 // DefaultDecisionErrorHandler is the default DecisionErrorHandler that is used
 // if a handler is not set on the FSM or a handler is not associated with the
 // current state.  This default handler simply logs the error and the decision task will timeout.
@@ -283,6 +305,10 @@ func (f *FSM) Init() {
 
 	if f.TaskErrorHandler == nil {
 		f.TaskErrorHandler = f.DefaultTaskErrorHandler
+	}
+
+	if f.DecisionInterceptor == nil {
+		f.DecisionInterceptor = f.DefaultDecisionInterceptor()
 	}
 
 	if f.FSMErrorReporter == nil {

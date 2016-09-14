@@ -78,6 +78,159 @@ func (c *ComposedDecisionInterceptor) AfterDecision(decision *swf.PollForDecisio
 	}
 }
 
+// DedupeWorkflowCompletes returns an interceptor that executes after a decision and removes
+// any duplicate swf.DecisionTypeCompleteWorkflowExecution decisions from the outcome.
+// Duplicates are removed from the beginning of the input list, so that
+// the last complete decision is the one that remains in the list.
+func DedupeWorkflowCompletes() DecisionInterceptor {
+	return DedupeDecisions(swf.DecisionTypeCompleteWorkflowExecution)
+}
+
+// DedupeWorkflowCancellations returns an interceptor that executes after a decision and removes
+// any duplicate swf.DecisionTypeCancelWorkflowExecution decisions from the outcome.
+// Duplicates are removed from the beginning of the input list, so that
+// the last cancel decision is the one that remains in the list.
+func DedupeWorkflowCancellations() DecisionInterceptor {
+	return DedupeDecisions(swf.DecisionTypeCancelWorkflowExecution)
+}
+
+// DedupeWorkflowFailures returns an interceptor that executes after a decision and removes
+// any duplicate swf.DecisionTypeFailWorkflowExecution decisions from the outcome.
+// Duplicates are removed from the beginning of the input list, so that
+// the last failure decision is the one that remains in the list.
+func DedupeWorkflowFailures() DecisionInterceptor {
+	return DedupeDecisions(swf.DecisionTypeFailWorkflowExecution)
+}
+
+// DedupeWorkflowCloseDecisions returns an interceptor that executes after a decision and removes
+// any duplicate workflow close decisions (cancel, complete, fail) from the outcome.
+// Duplicates are removed from the beginning of the input list, so that
+// the last failure decision is the one that remains in the list.
+func DedupeWorkflowCloseDecisions() DecisionInterceptor {
+	return NewComposedDecisionInterceptor(
+		DedupeWorkflowCompletes(),
+		DedupeWorkflowCancellations(),
+		DedupeWorkflowFailures(),
+	)
+}
+
+// DedupeDecisions returns an interceptor that executes after a decision and removes
+// any duplicate decisions of the specified type from the outcome.
+// Duplicates are removed from the beginning of the input list, so that
+// the last decision of the specified type is the one that remains in the list.
+//
+// e.g.  An outcome with a list of decisions [a, a, b, a, c] where the type to dedupe was 'a' would
+// result in an outcome with a list of decisions [b, a, c]
+func DedupeDecisions(decisionType string) DecisionInterceptor {
+	return &FuncInterceptor{
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
+			in := outcome.Decisions
+			out := []*swf.Decision{}
+			specifiedTypeEncountered := false
+
+			// iterate backwards so we can grab the last decision
+			for i := len(in) - 1; i >= 0; i-- {
+				currentDecision := in[i]
+				// keep last instance of decisions of the specified type
+				if *currentDecision.DecisionType == decisionType && !specifiedTypeEncountered {
+					specifiedTypeEncountered = true
+					// prepend
+					out = append([]*swf.Decision{currentDecision}, out...)
+				} else if *currentDecision.DecisionType != decisionType {
+					// prepend
+					out = append([]*swf.Decision{currentDecision}, out...)
+				}
+			}
+			outcome.Decisions = out
+		},
+	}
+}
+
+// MoveWorkflowCloseDecisionsToEnd returns an interceptor that executes after a decision and moves
+// any workflow close decisions (complete, fail, cancel) to the end of an outcome's decision list.
+//
+// Note: SWF responds with a 400 error if a workflow close decision is not the last decision
+// in the list of decisions.
+func MoveWorkflowCloseDecisionsToEnd() DecisionInterceptor {
+	return NewComposedDecisionInterceptor(
+		MoveDecisionsToEnd(swf.DecisionTypeFailWorkflowExecution),
+		MoveDecisionsToEnd(swf.DecisionTypeCancelWorkflowExecution),
+		MoveDecisionsToEnd(swf.DecisionTypeCompleteWorkflowExecution),
+	)
+}
+
+// MoveDecisionsToEnd returns an interceptor that executes after a decision and moves
+// any decisions of the specified type to the end of an outcome's decision list.
+//
+// e.g.  An outcome with a list of decisions [a, a, b, a, c] where the type to move was 'a' would
+// result in an outcome with a list of decisions [b, c, a, a, a]
+func MoveDecisionsToEnd(decisionType string) DecisionInterceptor {
+	return &FuncInterceptor{
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
+			in := outcome.Decisions
+			out := []*swf.Decision{}
+			decisionsToMove := []*swf.Decision{}
+
+			for i, currentDecision := range in {
+				if *currentDecision.DecisionType == decisionType {
+					// don't append currentDecision because it's value changes on each iteration
+					decisionsToMove = append(decisionsToMove, in[i])
+				} else {
+					out = append(out, in[i])
+				}
+			}
+			out = append(out, decisionsToMove...)
+			outcome.Decisions = out
+		},
+	}
+}
+
+// RemoveLowerPriorityDecisions returns an interceptor that executes after a decision and removes
+// any lower priority decisions from an outcome if a higher priority decision exists.
+// The decisionTypes passed to this function should be listed in highest to
+// lowest priority order.
+//
+// e.g.  An outcome with a list of decisions [a, a, b, a, c] where the priority
+// was a > b > c would return [a, a, a]
+func RemoveLowerPriorityDecisions(prioritizedDecisionTypes ...string) DecisionInterceptor {
+	return &FuncInterceptor{
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
+			in := outcome.Decisions
+			out := []*swf.Decision{}
+			var indexOfHighestPriorityDecision *int
+
+			// Find highest priority item that is in list
+			for _, currentDecision := range in {
+				if index := indexOfString(prioritizedDecisionTypes, *currentDecision.DecisionType); index != -1 {
+					if indexOfHighestPriorityDecision == nil || index < *indexOfHighestPriorityDecision {
+						indexOfHighestPriorityDecision = aws.Int(index)
+					}
+				}
+			}
+			// Leave lower priority items off the final decision list
+			for _, currentDecision := range in {
+				index := indexOfString(prioritizedDecisionTypes, *currentDecision.DecisionType)
+				if index != -1 && indexOfHighestPriorityDecision != nil && index > *indexOfHighestPriorityDecision {
+					continue
+				}
+				out = append(out, currentDecision)
+			}
+			outcome.Decisions = out
+		},
+	}
+}
+
+func indexOfString(stringSlice []string, testString string) int {
+	index := -1
+	for i, currentString := range stringSlice {
+		if currentString == testString {
+			index = i
+			break
+		}
+	}
+	return index
+}
+
 //ManagedContinuations is an interceptor that will handle most of the mechanics of automatically continuing workflows.
 //
 //For workflows without persistent, heartbeating activities, it should do everything.
