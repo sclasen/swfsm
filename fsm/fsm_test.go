@@ -660,6 +660,55 @@ func TestInitWhenTaskErrorHandlerSetExpectsSetFuncUsed(t *testing.T) {
 		"Expected FSM to use the set handler after Init()")
 }
 
+func TestInitWhenDecisionInterceptorNotSetExpectsSomeDefaultUsed(t *testing.T) {
+	// arrange
+	f := testFSM()
+	f.AddInitialState(f.DefaultCompleteState())
+
+	// act
+	f.Init()
+
+	// assert
+	assert.NotNil(t, f.DecisionInterceptor,
+		"Expected DecisionInterceptor to be non-nil after Init() even if none is set")
+}
+
+func TestInitWhenDecisionInterceptorSetExpectsSetInterceptorUsed(t *testing.T) {
+	// arrange
+	f := testFSM()
+	f.AddInitialState(f.DefaultCompleteState())
+	expectedInterceptor := &FuncInterceptor{}
+	f.DecisionInterceptor = expectedInterceptor
+
+	// act
+	f.Init()
+
+	// assert
+	assert.Equal(t, expectedInterceptor, f.DecisionInterceptor,
+		"Expected DecisionInterceptor to use the set interceptor after Init()")
+}
+
+func TestDefaultDecisionInterceptorExpectsCloseDecisionsDedupedMovedAndPrioritized(t *testing.T) {
+	// arrange
+	f := testFSM()
+	f.AddInitialState(f.DefaultCompleteState())
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{timerDecision(), completeDecision(), completeDecision(), cancelDecision(), cancelDecision(), failDecision(), failDecision(), timerDecision()},
+	}
+	interceptor := f.DefaultDecisionInterceptor()
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Len(t, outcome.Decisions, 3, "Expected outcome to have 3 decisions after deduping"+
+		" and prioritization because all 'completes', 'cancels', and duplicates should have been removed")
+	assert.Equal(t, []*swf.Decision{timerDecision(), timerDecision(), failDecision()},
+		outcome.Decisions, "Expected a single highest priority close decision to be at the end of the decision list and other decisions to be retained.")
+}
+
 func TestHandleDecisionTaskWhenTickErrorsExpectsTaskErrorHandlerCalled(t *testing.T) {
 	// arrange
 	f := testFSM()
