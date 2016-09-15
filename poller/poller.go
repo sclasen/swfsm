@@ -4,9 +4,12 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
@@ -39,14 +42,18 @@ type DecisionTaskPoller struct {
 	TaskList string
 }
 
-// Poll polls the task list for a task. If there is no task available, nil is
+// p polls the task list for a task. If there is no task available, nil is
 // returned. If an error is encountered, no task is returned.
-func (p *DecisionTaskPoller) Poll(taskReady func(*swf.PollForDecisionTaskOutput) bool) (*swf.PollForDecisionTaskOutput, error) {
+func (p *DecisionTaskPoller) poll(ctx context.Context, pollId string, taskReady func(*swf.PollForDecisionTaskOutput) bool) (*swf.PollForDecisionTaskOutput, error) {
 	var (
-		resp   *swf.PollForDecisionTaskOutput
-		page   int
-		pollId = uuid.New()
+		resp *swf.PollForDecisionTaskOutput
+		page int
 	)
+
+	sp := opentracing.StartSpan(
+		"poll_for_decision_task_output",
+		opentracing.ChildOf(opentracing.SpanFromContext(ctx).Context()))
+	defer sp.Finish()
 
 	eachPage := func(out *swf.PollForDecisionTaskOutput, _ bool) bool {
 		page++
@@ -98,6 +105,7 @@ func (p *DecisionTaskPoller) Poll(taskReady func(*swf.PollForDecisionTaskOutput)
 		Log.Printf("component=DecisionTaskPoller poll-id=%q at=decision-task-received task-list=%q workflow=%q",
 			pollId, p.TaskList, LS(resp.WorkflowExecution.WorkflowId))
 		p.logTaskLatency(resp)
+		sp.LogEventWithPayload("events_found", len(resp.Events))
 		return resp, nil
 	}
 	Log.Printf("component=DecisionTaskPoller at=decision-task-empty-response poll-id=%q task-list=%q", pollId, p.TaskList)
@@ -105,8 +113,8 @@ func (p *DecisionTaskPoller) Poll(taskReady func(*swf.PollForDecisionTaskOutput)
 }
 
 // PollUntilShutdownBy will poll until signaled to shutdown by the PollerShutdownManager. this func blocks, so run it in a goroutine if necessary.
-// The implementation calls Poll() and invokes the callback whenever a valid PollForDecisionTaskResponse is received.
-func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerName string, onTask func(*swf.PollForDecisionTaskOutput), taskReady func(*swf.PollForDecisionTaskOutput) bool) {
+// The implementation calls poll() and invokes the callback whenever a valid PollForDecisionTaskResponse is received.
+func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerName string, onTask func(context.Context, *swf.PollForDecisionTaskOutput), taskReady func(*swf.PollForDecisionTaskOutput) bool) {
 	stop := make(chan bool, 1)
 	stopAck := make(chan bool, 1)
 	mgr.Register(pollerName, stop, stopAck)
@@ -117,7 +125,12 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 			stopAck <- true
 			return
 		default:
-			task, err := p.Poll(taskReady)
+			pollID := uuid.New()
+			ctx := context.WithValue(context.Background(), "RequestID", pollID)
+			// Start a span. Discard it unless we process to handling tasks
+			sp, ctx := opentracing.StartSpanFromContext(ctx, "decision_task_poll")
+			sp.SetTag("RequestID", pollID)
+			task, err := p.poll(ctx, pollID, taskReady)
 			if err != nil {
 				Log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
 				continue
@@ -126,7 +139,8 @@ func (p *DecisionTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 				Log.Printf("component=DecisionTaskPoller fn=PollUntilShutdownBy at=poll-no-task poller=%s task-list=%q", pollerName, p.TaskList)
 				continue
 			}
-			onTask(task)
+			onTask(ctx, task)
+			sp.Finish()
 		}
 	}
 }
@@ -160,27 +174,30 @@ type ActivityTaskPoller struct {
 
 // Poll polls the task list for a task. If there is no task, nil is returned.
 // If an error is encountered, no task is returned.
-func (p *ActivityTaskPoller) Poll() (*swf.PollForActivityTaskOutput, error) {
+func (p *ActivityTaskPoller) Poll() (context.Context, *swf.PollForActivityTaskOutput, error) {
+	pollID := uuid.New()
+	ctx := context.WithValue(context.Background(), "requestID", pollID)
+
 	resp, err := p.client.PollForActivityTask(&swf.PollForActivityTaskInput{
 		Domain:   aws.String(p.Domain),
 		Identity: aws.String(p.Identity),
 		TaskList: &swf.TaskList{Name: aws.String(p.TaskList)},
 	})
 	if err != nil {
-		Log.Printf("component=ActivityTaskPoller at=error error=%q", err.Error())
-		return nil, errors.Trace(err)
+		Log.Printf("component=ActivityTaskPoller poll-id=%s at=error error=%q", pollID, err.Error())
+		return nil, nil, errors.Trace(err)
 	}
 	if resp.TaskToken != nil {
-		Log.Printf("component=ActivityTaskPoller at=activity-task-received activity=%s", LS(resp.ActivityType.Name))
-		return resp, nil
+		Log.Printf("component=ActivityTaskPoller at=activity-task-received poll-id=%s activity=%s", pollID, LS(resp.ActivityType.Name))
+		return ctx, resp, nil
 	}
-	Log.Println("component=ActivityTaskPoller at=activity-task-empty-response")
-	return nil, nil
+	Log.Printf("component=ActivityTaskPoller at=activity-task-empty-response poll-id=%s", pollID)
+	return nil, nil, nil
 }
 
 // PollUntilShutdownBy will poll until signaled to shutdown by the ShutdownManager. this func blocks, so run it in a goroutine if necessary.
 // The implementation calls Poll() and invokes the callback whenever a valid PollForActivityTaskResponse is received.
-func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerName string, onTask func(*swf.PollForActivityTaskOutput)) {
+func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerName string, onTask func(context.Context, *swf.PollForActivityTaskOutput)) {
 	stop := make(chan bool, 1)
 	stopAck := make(chan bool, 1)
 	mgr.Register(pollerName, stop, stopAck)
@@ -191,7 +208,7 @@ func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 			stopAck <- true
 			return
 		default:
-			task, err := p.Poll()
+			ctx, task, err := p.Poll()
 			if err != nil {
 				Log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-err poller=%s task-list=%q error=%q", pollerName, p.TaskList, err)
 				continue
@@ -200,7 +217,7 @@ func (p *ActivityTaskPoller) PollUntilShutdownBy(mgr *ShutdownManager, pollerNam
 				Log.Printf("component=ActivityTaskPoller fn=PollUntilShutdownBy at=poll-no-task poller=%s task-list=%q", pollerName, p.TaskList)
 				continue
 			}
-			onTask(task)
+			onTask(ctx, task)
 		}
 	}
 }

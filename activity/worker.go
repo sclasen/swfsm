@@ -3,6 +3,8 @@ package activity
 import (
 	"fmt"
 
+	"golang.org/x/net/context"
+
 	"time"
 
 	"math"
@@ -104,11 +106,11 @@ func (a *ActivityWorker) Start() {
 	go poller.PollUntilShutdownBy(a.ShutdownManager, fmt.Sprintf("%s-poller", a.Identity), a.dispatchTask)
 }
 
-func (a *ActivityWorker) dispatchTask(activityTask *swf.PollForActivityTaskOutput) {
+func (a *ActivityWorker) dispatchTask(ctx context.Context, activityTask *swf.PollForActivityTaskOutput) {
 	if a.AllowPanics {
-		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.HandleActivityTask)
+		a.ActivityTaskDispatcher.DispatchTask(ctx, activityTask, a.HandleActivityTask)
 	} else {
-		a.ActivityTaskDispatcher.DispatchTask(activityTask, a.HandleWithRecovery(a.HandleActivityTask))
+		a.ActivityTaskDispatcher.DispatchTask(ctx, activityTask, a.HandleWithRecovery(a.HandleActivityTask))
 	}
 }
 
@@ -120,7 +122,7 @@ func (a *ActivityWorker) dispatchTask(activityTask *swf.PollForActivityTaskOutpu
 //
 // Note: You will need to handle recovering from panics if you call this directly without wrapping
 // with HandleWithRecovery.
-func (a *ActivityWorker) HandleActivityTask(activityTask *swf.PollForActivityTaskOutput) {
+func (a *ActivityWorker) HandleActivityTask(ctx context.Context, activityTask *swf.PollForActivityTaskOutput) {
 	a.ActivityInterceptor.BeforeTask(activityTask)
 	handler := a.handlers[*activityTask.ActivityType.Name]
 
@@ -149,7 +151,7 @@ func (a *ActivityWorker) HandleActivityTask(activityTask *swf.PollForActivityTas
 		deserialized = nil
 	}
 
-	result, err := handler.HandlerFunc(activityTask, deserialized)
+	result, err := handler.HandlerFunc(ctx, activityTask, deserialized)
 	result, err = a.ActivityInterceptor.AfterTask(activityTask, result, err)
 	if err != nil {
 		if e, ok := err.(ActivityTaskCanceledError); ok {
@@ -301,8 +303,8 @@ func truncate(s string, i int) string {
 
 // HandleWithRecovery is used to wrap handler functions (such as HandleActivityTask)
 // so they gracefully recover from panics.
-func (h *ActivityWorker) HandleWithRecovery(handler func(*swf.PollForActivityTaskOutput)) func(*swf.PollForActivityTaskOutput) {
-	return func(resp *swf.PollForActivityTaskOutput) {
+func (h *ActivityWorker) HandleWithRecovery(handler func(context.Context, *swf.PollForActivityTaskOutput)) func(context.Context, *swf.PollForActivityTaskOutput) {
+	return func(ctx context.Context, resp *swf.PollForActivityTaskOutput) {
 		defer func() {
 			var anErr error
 			if r := recover(); r != nil {
@@ -315,7 +317,6 @@ func (h *ActivityWorker) HandleWithRecovery(handler func(*swf.PollForActivityTas
 				h.fail(resp, anErr)
 			}
 		}()
-		handler(resp)
-
+		handler(ctx, resp)
 	}
 }

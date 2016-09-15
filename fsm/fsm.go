@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"reflect"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	"github.com/opentracing/opentracing-go"
 	. "github.com/sclasen/swfsm/log"
 	"github.com/sclasen/swfsm/poller"
 	s "github.com/sclasen/swfsm/sugar"
@@ -360,12 +363,12 @@ func (f *FSM) taskReady(task *swf.PollForDecisionTaskOutput) bool {
 	return false
 }
 
-func (f *FSM) dispatchTask(decisionTask *swf.PollForDecisionTaskOutput) {
-	f.DecisionTaskDispatcher.DispatchTask(decisionTask, f.handleDecisionTask)
+func (f *FSM) dispatchTask(ctx context.Context, decisionTask *swf.PollForDecisionTaskOutput) {
+	f.DecisionTaskDispatcher.DispatchTask(ctx, decisionTask, f.handleDecisionTask)
 }
 
-func (f *FSM) handleDecisionTask(decisionTask *swf.PollForDecisionTaskOutput) {
-	context, decisions, state, err := f.Tick(decisionTask)
+func (f *FSM) handleDecisionTask(ctx context.Context, decisionTask *swf.PollForDecisionTaskOutput) {
+	context, decisions, state, err := f.Tick(ctx, decisionTask)
 	if err != nil {
 		f.TaskErrorHandler(decisionTask, err)
 		return
@@ -416,14 +419,26 @@ func (f *FSM) Deserialize(serialized string, data interface{}) {
 // Tick is called when the DecisionTaskPoller receives a PollForDecisionTaskResponse in its polling loop.
 // On errors, a nil *SerializedState is returned, and an error Outcome is included in the Decision list.
 // It is exported to facilitate testing.
-func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []*swf.Decision, *SerializedState, error) {
+func (f *FSM) Tick(ctx context.Context, decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []*swf.Decision, *SerializedState, error) {
+	sp := opentracing.SpanFromContext(ctx)
+	if sp == nil {
+		sp, ctx = opentracing.StartSpanFromContext(ctx, "fsm_tick")
+	} else {
+		sp = opentracing.StartSpan(
+			"fsm_tick",
+			opentracing.ChildOf(sp.Context()))
+	}
+	defer sp.Finish()
+	sp.SetTag("WorkflowType", *decisionTask.WorkflowType)
+	sp.SetTag("WorkflowID", *decisionTask.WorkflowExecution)
+
 	//BeforeDecision interceptor invocation
 	if f.DecisionInterceptor != nil {
 		f.DecisionInterceptor.BeforeTask(decisionTask)
 	}
 	lastEvents := f.findLastEvents(*decisionTask.PreviousStartedEventId, decisionTask.Events)
 	outcome := new(Outcome)
-	context := NewFSMContext(f,
+	context := NewFSMContext(ctx, f,
 		*decisionTask.WorkflowType,
 		*decisionTask.WorkflowExecution,
 		nil,
@@ -493,6 +508,7 @@ func (f *FSM) Tick(decisionTask *swf.PollForDecisionTaskOutput) (*FSMContext, []
 	for i := len(lastEvents) - 1; i >= 0; i-- {
 		e := lastEvents[i]
 		f.clog(context, "action=tick at=history id=%d type=%s", *e.EventId, *e.EventType)
+		sp.LogEventWithPayload("calling_decider", *e.EventId)
 		fsmState, ok := f.states[outcome.State]
 		if ok {
 			context.State = outcome.State
@@ -609,7 +625,7 @@ func (f *FSM) ErrorStateTick(decisionTask *swf.PollForDecisionTaskOutput, error 
 	filteredDecisionTask.StartedEventId = &error.LatestUnprocessedEventId
 	filteredDecisionTask.PreviousStartedEventId = &error.EarliestUnprocessedEventId
 
-	_, decisions, serializedState, err := f.Tick(filteredDecisionTask)
+	_, decisions, serializedState, err := f.Tick(context.RequestContext(), filteredDecisionTask)
 	if err != nil {
 		data := f.zeroStateData()
 		f.Deserialize(serializedState.StateData, data)

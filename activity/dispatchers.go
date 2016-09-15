@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/sclasen/swfsm/poller"
 )
@@ -12,15 +14,15 @@ import (
 //ActivityTaskDispatcher is used by the ActivityWorker machinery to dispatch the handling of ActivityTasks.
 //Different implementations can provide different concurrency models.
 type ActivityTaskDispatcher interface {
-	DispatchTask(*swf.PollForActivityTaskOutput, func(*swf.PollForActivityTaskOutput))
+	DispatchTask(context.Context, *swf.PollForActivityTaskOutput, func(context.Context, *swf.PollForActivityTaskOutput))
 }
 
 //CallingGoroutineDispatcher is a DecisionTaskDispatcher that runs the decision handler in the polling goroutine
 type CallingGoroutineDispatcher struct{}
 
 //DispatchTask calls the handler in the same goroutine.
-func (*CallingGoroutineDispatcher) DispatchTask(task *swf.PollForActivityTaskOutput, handler func(*swf.PollForActivityTaskOutput)) {
-	handler(task)
+func (*CallingGoroutineDispatcher) DispatchTask(ctx context.Context, task *swf.PollForActivityTaskOutput, handler func(context.Context, *swf.PollForActivityTaskOutput)) {
+	handler(ctx, task)
 }
 
 //NewGoroutineDispatcher is a DecisionTaskDispatcher that runs the decision handler in a new goroutine.
@@ -28,8 +30,8 @@ type NewGoroutineDispatcher struct {
 }
 
 //DispatchTask calls the handler in a new  goroutine.
-func (*NewGoroutineDispatcher) DispatchTask(task *swf.PollForActivityTaskOutput, handler func(*swf.PollForActivityTaskOutput)) {
-	go handler(task)
+func (*NewGoroutineDispatcher) DispatchTask(ctx context.Context, task *swf.PollForActivityTaskOutput, handler func(context.Context, *swf.PollForActivityTaskOutput)) {
+	go handler(ctx, task)
 }
 
 //BoundedGoroutineDispatcher is a DecisionTaskDispatcher that uses a bounded number of goroutines to run decision handlers.
@@ -42,7 +44,7 @@ type BoundedGoroutineDispatcher struct {
 //DispatchTask calls sends the task on a channel that NumGoroutines goroutines are selecting on.
 //Goroutines recieving a task run it in the same goroutine.
 //note that this is unsynchronized as DispatchTask will only be called by the single poller goroutine.
-func (b *BoundedGoroutineDispatcher) DispatchTask(task *swf.PollForActivityTaskOutput, handler func(*swf.PollForActivityTaskOutput)) {
+func (b *BoundedGoroutineDispatcher) DispatchTask(ctx context.Context, task *swf.PollForActivityTaskOutput, handler func(context.Context, *swf.PollForActivityTaskOutput)) {
 
 	if !b.started {
 		if b.NumGoroutines == 0 {
@@ -55,7 +57,7 @@ func (b *BoundedGoroutineDispatcher) DispatchTask(task *swf.PollForActivityTaskO
 				for {
 					select {
 					case t := <-b.tasks:
-						handler(t)
+						handler(ctx, t)
 					}
 				}
 			}()
@@ -92,11 +94,11 @@ func RegisterNewCountdownGoroutineDispatcher(mgr poller.ShutdownManager) *Countd
 	return g
 }
 
-func (m *CountdownGoroutineDispatcher) DispatchTask(t *swf.PollForActivityTaskOutput, f func(*swf.PollForActivityTaskOutput)) {
+func (m *CountdownGoroutineDispatcher) DispatchTask(ctx context.Context, t *swf.PollForActivityTaskOutput, f func(context.Context, *swf.PollForActivityTaskOutput)) {
 	//run tasks in a new goroutine
 	go func() {
 		atomic.AddInt64(&m.inFlight, 1)
-		f(t)
+		f(ctx, t)
 		atomic.AddInt64(&m.inFlight, -1)
 	}()
 }

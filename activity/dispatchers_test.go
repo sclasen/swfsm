@@ -4,6 +4,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 
 	"time"
@@ -45,7 +47,7 @@ func testDispatcher(dispatcher ActivityTaskDispatcher, t *testing.T) {
 	tasksHandled := int32(0)
 	totalTasks := int32(1000)
 	done := make(chan struct{}, 1)
-	handler := func(d *swf.PollForActivityTaskOutput) {
+	handler := func(ctx context.Context, d *swf.PollForActivityTaskOutput) {
 		handled := atomic.AddInt32(&tasksHandled, 1)
 		if handled == totalTasks {
 			done <- struct{}{}
@@ -53,7 +55,7 @@ func testDispatcher(dispatcher ActivityTaskDispatcher, t *testing.T) {
 	}
 
 	for i := int32(0); i < totalTasks; i++ {
-		dispatcher.DispatchTask(task, handler)
+		dispatcher.DispatchTask(context.Background(), task, handler)
 	}
 
 	select {

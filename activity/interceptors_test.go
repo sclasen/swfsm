@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/sugar"
 )
@@ -43,14 +45,14 @@ func TestInterceptors(t *testing.T) {
 
 	handler := &ActivityHandler{
 		Activity: "test",
-		HandlerFunc: func(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+		HandlerFunc: func(ctx context.Context, activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 			return nil, nil
 		},
 	}
 
 	worker.AddHandler(handler)
 
-	worker.HandleActivityTask(task)
+	worker.HandleActivityTask(context.Background(), task)
 
 	if !calledBefore {
 		t.Fatal("no before")
@@ -66,7 +68,7 @@ func TestInterceptors(t *testing.T) {
 	calledBefore = false
 	calledComplete = false
 
-	worker.HandleActivityTask(task)
+	worker.HandleActivityTask(context.Background(), task)
 
 	if !calledBefore {
 		t.Fatal("no before")
@@ -112,13 +114,13 @@ func TestFailedInterceptor(t *testing.T) {
 	}
 	handler := &ActivityHandler{
 		Activity: "test",
-		HandlerFunc: func(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+		HandlerFunc: func(ctx context.Context, activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 			return nil, errors.New("fail")
 		},
 	}
 
 	worker.AddHandler(handler)
-	worker.HandleActivityTask(task)
+	worker.HandleActivityTask(context.Background(), task)
 	if !calledBefore {
 		t.Fatal("no before")
 	}
@@ -165,13 +167,13 @@ func TestCanceledInterceptor(t *testing.T) {
 	}
 	handler := &ActivityHandler{
 		Activity: "test",
-		HandlerFunc: func(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+		HandlerFunc: func(ctx context.Context, activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 			return nil, ActivityTaskCanceledError{details: "details"}
 		},
 	}
 
 	worker.AddHandler(handler)
-	worker.HandleActivityTask(task)
+	worker.HandleActivityTask(context.Background(), task)
 	if !calledBefore {
 		t.Fatal("no before")
 	}

@@ -3,12 +3,14 @@ package activity
 import (
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 )
 
 func TestHandler(t *testing.T) {
 	handler := NewActivityHandler("activity", Handler)
-	ret, err := handler.HandlerFunc(&swf.PollForActivityTaskOutput{}, &TestInput{Name: "testIn"})
+	ret, err := handler.HandlerFunc(context.Background(), &swf.PollForActivityTaskOutput{}, &TestInput{Name: "testIn"})
 	if ret.(*TestOutput).Name != "testInOut" {
 		t.Fatal("Not testInOut")
 	}
@@ -17,16 +19,16 @@ func TestHandler(t *testing.T) {
 		t.Fatal("err not nil")
 	}
 
-	handler.HandlerFunc(&swf.PollForActivityTaskOutput{}, handler.ZeroInput())
+	handler.HandlerFunc(context.Background(), &swf.PollForActivityTaskOutput{}, handler.ZeroInput())
 
 	stringHandler := NewActivityHandler("activity", StringHandler)
-	ret, _ = stringHandler.HandlerFunc(&swf.PollForActivityTaskOutput{}, "foo")
+	ret, _ = stringHandler.HandlerFunc(context.Background(), &swf.PollForActivityTaskOutput{}, "foo")
 	if ret.(string) != "fooOut" {
 		t.Fatal("string not fooOut")
 	}
 
 	nilHandler := NewActivityHandler("activity", NilHandler)
-	ret, err = nilHandler.HandlerFunc(&swf.PollForActivityTaskOutput{}, &TestInput{Name: "testIn"})
+	ret, err = nilHandler.HandlerFunc(context.Background(), &swf.PollForActivityTaskOutput{}, &TestInput{Name: "testIn"})
 	if err != nil {
 		t.Fatal(ret, err)
 	}
@@ -37,15 +39,15 @@ func TestHandler(t *testing.T) {
 
 }
 
-func Handler(task *swf.PollForActivityTaskOutput, input *TestInput) (*TestOutput, error) {
+func Handler(ctx context.Context, task *swf.PollForActivityTaskOutput, input *TestInput) (*TestOutput, error) {
 	return &TestOutput{Name: input.Name + "Out"}, nil
 }
 
-func NilHandler(task *swf.PollForActivityTaskOutput, input *TestInput) (*TestOutput, error) {
+func NilHandler(ctx context.Context, task *swf.PollForActivityTaskOutput, input *TestInput) (*TestOutput, error) {
 	return nil, nil
 }
 
-func StringHandler(task *swf.PollForActivityTaskOutput, input string) (string, error) {
+func StringHandler(ctx context.Context, task *swf.PollForActivityTaskOutput, input string) (string, error) {
 	return input + "Out", nil
 }
 

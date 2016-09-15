@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/service/swf"
 	. "github.com/sclasen/swfsm/log"
 	. "github.com/sclasen/swfsm/sugar"
@@ -118,7 +120,7 @@ func TestTrackPendingActivities(t *testing.T) {
 	}
 	first := testDecisionTask(0, events)
 
-	_, decisions, _, _ := fsm.Tick(first)
+	_, decisions, _, _ := fsm.Tick(context.Background(), first)
 	recordMarker := FindDecision(decisions, stateMarkerPredicate)
 	if recordMarker == nil {
 		t.Fatal("No Record State Marker")
@@ -159,7 +161,7 @@ func TestTrackPendingActivities(t *testing.T) {
 	}
 	second := testDecisionTask(3, secondEvents)
 
-	_, secondDecisions, _, _ := fsm.Tick(second)
+	_, secondDecisions, _, _ := fsm.Tick(context.Background(), second)
 	recordMarker = FindDecision(secondDecisions, stateMarkerPredicate)
 	if recordMarker == nil {
 		t.Fatal("No Record State Marker")
@@ -199,7 +201,7 @@ func TestTrackPendingActivities(t *testing.T) {
 		t.Fatal("current state is not 'working'", thirdEvents)
 	}
 	third := testDecisionTask(7, thirdEvents)
-	_, thirdDecisions, _, _ := fsm.Tick(third)
+	_, thirdDecisions, _, _ := fsm.Tick(context.Background(), third)
 	recordMarker = FindDecision(thirdDecisions, stateMarkerPredicate)
 	if recordMarker == nil {
 		t.Fatal("No Record State Marker")
@@ -240,7 +242,7 @@ func TestTrackPendingActivities(t *testing.T) {
 		t.Fatal("current state is not 'done'", fourthEvents)
 	}
 	fourth := testDecisionTask(11, fourthEvents)
-	_, fourthDecisions, _, _ := fsm.Tick(fourth)
+	_, fourthDecisions, _, _ := fsm.Tick(context.Background(), fourth)
 	recordMarker = FindDecision(fourthDecisions, stateMarkerPredicate)
 	if recordMarker == nil {
 		t.Fatal("No Record State Marker")

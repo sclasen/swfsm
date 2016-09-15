@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -69,11 +71,11 @@ func ExampleActivityWorker() {
 
 	taskList := "aTaskListSharedBetweenTaskOneAndTwo"
 
-	handleTask1 := func(task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+	handleTask1 := func(ctx context.Context, task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 		return input, nil
 	}
 
-	handleTask2 := func(task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+	handleTask2 := func(ctx context.Context, task *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
 		return input, nil
 	}
 
@@ -380,17 +382,17 @@ func TestStringHandler(t *testing.T) {
 	worker.Init()
 	worker.AllowPanics = true
 
-	handler := func(task *swf.PollForActivityTaskOutput, input string) (string, error) {
+	handler := func(ctx context.Context, task *swf.PollForActivityTaskOutput, input string) (string, error) {
 		return input + "Out", nil
 	}
 
-	nilHandler := func(task *swf.PollForActivityTaskOutput, input string) (*swf.PollForActivityTaskOutput, error) {
+	nilHandler := func(ctx context.Context, task *swf.PollForActivityTaskOutput, input string) (*swf.PollForActivityTaskOutput, error) {
 		return nil, nil
 	}
 
 	worker.AddHandler(NewActivityHandler("activity", handler))
 	worker.AddHandler(NewActivityHandler("nilactivity", nilHandler))
-	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType:      &swf.ActivityType{Name: S("activity")},
 		Input:             S("theInput"),
@@ -403,7 +405,7 @@ func TestStringHandler(t *testing.T) {
 	ops.Completed = nil
 	ops.CompletedSet = false
 
-	worker.HandleActivityTask(&swf.PollForActivityTaskOutput{
+	worker.HandleActivityTask(context.Background(), &swf.PollForActivityTaskOutput{
 		WorkflowExecution: &swf.WorkflowExecution{},
 		ActivityType:      &swf.ActivityType{Name: S("nilactivity")},
 		Input:             S("theInput"),

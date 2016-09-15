@@ -3,6 +3,8 @@ package activity
 import (
 	"time"
 
+	"golang.org/x/net/context"
+
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -75,10 +77,10 @@ func (c *coordinatedActivityAdapter) heartbeat(activityTask *swf.PollForActivity
 	}
 }
 
-func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
-	defer c.finish(activityTask, input)
+func (c *coordinatedActivityAdapter) coordinate(ctx context.Context, activityTask *swf.PollForActivityTaskOutput, input interface{}) (interface{}, error) {
+	defer c.finish(ctx, activityTask, input)
 
-	update, err := c.handler.Start(activityTask, input)
+	update, err := c.handler.Start(ctx, activityTask, input)
 	if err != nil {
 		return nil, err
 	}
@@ -97,10 +99,10 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 	for {
 		select {
 		case cause := <-cancel:
-			c.cancel(activityTask, input)
+			c.cancel(ctx, activityTask, input)
 			return nil, cause
 		case <-ticks.C:
-			cont, res, err := c.handler.Tick(activityTask, input)
+			cont, res, err := c.handler.Tick(ctx, activityTask, input)
 			if !cont {
 				return res, err
 			}
@@ -117,14 +119,14 @@ func (c *coordinatedActivityAdapter) coordinate(activityTask *swf.PollForActivit
 	}
 }
 
-func (c *coordinatedActivityAdapter) cancel(activityTask *swf.PollForActivityTaskOutput, input interface{}) {
-	if err := c.handler.Cancel(activityTask, input); err != nil {
+func (c *coordinatedActivityAdapter) cancel(ctx context.Context, activityTask *swf.PollForActivityTaskOutput, input interface{}) {
+	if err := c.handler.Cancel(ctx, activityTask, input); err != nil {
 		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-cancel-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err)
 	}
 }
 
-func (c *coordinatedActivityAdapter) finish(activityTask *swf.PollForActivityTaskOutput, input interface{}) {
-	if err := c.handler.Finish(activityTask, input); err != nil {
+func (c *coordinatedActivityAdapter) finish(ctx context.Context, activityTask *swf.PollForActivityTaskOutput, input interface{}) {
+	if err := c.handler.Finish(ctx, activityTask, input); err != nil {
 		Log.Printf("workflow-id=%s activity-id=%s activity-id=%s at=activity-finish-err error=%q", LS(activityTask.WorkflowExecution.WorkflowId), LS(activityTask.ActivityType.Name), LS(activityTask.ActivityId), err)
 	}
 }

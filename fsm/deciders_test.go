@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/stretchr/testify/assert"
@@ -477,7 +479,7 @@ func TestCompleteWorkflow(t *testing.T) {}
 func TestFailWorkflow(t *testing.T) {
 	// arrange
 	data := &TestingType{"Some data"}
-	fsmContext := NewFSMContext(nil,
+	fsmContext := NewFSMContext(context.Background(), nil,
 		swf.WorkflowType{Name: s.S("foo"), Version: s.S("1")},
 		swf.WorkflowExecution{WorkflowId: s.S("id"), RunId: s.S("runid")},
 		nil, "state", nil, 1)
@@ -516,7 +518,7 @@ func testContextWithSignal(scheduledEventId int, event *swf.SignalExternalWorkfl
 			SignalExternalWorkflowExecutionInitiatedEventAttributes: event,
 		})
 
-		return NewFSMContext(nil,
+		return NewFSMContext(context.Background(), nil,
 			swf.WorkflowType{Name: s.S("foo"), Version: s.S("1")},
 			swf.WorkflowExecution{WorkflowId: s.S("id"), RunId: s.S("runid")},
 			correlator, "state", nil, 1)
@@ -524,7 +526,7 @@ func testContextWithSignal(scheduledEventId int, event *swf.SignalExternalWorkfl
 }
 
 func deciderTestContext() *FSMContext {
-	return NewFSMContext(nil,
+	return NewFSMContext(context.Background(), nil,
 		swf.WorkflowType{Name: s.S("foo"), Version: s.S("1")},
 		swf.WorkflowExecution{WorkflowId: s.S("id"), RunId: s.S("runid")},
 		nil, "state", nil, 1)
