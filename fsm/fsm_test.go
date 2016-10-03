@@ -289,27 +289,10 @@ func TestMarshalledDecider(t *testing.T) {
 	}
 }
 
-func TestPanicRecovery(t *testing.T) {
-	s := &FSMState{
-		Name: "panic",
-		Decider: func(f *FSMContext, e *swf.HistoryEvent, data interface{}) Outcome {
-			panic("can you handle it?")
-		},
-	}
-	f := &FSM{}
-	f.AddInitialState(s)
-	_, err := f.panicSafeDecide(s, new(FSMContext), &swf.HistoryEvent{}, nil)
-	if err == nil {
-		t.Fatal("fatallz")
-	} else {
-		Log.Println(err)
-	}
-}
-
 func ExampleFSM() {
 	// create with swf.NewClient
 	var client *swf.SWF
-	// data type that will be managed by the FSM
+	// data type that will be managed by the
 	type StateData struct {
 		Message string `json:"message,omitempty"`
 		Count   int    `json:"count,omitempty"`

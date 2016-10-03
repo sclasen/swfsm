@@ -70,7 +70,10 @@ type FSM struct {
 	FSMErrorReporter FSMErrorReporter
 	//AllowPanics is mainly for testing, it should be set to false in production.
 	//when true, instead of recovering from panics in deciders, it allows them to propagate.
-	AllowPanics   bool
+	AllowPanics bool
+	// Logger is used for output on a FSM. If not set, will use log.Log
+	Logger StdLogger
+
 	states        map[string]*FSMState
 	errorHandlers map[string]DecisionErrorHandler
 	initialState  *FSMState
@@ -697,12 +700,20 @@ func (f *FSM) EventData(event *swf.HistoryEvent, eventData interface{}) {
 
 func (f *FSM) log(format string, data ...interface{}) {
 	actualFormat := fmt.Sprintf("component=FSM name=%s %s", f.Name, format)
-	Log.Printf(actualFormat, data...)
+	if f.Logger != nil {
+		f.Logger.Printf(actualFormat, data...)
+	} else {
+		Log.Printf(actualFormat, data...)
+	}
 }
 
 func (f *FSM) clog(ctx *FSMContext, format string, data ...interface{}) {
 	actualFormat := fmt.Sprintf("component=FSM name=%s type=%s id=%s %s", f.Name, s.LS(ctx.WorkflowType.Name), s.LS(ctx.WorkflowId), format)
-	Log.Printf(actualFormat, data...)
+	if f.Logger != nil {
+		f.Logger.Printf(actualFormat, data...)
+	} else {
+		Log.Printf(actualFormat, data...)
+	}
 }
 
 func (f *FSM) findSerializedState(events []*swf.HistoryEvent) (*SerializedState, error) {
