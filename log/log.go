@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	golog "log"
 	"os"
 )
@@ -28,3 +29,36 @@ type StdLogger interface {
 //provide a mutable logger so it can be changed
 //this is what the default logger in go's log pakcage looks like
 var Log StdLogger = golog.New(os.Stderr, "", golog.LstdFlags)
+
+// CapturingLogger is designed to be used in testing - it will saves lines it receives
+type CapturingLogger struct {
+	Lines []string
+}
+
+func (c *CapturingLogger) Print(a ...interface{}) {
+	c.Lines = append(c.Lines, fmt.Sprint(a...))
+}
+func (c *CapturingLogger) Printf(s string, a ...interface{}) {
+	c.Lines = append(c.Lines, fmt.Sprintf(s, a...))
+}
+func (c *CapturingLogger) Println(a ...interface{}) {
+	c.Lines = append(c.Lines, fmt.Sprint(a...))
+}
+func (c *CapturingLogger) Fatal(a ...interface{}) {
+	c.Lines = append(c.Lines, fmt.Sprint(a...))
+}
+func (c *CapturingLogger) Fatalf(s string, a ...interface{}) {
+	c.Lines = append(c.Lines, fmt.Sprintf(s, a...))
+}
+func (c *CapturingLogger) Fatalln(a ...interface{}) {
+	c.Lines = append(c.Lines, fmt.Sprint(a...))
+}
+func (c *CapturingLogger) Panic(a ...interface{}) {
+	c.Lines = append(c.Lines, fmt.Sprint(a...))
+}
+func (c *CapturingLogger) Panicf(s string, a ...interface{}) {
+	c.Lines = append(c.Lines, fmt.Sprintf(s, a...))
+}
+func (c *CapturingLogger) Panicln(a ...interface{}) {
+	c.Lines = append(c.Lines, fmt.Sprint(a...))
+}
