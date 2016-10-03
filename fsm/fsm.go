@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
+	"github.com/sclasen/swfsm/internal/panicinfo"
 	. "github.com/sclasen/swfsm/log"
 	"github.com/sclasen/swfsm/poller"
 	s "github.com/sclasen/swfsm/sugar"
@@ -637,7 +638,8 @@ func (f *FSM) panicSafeDecide(state *FSMState, context *FSMContext, event *swf.H
 	defer func() {
 		if !f.AllowPanics {
 			if r := recover(); r != nil {
-				f.log("at=decide-panic-recovery error=%q", r)
+				file, line, name := panicinfo.LocatePanic(r)
+				f.log("at=decide-panic-recovery func=%q file=\"%s:%d\" error=%q", name, file, line, r)
 				if err, ok := r.(error); ok && err != nil {
 					anErr = errors.Trace(err)
 				} else {

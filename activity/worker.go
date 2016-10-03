@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/juju/errors"
 	"github.com/sclasen/swfsm/fsm"
+	"github.com/sclasen/swfsm/internal/panicinfo"
 	. "github.com/sclasen/swfsm/log"
 	"github.com/sclasen/swfsm/poller"
 	. "github.com/sclasen/swfsm/sugar"
@@ -306,12 +307,13 @@ func (h *ActivityWorker) HandleWithRecovery(handler func(*swf.PollForActivityTas
 		defer func() {
 			var anErr error
 			if r := recover(); r != nil {
+				file, line, name := panicinfo.LocatePanic(r)
 				if err, ok := r.(error); ok && err != nil {
 					anErr = err
 				} else {
 					anErr = errors.New("panic in activity with nil error")
 				}
-				Log.Printf("component=activity at=activity-panic-recovery-error error=%q", r)
+				Log.Printf("component=activity at=activity-panic-recovery-error func=%q file=\"%s:%d\" error=%q", name, file, line, r)
 				h.fail(resp, anErr)
 			}
 		}()
