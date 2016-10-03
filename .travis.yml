@@ -1,5 +1,5 @@
 language: go
-go: 1.6.1
+go: 1.7.1
 before_install:
   - export PATH=$HOME/gopath/bin:$PATH
   - go get ./...
