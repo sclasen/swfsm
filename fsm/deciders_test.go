@@ -194,6 +194,57 @@ func TestOnChildStarted(t *testing.T) {
 	}
 }
 
+func TestOnChildStartedOrAlreadyRunning(t *testing.T) {
+	decider := func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		return ctx.Goto("some-state", data, ctx.EmptyDecisions())
+	}
+
+	composedDecider := OnChildStartedOrAlreadyRunning(decider)
+
+	for _, et := range s.SWFHistoryEventTypes() {
+		ctx := deciderTestContext()
+		switch et {
+		case swf.EventTypeChildWorkflowExecutionStarted:
+			event := s.EventFromPayload(129, &swf.ChildWorkflowExecutionStartedEventAttributes{})
+			data := new(TestData)
+			outcome := composedDecider(ctx, event, data)
+			expected := decider(ctx, event, data)
+			if !reflect.DeepEqual(outcome, expected) {
+				t.Fatal("Outcomes not equal", outcome, expected)
+			}
+		case swf.EventTypeStartChildWorkflowExecutionFailed:
+			{
+				event := s.EventFromPayload(129, &swf.StartChildWorkflowExecutionFailedEventAttributes{
+					Cause: aws.String(swf.StartChildWorkflowExecutionFailedCauseWorkflowAlreadyRunning),
+				})
+				data := new(TestData)
+				outcome := composedDecider(ctx, event, data)
+				expected := decider(ctx, event, data)
+				if !reflect.DeepEqual(outcome, expected) {
+					t.Fatal("Outcomes not equal", outcome, expected)
+				}
+			}
+
+			{
+				event := s.EventFromPayload(129, &swf.StartChildWorkflowExecutionFailedEventAttributes{
+					Cause: aws.String("other failure"),
+				})
+				if composedDecider(ctx, event, new(TestData)).State != "" {
+					t.Fatal("Non nil decision")
+				}
+			}
+
+		default:
+			event := &swf.HistoryEvent{
+				EventType: s.S(et),
+			}
+			if composedDecider(ctx, event, new(TestData)).State != "" {
+				t.Fatal("Non nil decision")
+			}
+		}
+	}
+}
+
 func TestOnData(t *testing.T) {
 	decider := Transition("some-state")
 	typed := Typed(new(TestingType))
