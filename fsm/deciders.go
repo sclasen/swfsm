@@ -586,6 +586,21 @@ func OnSignalFailedAndNotUnknown(signalName string, deciders ...Decider) Decider
 	}
 }
 
+// OnChildStartedOrAlreadyRunning builds a composed decider that fires on
+// EventTypeChildWorkflowExecutionStarted OR EventTypeStartChildWorkflowExecutionFailed with Cause == "WORKFLOW_ALREADY_RUNNING".
+func OnChildStartedOrAlreadyRunning(deciders ...Decider) Decider {
+	return func(ctx *FSMContext, h *swf.HistoryEvent, data interface{}) Outcome {
+		if *h.EventType == swf.EventTypeChildWorkflowExecutionStarted ||
+			(*h.EventType == swf.EventTypeStartChildWorkflowExecutionFailed &&
+				*h.StartChildWorkflowExecutionFailedEventAttributes.Cause ==
+					swf.StartChildWorkflowExecutionFailedCauseWorkflowAlreadyRunning) {
+			logf(ctx, "at=child-start-or-already-running workflow-id=%q", *ctx.WorkflowExecution.WorkflowId)
+			return NewComposedDecider(deciders...)(ctx, h, data)
+		}
+		return ctx.Pass()
+	}
+}
+
 // OnChildStartFailedAndNotAlreadyRunning builds a composed decider that fires on
 // EventTypeStartChildWorkflowExecutionFailed and Cause != "WORKFLOW_ALREADY_RUNNING".
 func OnChildStartFailedAndNotAlreadyRunning(deciders ...Decider) Decider {
