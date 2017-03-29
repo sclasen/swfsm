@@ -332,10 +332,10 @@ func (f *FSM) Init() {
 // If you wish to manage polling and calling Tick() yourself, you dont need to start the FSM, just call Init().
 func (f *FSM) Start() {
 	f.Init()
-	if f.PollerCount == 0 {
+	if f.PollerCount <= 0 {
 		f.startPoller(f.Name, f.Identity)
 	} else {
-		for i := 0; i <= f.PollerCount; i++ {
+		for i := 1; i <= f.PollerCount; i++ {
 			f.startPoller(fmt.Sprintf("%s-%d", f.Name, i), fmt.Sprintf("%s-%d", f.Identity, i))
 		}
 	}
