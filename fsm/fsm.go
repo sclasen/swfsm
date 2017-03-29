@@ -42,6 +42,9 @@ type FSM struct {
 	SystemSerializer StateSerializer
 	//PollerShutdownManager is used when the FSM is managing the polling
 	ShutdownManager *poller.ShutdownManager
+	//PollerCount is the number of DecisionTaskPollers to start when the FSM is started.
+	//Default 1, if you increase this, be sure your DecisionTaskDispatcher is goroutine-safe.
+	PollerCount int
 	//DecisionTaskDispatcher determines the concurrency strategy for processing tasks in your fsm
 	DecisionTaskDispatcher DecisionTaskDispatcher
 	// DecisionInterceptor fsm will call BeforeDecision/AfterDecision.  If unset
@@ -325,12 +328,22 @@ func (f *FSM) Init() {
 
 }
 
-// Start begins processing DecisionTasks with the FSM. It creates a DecisionTaskPoller and spawns a goroutine that continues polling until Stop() is called and any in-flight polls have completed.
+// Start begins processing DecisionTasks with the FSM. It creates one or more DecisionTaskPollers and spawns a goroutine that continues polling until Stop() is called and any in-flight polls have completed.
 // If you wish to manage polling and calling Tick() yourself, you dont need to start the FSM, just call Init().
 func (f *FSM) Start() {
 	f.Init()
-	poller := poller.NewDecisionTaskPoller(f.SWF, f.Domain, f.Identity, f.TaskList)
-	go poller.PollUntilShutdownBy(f.ShutdownManager, fmt.Sprintf("%s-poller", f.Name), f.dispatchTask, f.taskReady)
+	if f.PollerCount == 0 {
+		f.startPoller(f.Name, f.Identity)
+	} else {
+		for i := 0; i <= f.PollerCount; i++ {
+			f.startPoller(fmt.Sprintf("%s-%d", f.Name, i), fmt.Sprintf("%s-%d", f.Identity, i))
+		}
+	}
+}
+
+func (f *FSM) startPoller(name, identity string) {
+	poller := poller.NewDecisionTaskPoller(f.SWF, f.Domain, identity, f.TaskList)
+	go poller.PollUntilShutdownBy(f.ShutdownManager, fmt.Sprintf("%s-poller", name), f.dispatchTask, f.taskReady)
 }
 
 // signals the poller to stop reading decision task pages once we have marker events
