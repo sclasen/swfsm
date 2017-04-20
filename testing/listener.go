@@ -16,6 +16,8 @@ import (
 	"github.com/sclasen/swfsm/fsm"
 )
 
+const interestChannelSize = 1000
+
 type TestAdapter interface {
 	TestName() string
 	Logf(format string, args ...interface{})
@@ -44,11 +46,11 @@ func NewTestListener(t TestConfig) *TestListener {
 	}
 
 	tl := &TestListener{
-		decisionOutcomes: make(chan DecisionOutcome, 1000),
-		historyInterest:  make(map[string]chan *swf.HistoryEvent, 1000),
-		decisionInterest: make(map[string]chan *swf.Decision, 1000),
-		stateInterest:    make(map[string]chan string, 1000),
-		dataInterest:     make(map[string]chan *StateData, 1000),
+		decisionOutcomes: make(chan DecisionOutcome),
+		historyInterest:  make(map[string]chan *swf.HistoryEvent),
+		decisionInterest: make(map[string]chan *swf.Decision),
+		stateInterest:    make(map[string]chan string),
+		dataInterest:     make(map[string]chan *StateData),
 		DefaultWait:      time.Duration(t.DefaultWaitTimeout) * time.Second,
 		TestId:           strings.Join([]string{t.Testing.TestName(), uuid.New()}, "-"),
 		testAdapter:      t.Testing,
@@ -133,7 +135,7 @@ func (tl *TestListener) getHistoryInterest(workflowId string) chan *swf.HistoryE
 	tl.historyLock.Lock()
 	historyChan, ok := tl.historyInterest[workflowId]
 	if !ok {
-		historyChan = make(chan *swf.HistoryEvent, 1000)
+		historyChan = make(chan *swf.HistoryEvent, interestChannelSize)
 		tl.historyInterest[workflowId] = historyChan
 	}
 	return historyChan
@@ -144,7 +146,7 @@ func (tl *TestListener) getDecisionInterest(workflowId string) chan *swf.Decisio
 	tl.decisionLock.Lock()
 	decisionChan, ok := tl.decisionInterest[workflowId]
 	if !ok {
-		decisionChan = make(chan *swf.Decision, 1000)
+		decisionChan = make(chan *swf.Decision, interestChannelSize)
 		tl.decisionInterest[workflowId] = decisionChan
 	}
 	return decisionChan
@@ -155,7 +157,7 @@ func (tl *TestListener) getStateInterest(workflowId string) chan string {
 	tl.stateLock.Lock()
 	stateChan, ok := tl.stateInterest[workflowId]
 	if !ok {
-		stateChan = make(chan string, 1000)
+		stateChan = make(chan string, interestChannelSize)
 		tl.stateInterest[workflowId] = stateChan
 	}
 	return stateChan
@@ -166,7 +168,7 @@ func (tl *TestListener) getDataInterest(workflowId string) chan *StateData {
 	tl.dataLock.Lock()
 	dataChan, ok := tl.dataInterest[workflowId]
 	if !ok {
-		dataChan = make(chan *StateData, 1000)
+		dataChan = make(chan *StateData, interestChannelSize)
 		tl.dataInterest[workflowId] = dataChan
 	}
 	return dataChan
@@ -311,19 +313,31 @@ func (tl *TestListener) forward() {
 			for i := len(do.DecisionTask.Events) - 1; i >= 0; i-- {
 				event := do.DecisionTask.Events[i]
 				if *event.EventId > *do.DecisionTask.PreviousStartedEventId {
-					historyChan <- do.DecisionTask.Events[i]
+					select {
+					case historyChan <- do.DecisionTask.Events[i]:
+					default:
+						tl.testAdapter.Fatalf("historyChan full for %s", workflowId)
+					}
 				}
 			}
 
 			//send decisions
 			decisionChan := tl.getDecisionInterest(workflowId)
 			for _, d := range do.Decisions {
-				decisionChan <- d
+				select {
+				case decisionChan <- d:
+				default:
+					tl.testAdapter.Fatalf("decisionChan full for %s", workflowId)
+				}
 			}
 
 			//send states
 			stateChan := tl.getStateInterest(workflowId)
-			stateChan <- do.State.StateName
+			select {
+			case stateChan <- do.State.StateName:
+			default:
+				tl.testAdapter.Fatalf("stateChan full for %s", workflowId)
+			}
 
 			//send data
 			dataChan := tl.getDataInterest(workflowId)
@@ -331,7 +345,12 @@ func (tl *TestListener) forward() {
 				State: do.State.StateName,
 				Data:  tl.deserialize(do.State.StateData),
 			}
-			dataChan <- stateData
+			select {
+			case dataChan <- stateData:
+			default:
+				tl.testAdapter.Fatalf("dataChan full for %s", workflowId)
+			}
+
 		case <-time.After(1 * time.Second):
 			tl.testAdapter.Logf("TestListener: warn, no DecisionOutcomes after 1 second")
 		}
