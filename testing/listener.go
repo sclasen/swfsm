@@ -128,7 +128,7 @@ func (tl *TestListener) TestWorkerTaskList(w *activity.ActivityWorker) string {
 	return w.TaskList + tl.TestId
 }
 
-func (tl *TestListener) RegisterHistoryInterest(workflowId string) chan *swf.HistoryEvent {
+func (tl *TestListener) getHistoryInterest(workflowId string) chan *swf.HistoryEvent {
 	defer tl.historyLock.Unlock()
 	tl.historyLock.Lock()
 	historyChan, ok := tl.historyInterest[workflowId]
@@ -139,7 +139,7 @@ func (tl *TestListener) RegisterHistoryInterest(workflowId string) chan *swf.His
 	return historyChan
 }
 
-func (tl *TestListener) RegisterDecisionInterest(workflowId string) chan *swf.Decision {
+func (tl *TestListener) getDecisionInterest(workflowId string) chan *swf.Decision {
 	defer tl.decisionLock.Unlock()
 	tl.decisionLock.Lock()
 	decisionChan, ok := tl.decisionInterest[workflowId]
@@ -150,7 +150,7 @@ func (tl *TestListener) RegisterDecisionInterest(workflowId string) chan *swf.De
 	return decisionChan
 }
 
-func (tl *TestListener) RegisterStateInterest(workflowId string) chan string {
+func (tl *TestListener) getStateInterest(workflowId string) chan string {
 	defer tl.stateLock.Unlock()
 	tl.stateLock.Lock()
 	stateChan, ok := tl.stateInterest[workflowId]
@@ -161,7 +161,7 @@ func (tl *TestListener) RegisterStateInterest(workflowId string) chan string {
 	return stateChan
 }
 
-func (tl *TestListener) RegisterDataInterest(workflowId string) chan *StateData {
+func (tl *TestListener) getDataInterest(workflowId string) chan *StateData {
 	defer tl.dataLock.Unlock()
 	tl.dataLock.Lock()
 	dataChan, ok := tl.dataInterest[workflowId]
@@ -172,8 +172,24 @@ func (tl *TestListener) RegisterDataInterest(workflowId string) chan *StateData 
 	return dataChan
 }
 
+func (tl *TestListener) RegisterHistoryInterest(workflowId string) {
+	tl.testAdapter.Logf("DEPRECATED: Registration happens automatically now.")
+}
+
+func (tl *TestListener) RegisterDecisionInterest(workflowId string) {
+	tl.testAdapter.Logf("DEPRECATED: Registration happens automatically now.")
+}
+
+func (tl *TestListener) RegisterStateInterest(workflowId string) {
+	tl.testAdapter.Logf("DEPRECATED: Registration happens automatically now.")
+}
+
+func (tl *TestListener) RegisterDataInterest(workflowId string) {
+	tl.testAdapter.Logf("DEPRECATED: Registration happens automatically now.")
+}
+
 func (tl *TestListener) AwaitStateFor(workflowId, state string, waitFor time.Duration) {
-	ch := tl.RegisterStateInterest(workflowId)
+	ch := tl.getStateInterest(workflowId)
 	timer := time.After(waitFor)
 
 	for {
@@ -196,7 +212,7 @@ func (tl *TestListener) AwaitState(workflowId, state string) {
 }
 
 func (tl *TestListener) AwaitEventFor(workflowId string, waitFor time.Duration, predicate func(*swf.HistoryEvent) bool) {
-	ch := tl.RegisterHistoryInterest(workflowId)
+	ch := tl.getHistoryInterest(workflowId)
 	timer := time.After(waitFor)
 	for {
 		select {
@@ -220,7 +236,7 @@ func (tl *TestListener) AwaitEvent(workflowId string, predicate func(*swf.Histor
 }
 
 func (tl *TestListener) AwaitDecisionFor(workflowId string, waitFor time.Duration, predicate func(*swf.Decision) bool) {
-	ch := tl.RegisterDecisionInterest(workflowId)
+	ch := tl.getDecisionInterest(workflowId)
 	timer := time.After(waitFor)
 	for {
 		select {
@@ -244,7 +260,7 @@ func (tl *TestListener) AwaitDecision(workflowId string, predicate func(*swf.Dec
 }
 
 func (tl *TestListener) AwaitDataFor(workflowId string, waitFor time.Duration, predicate func(*StateData) bool) {
-	ch := tl.RegisterDataInterest(workflowId)
+	ch := tl.getDataInterest(workflowId)
 	timer := time.After(waitFor)
 	for {
 		select {
@@ -287,48 +303,35 @@ func (tl *TestListener) forward() {
 				return
 			}
 
-			workflow := *do.DecisionTask.WorkflowExecution.WorkflowId
-			tl.testAdapter.Logf("TestListener: DecisionOutcome for workflow %s", workflow)
+			workflowId := *do.DecisionTask.WorkflowExecution.WorkflowId
+			tl.testAdapter.Logf("TestListener: DecisionOutcome for workflow %s", workflowId)
+
 			//send history events
-			if c, ok := tl.historyInterest[workflow]; ok {
-				tl.testAdapter.Logf("TestListener: yes historyInterest for workflow %s", workflow)
-				for i := len(do.DecisionTask.Events) - 1; i >= 0; i-- {
-					event := do.DecisionTask.Events[i]
-					if *event.EventId > *do.DecisionTask.PreviousStartedEventId {
-						tl.testAdapter.Logf("TestListener: yes historyInterest for workflow %s %s", workflow, *do.DecisionTask.Events[i].EventType)
-						c <- do.DecisionTask.Events[i]
-					}
+			historyChan := tl.getHistoryInterest(workflowId)
+			for i := len(do.DecisionTask.Events) - 1; i >= 0; i-- {
+				event := do.DecisionTask.Events[i]
+				if *event.EventId > *do.DecisionTask.PreviousStartedEventId {
+					historyChan <- do.DecisionTask.Events[i]
 				}
-			} else {
-				tl.testAdapter.Logf("TestListener: no historyInterest for workflow %s", workflow)
 			}
+
 			//send decisions
-			if c, ok := tl.decisionInterest[workflow]; ok {
-				for _, d := range do.Decisions {
-					tl.testAdapter.Logf("TestListener: yes decisionInterest for workflow %s %s", workflow, *d.DecisionType)
-					c <- d
-				}
-			} else {
-				tl.testAdapter.Logf("TestListener: no decisionInterest for workflow %s", workflow)
+			decisionChan := tl.getDecisionInterest(workflowId)
+			for _, d := range do.Decisions {
+				decisionChan <- d
 			}
+
 			//send states
-			if c, ok := tl.stateInterest[workflow]; ok {
-				tl.testAdapter.Logf("TestListener: yes stateInterest for workflow %s %s", workflow, do.State)
-				c <- do.State.StateName
-			} else {
-				tl.testAdapter.Logf("TestListener: no stateInterest for workflow %s", workflow)
-			}
+			stateChan := tl.getStateInterest(workflowId)
+			stateChan <- do.State.StateName
+
 			//send data
-			if c, ok := tl.dataInterest[workflow]; ok {
-				tl.testAdapter.Logf("TestListener: yes stateInterest for workflow %s %s", workflow, do.State)
-				stateData := &StateData{
-					State: do.State.StateName,
-					Data:  tl.deserialize(do.State.StateData),
-				}
-				c <- stateData
-			} else {
-				tl.testAdapter.Logf("TestListener: no stateInterest for workflow %s", workflow)
+			dataChan := tl.getDataInterest(workflowId)
+			stateData := &StateData{
+				State: do.State.StateName,
+				Data:  tl.deserialize(do.State.StateData),
 			}
+			dataChan <- stateData
 		case <-time.After(1 * time.Second):
 			tl.testAdapter.Logf("TestListener: warn, no DecisionOutcomes after 1 second")
 		}
