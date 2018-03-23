@@ -3,7 +3,7 @@ swfsm
 
 * simple workflow finite state machines
 
-go library that provides a Finite State Machine abstraction and other niceities on top of swf apis.
+go library that provides a Finite State Machine abstraction and other niceties on top of swf apis.
 
  Built using the [aws-sdk-go](https://github.com/awslabs/aws-sdk-go)
 
@@ -32,4 +32,4 @@ Please see the godoc for detailed documentation and examples.
 versions
 --------
 
-Please see vendor/vendor.js for the version of aws-sdk-go that this lib currently supports.
+Please see vendor/vendor.json for the version of aws-sdk-go that this lib currently supports.
