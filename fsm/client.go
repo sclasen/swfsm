@@ -30,6 +30,7 @@ type FSMClient interface {
 	GetWorkflowExecutionHistoryPages(execution *swf.WorkflowExecution, fn func(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool)) error
 	GetWorkflowExecutionHistoryFromReader(reader io.Reader) (*swf.GetWorkflowExecutionHistoryOutput, error)
 	FindAll(input *FindInput) (output *FindOutput, err error)
+	FindAllWalk(input *FindInput, workflowInfosFunc WorkflowInfosFunc) (err error)
 	FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error)
 	NewHistorySegmentor() HistorySegmentor
 }
@@ -249,6 +250,37 @@ func (c *client) NewHistorySegmentor() HistorySegmentor {
 
 func (c *client) FindAll(input *FindInput) (output *FindOutput, err error) {
 	return NewFinder(c.f.Domain, c.c).FindAll(input)
+}
+
+func (c *client) FindAllWalk(input *FindInput, workflowInfosFunc WorkflowInfosFunc) error {
+	f := NewFinder(c.f.Domain, c.c)
+	output, err := f.FindAll(input)
+
+	for {
+		if err != nil {
+			return err
+		}
+
+		err := workflowInfosFunc(&swf.WorkflowExecutionInfos{ExecutionInfos: output.ExecutionInfos})
+
+		if err != nil {
+			if IsStopWalking(err) {
+				return nil
+			}
+			return err
+		}
+
+		if output.OpenNextPageToken == nil && output.ClosedNextPageToken == nil {
+			break
+		}
+
+		input.OpenNextPageToken = output.OpenNextPageToken
+		input.ClosedNextPageToken = output.ClosedNextPageToken
+		output, err = f.FindAll(input)
+	}
+
+	return nil
+
 }
 
 func (c *client) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error) {
