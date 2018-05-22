@@ -23,12 +23,14 @@ const (
 type Finder interface {
 	FindAll(*FindInput) (*FindOutput, error)
 	FindLatestByWorkflowID(workflowID string) (*swf.WorkflowExecution, error)
+	Reset()
 }
 
 func NewFinder(domain string, c ClientSWFOps) Finder {
 	return &finder{
-		domain: domain,
-		c:      c,
+		domain:          domain,
+		c:               c,
+		workflowIdIndex: make(map[string]struct{}),
 	}
 }
 
@@ -49,8 +51,6 @@ type FindInput struct {
 	TagFilter         *swf.TagFilter
 	TypeFilter        *swf.WorkflowTypeFilter
 	CloseStatusFilter *swf.CloseStatusFilter // only closed
-
-	workflowIdIndex map[string]struct{} // private on input for passing for use on subsequent pages
 }
 
 type FindOutput struct {
@@ -60,8 +60,9 @@ type FindOutput struct {
 }
 
 type finder struct {
-	domain string
-	c      ClientSWFOps
+	domain          string
+	c               ClientSWFOps
+	workflowIdIndex map[string]struct{}
 }
 
 func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
@@ -204,16 +205,12 @@ func (f *finder) setMostSelectiveTimeFilter(input *FindInput, output *listAnyWor
 }
 
 func (f *finder) append(input *FindInput, output *FindOutput, infos []*swf.WorkflowExecutionInfo) {
-	if input.workflowIdIndex == nil {
-		input.workflowIdIndex = make(map[string]struct{})
-	}
-
 	for _, info := range infos {
 		if input.StatusFilter == FilterStatusOpenPriorityWorkflow {
-			if _, ok := input.workflowIdIndex[*info.Execution.WorkflowId]; ok {
+			if _, ok := f.workflowIdIndex[*info.Execution.WorkflowId]; ok {
 				continue
 			}
-			input.workflowIdIndex[*info.Execution.WorkflowId] = struct{}{}
+			f.workflowIdIndex[*info.Execution.WorkflowId] = struct{}{}
 		}
 
 		output.ExecutionInfos = append(output.ExecutionInfos, info)
@@ -338,4 +335,8 @@ func (f *finder) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowEx
 		return output.ExecutionInfos[0].Execution, nil
 	}
 	return nil, nil
+}
+
+func (f *finder) Reset() {
+	f.workflowIdIndex = make(map[string]struct{})
 }
