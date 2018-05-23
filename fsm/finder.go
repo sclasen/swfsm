@@ -244,7 +244,7 @@ func (f *finder) applyInputLocally(input *FindInput, infos []*swf.WorkflowExecut
 			if *input.TypeFilter.Name != *info.WorkflowType.Name {
 				continue
 			}
-			if input.TypeFilter.Version != nil && input.TypeFilter.Version != nil {
+			if input.TypeFilter.Version != nil {
 				if *input.TypeFilter.Version != *info.WorkflowType.Version {
 					continue
 				}
