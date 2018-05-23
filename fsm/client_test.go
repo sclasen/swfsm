@@ -735,6 +735,79 @@ func TestEmptyFindLatestByWorkflowID(t *testing.T) {
 	mockSwf.AssertExpectations(t)
 }
 
+func TestClient_FindAllWalk(t *testing.T) {
+	mockSwf := &mocks.SWFAPI{}
+
+	// page 1 open
+	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+		Domain: aws.String(dummyFsm().Domain),
+	}).Return(
+		func(req *swf.ListOpenWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("A")}, StartTimestamp: aws.Time(time.Now())},
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("B")}, StartTimestamp: aws.Time(time.Now())},
+				},
+				NextPageToken: aws.String("page-2"),
+			}
+		}, nil,
+	)
+
+	// page 2 closed
+	mockSwf.MockOnTyped_ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
+		Domain: aws.String(dummyFsm().Domain),
+	}).Return(
+		func(req *swf.ListClosedWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("C")}, StartTimestamp: aws.Time(time.Now())},
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("D")}, StartTimestamp: aws.Time(time.Now())},
+				},
+			}
+		}, nil,
+	)
+
+	// page 2 open
+	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+		Domain:        aws.String(dummyFsm().Domain),
+		NextPageToken: aws.String("page-2"),
+	}).Return(
+		func(req *swf.ListOpenWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("E")}, StartTimestamp: aws.Time(time.Now())},
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("F")}, StartTimestamp: aws.Time(time.Now())},
+				},
+			}
+		}, nil,
+	)
+
+	// no page 2 closed
+
+	pages := 0
+	workflows := []string{}
+
+	NewFSMClient(dummyFsm(), mockSwf).FindAllWalk(&FindInput{StatusFilter: FilterStatusAll}, func(infos *swf.WorkflowExecutionInfos) error {
+		pages++
+		for _, info := range infos.ExecutionInfos {
+			workflows = append(workflows, *info.Execution.WorkflowId)
+		}
+		return nil
+	})
+
+	if pages != 2 {
+		t.Fatal("expected 2 pages. got: ", pages)
+	}
+
+	for _, want := range []string{"A", "B", "C", "D", "E", "F"} {
+		if !stringsContain(workflows, want) {
+			t.Fatal("workflow not found: ", want)
+		}
+	}
+
+	mockSwf.AssertExpectations(t)
+}
+
 func dummyFsm() *FSM {
 	fsm := &FSM{
 		Domain:           "client-test",
