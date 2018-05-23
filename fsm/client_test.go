@@ -107,7 +107,7 @@ func TestClient(t *testing.T) {
 	}
 
 	found := false
-	err = fsmClient.WalkOpenWorkflowInfos(&swf.ListOpenWorkflowExecutionsInput{}, func(infos *swf.WorkflowExecutionInfos) error {
+	err = fsmClient.FindAllWalk(&FindInput{}, func(infos *swf.WorkflowExecutionInfos) error {
 		for _, info := range infos.ExecutionInfos {
 			if *info.Execution.WorkflowId == workflow {
 				found = true
