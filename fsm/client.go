@@ -3,8 +3,6 @@ package fsm
 import (
 	"fmt"
 
-	"time"
-
 	"io"
 	"strings"
 
@@ -20,7 +18,6 @@ import (
 )
 
 type FSMClient interface {
-	WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error
 	GetState(id string) (string, interface{}, error)
 	GetStateForRun(workflow, run string) (string, interface{}, error)
 	GetSerializedStateForRun(workflow, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error)
@@ -30,7 +27,7 @@ type FSMClient interface {
 	GetWorkflowExecutionHistoryPages(execution *swf.WorkflowExecution, fn func(p *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool)) error
 	GetWorkflowExecutionHistoryFromReader(reader io.Reader) (*swf.GetWorkflowExecutionHistoryOutput, error)
 	FindAll(input *FindInput) (output *FindOutput, err error)
-	FindAllWalk(input *FindInput, workflowInfosFunc WorkflowInfosFunc) (err error)
+	FindAllWalk(input *FindInput, fn func(info *swf.WorkflowExecutionInfo, done bool) (cont bool)) (err error)
 	FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error)
 	NewHistorySegmentor() HistorySegmentor
 }
@@ -56,57 +53,6 @@ func NewFSMClient(f *FSM, c ClientSWFOps) FSMClient {
 type client struct {
 	f *FSM
 	c ClientSWFOps
-}
-
-type WorkflowInfosFunc func(infos *swf.WorkflowExecutionInfos) error
-
-type stopWalkingError error
-
-func StopWalking() stopWalkingError {
-	return stopWalkingError(fmt.Errorf(""))
-}
-
-func IsStopWalking(err error) bool {
-	_, ok := err.(stopWalkingError)
-	return ok
-}
-
-func (c *client) WalkOpenWorkflowInfos(template *swf.ListOpenWorkflowExecutionsInput, workflowInfosFunc WorkflowInfosFunc) error {
-	template.Domain = S(c.f.Domain)
-
-	if template.StartTimeFilter == nil {
-		template.StartTimeFilter = &swf.ExecutionTimeFilter{OldestDate: aws.Time(time.Unix(0, 0))}
-	}
-
-	if template.TypeFilter == nil && template.ExecutionFilter == nil && template.TagFilter == nil {
-		template.TypeFilter = &swf.WorkflowTypeFilter{Name: S(c.f.Name)}
-	}
-
-	infos, err := c.c.ListOpenWorkflowExecutions(template)
-
-	for {
-		if err != nil {
-			return err
-		}
-
-		err := workflowInfosFunc(infos)
-
-		if err != nil {
-			if IsStopWalking(err) {
-				return nil
-			}
-			return err
-		}
-
-		if infos.NextPageToken == nil {
-			break
-		}
-
-		template.NextPageToken = infos.NextPageToken
-		infos, err = c.c.ListOpenWorkflowExecutions(template)
-	}
-
-	return nil
 }
 
 func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error) {
@@ -252,31 +198,28 @@ func (c *client) FindAll(input *FindInput) (output *FindOutput, err error) {
 	return NewFinder(c.f.Domain, c.c).FindAll(input)
 }
 
-func (c *client) FindAllWalk(input *FindInput, workflowInfosFunc WorkflowInfosFunc) error {
+func (c *client) FindAllWalk(input *FindInput, fn func(info *swf.WorkflowExecutionInfo, done bool) (cont bool)) error {
 	f := NewFinder(c.f.Domain, c.c)
-	output, err := f.FindAll(input)
 
-	for {
+	cont := true
+	for cont {
+		output, err := f.FindAll(input)
 		if err != nil {
 			return err
 		}
 
-		err := workflowInfosFunc(&swf.WorkflowExecutionInfos{ExecutionInfos: output.ExecutionInfos})
+		hasNextPage := output.OpenNextPageToken != nil || output.ClosedNextPageToken != nil
 
-		if err != nil {
-			if IsStopWalking(err) {
+		for i, info := range output.ExecutionInfos {
+			if !cont {
 				return nil
 			}
-			return err
-		}
-
-		if output.OpenNextPageToken == nil && output.ClosedNextPageToken == nil {
-			break
+			done := !hasNextPage && i+1 == len(output.ExecutionInfos)
+			cont = fn(info, done) && !done
 		}
 
 		input.OpenNextPageToken = output.OpenNextPageToken
 		input.ClosedNextPageToken = output.ClosedNextPageToken
-		output, err = f.FindAll(input)
 	}
 
 	return nil

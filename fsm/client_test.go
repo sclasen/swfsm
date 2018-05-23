@@ -107,14 +107,12 @@ func TestClient(t *testing.T) {
 	}
 
 	found := false
-	err = fsmClient.FindAllWalk(&FindInput{}, func(infos *swf.WorkflowExecutionInfos) error {
-		for _, info := range infos.ExecutionInfos {
-			if *info.Execution.WorkflowId == workflow {
-				found = true
-				return StopWalking()
-			}
+	err = fsmClient.FindAllWalk(&FindInput{}, func(info *swf.WorkflowExecutionInfo, done bool) (cont bool) {
+		if *info.Execution.WorkflowId == workflow {
+			found = true
+			return false
 		}
-		return nil
+		return true
 	})
 
 	if err != nil {
@@ -736,6 +734,58 @@ func TestEmptyFindLatestByWorkflowID(t *testing.T) {
 }
 
 func TestClient_FindAllWalk(t *testing.T) {
+	mockSwf := setupFindAllWalkMocks()
+
+	steps := 0
+	workflows := []string{}
+
+	NewFSMClient(dummyFsm(), mockSwf).FindAllWalk(&FindInput{StatusFilter: FilterStatusAll}, func(info *swf.WorkflowExecutionInfo, done bool) (cont bool) {
+		steps++
+		workflows = append(workflows, *info.Execution.WorkflowId)
+		if done && *info.Execution.WorkflowId != "E" {
+			t.Fatal("should be done on E")
+		}
+		return true
+	})
+
+	if steps != 6 {
+		t.Fatal("expected 6 steps. got: ", steps)
+	}
+
+	for _, want := range []string{"A", "B", "C", "D", "E", "F"} {
+		if !stringsContain(workflows, want) {
+			t.Fatal("workflow not found: ", want)
+		}
+	}
+
+	mockSwf.AssertExpectations(t)
+}
+
+func TestClient_FindAllWalk_EarlyTermination(t *testing.T) {
+	mockSwf := setupFindAllWalkMocks()
+	steps := 0
+	workflows := []string{}
+
+	NewFSMClient(dummyFsm(), mockSwf).FindAllWalk(&FindInput{StatusFilter: FilterStatusAll}, func(info *swf.WorkflowExecutionInfo, done bool) (cont bool) {
+		steps++
+		workflows = append(workflows, *info.Execution.WorkflowId)
+		return steps < 5
+	})
+
+	if steps != 5 {
+		t.Fatal("expected 5 steps. got: ", steps)
+	}
+
+	for _, want := range []string{"A", "B", "C", "D", "F"} {
+		if !stringsContain(workflows, want) {
+			t.Fatalf("workflow not found: %v; have %v", want, workflows)
+		}
+	}
+
+	mockSwf.AssertExpectations(t)
+}
+
+func setupFindAllWalkMocks() *mocks.SWFAPI {
 	mockSwf := &mocks.SWFAPI{}
 
 	// page 1 open
@@ -784,28 +834,7 @@ func TestClient_FindAllWalk(t *testing.T) {
 
 	// no page 2 closed
 
-	pages := 0
-	workflows := []string{}
-
-	NewFSMClient(dummyFsm(), mockSwf).FindAllWalk(&FindInput{StatusFilter: FilterStatusAll}, func(infos *swf.WorkflowExecutionInfos) error {
-		pages++
-		for _, info := range infos.ExecutionInfos {
-			workflows = append(workflows, *info.Execution.WorkflowId)
-		}
-		return nil
-	})
-
-	if pages != 2 {
-		t.Fatal("expected 2 pages. got: ", pages)
-	}
-
-	for _, want := range []string{"A", "B", "C", "D", "E", "F"} {
-		if !stringsContain(workflows, want) {
-			t.Fatal("workflow not found: ", want)
-		}
-	}
-
-	mockSwf.AssertExpectations(t)
+	return mockSwf
 }
 
 func dummyFsm() *FSM {
