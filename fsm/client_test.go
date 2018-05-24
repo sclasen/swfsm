@@ -107,14 +107,12 @@ func TestClient(t *testing.T) {
 	}
 
 	found := false
-	err = fsmClient.WalkOpenWorkflowInfos(&swf.ListOpenWorkflowExecutionsInput{}, func(infos *swf.WorkflowExecutionInfos) error {
-		for _, info := range infos.ExecutionInfos {
-			if *info.Execution.WorkflowId == workflow {
-				found = true
-				return StopWalking()
-			}
+	err = fsmClient.FindAllWalk(&FindInput{}, func(info *swf.WorkflowExecutionInfo, done bool) (cont bool) {
+		if *info.Execution.WorkflowId == workflow {
+			found = true
+			return false
 		}
-		return nil
+		return true
 	})
 
 	if err != nil {
@@ -561,6 +559,138 @@ func TestFindAll_FindLatestByWorkflowID(t *testing.T) {
 	mockSwf.AssertExpectations(t)
 }
 
+func TestFindAll_OpenPriorityWorkflow_ByTagIncludingContinuations(t *testing.T) {
+	input := &FindInput{
+		StatusFilter: FilterStatusOpenPriorityWorkflow,
+		TagFilter: &swf.TagFilter{
+			Tag: aws.String("T"),
+		},
+		CloseStatusFilter: &swf.CloseStatusFilter{
+			Status: aws.String(swf.CloseStatusContinuedAsNew),
+		},
+		CloseTimeFilter: &swf.ExecutionTimeFilter{
+			OldestDate: aws.Time(time.Now().Add(-1 * time.Minute)),
+		},
+	}
+
+	mockSwf := &mocks.SWFAPI{}
+
+	expectedOpenInput := &swf.ListOpenWorkflowExecutionsInput{
+		Domain:    aws.String(dummyFsm().Domain),
+		TagFilter: input.TagFilter,
+	}
+	expectedClosedInput := &swf.ListClosedWorkflowExecutionsInput{
+		Domain:          aws.String(dummyFsm().Domain),
+		TagFilter:       input.TagFilter,
+		CloseTimeFilter: input.CloseTimeFilter,
+		/* does not include close status filter in server request, but filtered later locally */
+	}
+
+	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(expectedOpenInput).Return(
+		func(req *swf.ListOpenWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+					&swf.WorkflowExecutionInfo{
+						Execution: &swf.WorkflowExecution{
+							WorkflowId: aws.String("A"),
+							RunId:      aws.String("A-open"),
+						},
+						TagList:        []*string{aws.String("T")},
+						StartTimestamp: aws.Time(time.Now().Add(-6 * time.Minute)),
+					},
+					&swf.WorkflowExecutionInfo{
+						Execution: &swf.WorkflowExecution{
+							WorkflowId: aws.String("B"),
+							RunId:      aws.String("B-open"),
+						},
+						TagList:        []*string{aws.String("T")},
+						StartTimestamp: aws.Time(time.Now().Add(-5 * time.Minute)),
+					},
+				},
+			}
+		}, nil)
+
+	mockSwf.MockOnTyped_ListClosedWorkflowExecutions(expectedClosedInput).Return(
+		func(req *swf.ListClosedWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+					&swf.WorkflowExecutionInfo{
+						Execution: &swf.WorkflowExecution{
+							WorkflowId: aws.String("B"),
+							RunId:      aws.String("B-closed-recently"),
+						},
+						TagList:        []*string{aws.String("T")},
+						StartTimestamp: aws.Time(time.Now().Add(-4 * time.Minute)),
+						CloseTimestamp: aws.Time(time.Now()),
+						CloseStatus:    aws.String(swf.CloseStatusContinuedAsNew),
+					},
+					&swf.WorkflowExecutionInfo{
+						Execution: &swf.WorkflowExecution{
+							WorkflowId: aws.String("C"),
+							RunId:      aws.String("C-closed-recently"),
+						},
+						TagList:        []*string{aws.String("T")},
+						StartTimestamp: aws.Time(time.Now().Add(-3 * time.Minute)),
+						CloseTimestamp: aws.Time(time.Now()),
+						CloseStatus:    aws.String(swf.CloseStatusContinuedAsNew),
+					},
+					&swf.WorkflowExecutionInfo{
+						Execution: &swf.WorkflowExecution{
+							WorkflowId: aws.String("D"),
+							RunId:      aws.String("D-closed-a-while-ago"),
+						},
+						TagList:        []*string{aws.String("T")},
+						StartTimestamp: aws.Time(time.Now().Add(-3 * time.Minute)),
+						CloseTimestamp: aws.Time(time.Now().Add(-2 * time.Minute)),
+						CloseStatus:    aws.String(swf.CloseStatusContinuedAsNew),
+					},
+					&swf.WorkflowExecutionInfo{
+						Execution: &swf.WorkflowExecution{
+							WorkflowId: aws.String("E"),
+							RunId:      aws.String("E-closed-recently-completed"),
+						},
+						TagList:        []*string{aws.String("T")},
+						StartTimestamp: aws.Time(time.Now().Add(-3 * time.Minute)),
+						CloseTimestamp: aws.Time(time.Now()),
+						CloseStatus:    aws.String(swf.CloseStatusCompleted),
+					},
+				},
+			}
+		}, nil)
+
+	output, err := NewFSMClient(dummyFsm(), mockSwf).FindAll(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(output.ExecutionInfos) != 3 {
+		t.Fatal(output.ExecutionInfos)
+	}
+
+	if *output.ExecutionInfos[0].Execution.WorkflowId != "C" {
+		t.Fatal(output.ExecutionInfos)
+	}
+	if *output.ExecutionInfos[0].Execution.RunId != "C-closed-recently" {
+		t.Fatal(output.ExecutionInfos)
+	}
+
+	if *output.ExecutionInfos[1].Execution.WorkflowId != "B" {
+		t.Fatal(output.ExecutionInfos)
+	}
+	if *output.ExecutionInfos[1].Execution.RunId != "B-open" {
+		t.Fatal(output.ExecutionInfos)
+	}
+
+	if *output.ExecutionInfos[2].Execution.WorkflowId != "A" {
+		t.Fatal(output.ExecutionInfos)
+	}
+	if *output.ExecutionInfos[2].Execution.RunId != "A-open" {
+		t.Fatal(output.ExecutionInfos)
+	}
+
+	mockSwf.AssertExpectations(t)
+}
+
 func TestEmptyFindLatestByWorkflowID(t *testing.T) {
 	mockSwf := &mocks.SWFAPI{}
 
@@ -585,18 +715,14 @@ func TestEmptyFindLatestByWorkflowID(t *testing.T) {
 	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(expectedOpenInput).Return(
 		func(req *swf.ListOpenWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
 			return &swf.WorkflowExecutionInfos{
-				ExecutionInfos: []*swf.WorkflowExecutionInfo{
-				//empty
-				},
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{},
 			}
 		}, nil,
 	)
 	mockSwf.MockOnTyped_ListClosedWorkflowExecutions(expectedClosedInput).Return(
 		func(req *swf.ListClosedWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
 			return &swf.WorkflowExecutionInfos{
-				ExecutionInfos: []*swf.WorkflowExecutionInfo{
-				//empty
-				},
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{},
 			}
 		}, nil,
 	)
@@ -605,6 +731,110 @@ func TestEmptyFindLatestByWorkflowID(t *testing.T) {
 		t.Fatal("expected an error when no results")
 	}
 	mockSwf.AssertExpectations(t)
+}
+
+func TestClient_FindAllWalk(t *testing.T) {
+	mockSwf := setupFindAllWalkMocks()
+
+	steps := 0
+	workflows := []string{}
+
+	NewFSMClient(dummyFsm(), mockSwf).FindAllWalk(&FindInput{StatusFilter: FilterStatusAll}, func(info *swf.WorkflowExecutionInfo, done bool) (cont bool) {
+		steps++
+		workflows = append(workflows, *info.Execution.WorkflowId)
+		if done && *info.Execution.WorkflowId != "E" {
+			t.Fatal("should be done on E")
+		}
+		return true
+	})
+
+	if steps != 6 {
+		t.Fatal("expected 6 steps. got: ", steps)
+	}
+
+	for _, want := range []string{"A", "B", "C", "D", "E", "F"} {
+		if !stringsContain(workflows, want) {
+			t.Fatal("workflow not found: ", want)
+		}
+	}
+
+	mockSwf.AssertExpectations(t)
+}
+
+func TestClient_FindAllWalk_EarlyTermination(t *testing.T) {
+	mockSwf := setupFindAllWalkMocks()
+	steps := 0
+	workflows := []string{}
+
+	NewFSMClient(dummyFsm(), mockSwf).FindAllWalk(&FindInput{StatusFilter: FilterStatusAll}, func(info *swf.WorkflowExecutionInfo, done bool) (cont bool) {
+		steps++
+		workflows = append(workflows, *info.Execution.WorkflowId)
+		return steps < 5
+	})
+
+	if steps != 5 {
+		t.Fatal("expected 5 steps. got: ", steps)
+	}
+
+	for _, want := range []string{"A", "B", "C", "D", "F"} {
+		if !stringsContain(workflows, want) {
+			t.Fatalf("workflow not found: %v; have %v", want, workflows)
+		}
+	}
+
+	mockSwf.AssertExpectations(t)
+}
+
+func setupFindAllWalkMocks() *mocks.SWFAPI {
+	mockSwf := &mocks.SWFAPI{}
+
+	// page 1 open
+	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+		Domain: aws.String(dummyFsm().Domain),
+	}).Return(
+		func(req *swf.ListOpenWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("A")}, StartTimestamp: aws.Time(time.Now())},
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("B")}, StartTimestamp: aws.Time(time.Now())},
+				},
+				NextPageToken: aws.String("page-2"),
+			}
+		}, nil,
+	)
+
+	// page 2 closed
+	mockSwf.MockOnTyped_ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
+		Domain: aws.String(dummyFsm().Domain),
+	}).Return(
+		func(req *swf.ListClosedWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("C")}, StartTimestamp: aws.Time(time.Now())},
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("D")}, StartTimestamp: aws.Time(time.Now())},
+				},
+			}
+		}, nil,
+	)
+
+	// page 2 open
+	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+		Domain:        aws.String(dummyFsm().Domain),
+		NextPageToken: aws.String("page-2"),
+	}).Return(
+		func(req *swf.ListOpenWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("E")}, StartTimestamp: aws.Time(time.Now())},
+					{Execution: &swf.WorkflowExecution{WorkflowId: aws.String("F")}, StartTimestamp: aws.Time(time.Now())},
+				},
+			}
+		}, nil,
+	)
+
+	// no page 2 closed
+
+	return mockSwf
 }
 
 func dummyFsm() *FSM {

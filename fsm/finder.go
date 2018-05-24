@@ -13,21 +13,24 @@ import (
 )
 
 const (
-	FilterStatusAll          = "ALL"
-	FilterStatusOpen         = "OPEN"
-	FilterStatusOpenPriority = "OPEN_PRIORITY"
-	FilterStatusClosed       = "CLOSED"
+	FilterStatusAll                  = "ALL"                    // open + closed
+	FilterStatusOpen                 = "OPEN"                   // open only
+	FilterStatusOpenPriority         = "OPEN_PRIORITY"          // open (+ closed, only if open is totally empty)
+	FilterStatusOpenPriorityWorkflow = "OPEN_PRIORITY_WORKFLOW" // open (+ closed, only if open not present workflow-by-workflow)
+	FilterStatusClosed               = "CLOSED"                 // closed only
 )
 
 type Finder interface {
 	FindAll(*FindInput) (*FindOutput, error)
 	FindLatestByWorkflowID(workflowID string) (*swf.WorkflowExecution, error)
+	Reset()
 }
 
 func NewFinder(domain string, c ClientSWFOps) Finder {
 	return &finder{
-		domain: domain,
-		c:      c,
+		domain:          domain,
+		c:               c,
+		workflowIdIndex: make(map[string]struct{}),
 	}
 }
 
@@ -57,8 +60,9 @@ type FindOutput struct {
 }
 
 type finder struct {
-	domain string
-	c      ClientSWFOps
+	domain          string
+	c               ClientSWFOps
+	workflowIdIndex map[string]struct{}
 }
 
 func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
@@ -72,35 +76,46 @@ func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
 		}
 	}
 
-	if input.StatusFilter != FilterStatusAll &&
-		input.StatusFilter != FilterStatusOpen &&
-		input.StatusFilter != FilterStatusOpenPriority &&
-		input.StatusFilter != FilterStatusClosed {
+	if !stringsContain([]string{
+		FilterStatusAll,
+		FilterStatusOpen,
+		FilterStatusOpenPriority,
+		FilterStatusOpenPriorityWorkflow,
+		FilterStatusClosed,
+	},
+		input.StatusFilter) {
 		return nil, fmt.Errorf("Invalid status filter")
 	}
 
 	selectiveFilter := f.mostSelectiveFilters(input)
 	output = &FindOutput{}
 
-	if input.StatusFilter == FilterStatusAll || input.StatusFilter == FilterStatusOpen || input.StatusFilter == FilterStatusOpenPriority {
-		openInput := &swf.ListOpenWorkflowExecutionsInput{
-			Domain:          &f.domain,
-			ReverseOrder:    input.ReverseOrder,
-			MaximumPageSize: input.MaximumPageSize,
-			NextPageToken:   input.OpenNextPageToken,
-			StartTimeFilter: selectiveFilter.StartTimeFilter,
-			ExecutionFilter: selectiveFilter.ExecutionFilter,
-			TagFilter:       selectiveFilter.TagFilter,
-			TypeFilter:      selectiveFilter.TypeFilter,
-		}
+	if input.OpenNextPageToken != nil || (input.OpenNextPageToken == nil && input.ClosedNextPageToken == nil) {
+		if stringsContain([]string{
+			FilterStatusAll,
+			FilterStatusOpen,
+			FilterStatusOpenPriority,
+			FilterStatusOpenPriorityWorkflow,
+		}, input.StatusFilter) {
+			openInput := &swf.ListOpenWorkflowExecutionsInput{
+				Domain:          &f.domain,
+				ReverseOrder:    input.ReverseOrder,
+				MaximumPageSize: input.MaximumPageSize,
+				NextPageToken:   input.OpenNextPageToken,
+				StartTimeFilter: selectiveFilter.StartTimeFilter,
+				ExecutionFilter: selectiveFilter.ExecutionFilter,
+				TagFilter:       selectiveFilter.TagFilter,
+				TypeFilter:      selectiveFilter.TypeFilter,
+			}
 
-		resp, err := f.c.ListOpenWorkflowExecutions(openInput)
-		if err != nil {
-			return nil, err
-		}
+			resp, err := f.c.ListOpenWorkflowExecutions(openInput)
+			if err != nil {
+				return nil, err
+			}
 
-		output.ExecutionInfos = append(output.ExecutionInfos, resp.ExecutionInfos...)
-		output.OpenNextPageToken = resp.NextPageToken
+			f.append(input, output, resp.ExecutionInfos)
+			output.OpenNextPageToken = resp.NextPageToken
+		}
 	}
 
 	if input.StatusFilter == FilterStatusOpenPriority {
@@ -110,28 +125,35 @@ func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
 		}
 	}
 
-	if input.StatusFilter == FilterStatusAll || input.StatusFilter == FilterStatusClosed || input.StatusFilter == FilterStatusOpenPriority {
-		closedInput := &swf.ListClosedWorkflowExecutionsInput{
-			Domain:            &f.domain,
-			ReverseOrder:      input.ReverseOrder,
-			MaximumPageSize:   input.MaximumPageSize,
-			NextPageToken:     input.ClosedNextPageToken,
-			StartTimeFilter:   selectiveFilter.StartTimeFilter,
-			CloseTimeFilter:   selectiveFilter.CloseTimeFilter,
-			ExecutionFilter:   selectiveFilter.ExecutionFilter,
-			TagFilter:         selectiveFilter.TagFilter,
-			TypeFilter:        selectiveFilter.TypeFilter,
-			CloseStatusFilter: selectiveFilter.CloseStatusFilter,
+	if input.ClosedNextPageToken != nil || (input.OpenNextPageToken == nil && input.ClosedNextPageToken == nil) {
+		if stringsContain([]string{
+			FilterStatusAll,
+			FilterStatusClosed,
+			FilterStatusOpenPriority,
+			FilterStatusOpenPriorityWorkflow,
+		}, input.StatusFilter) {
+			closedInput := &swf.ListClosedWorkflowExecutionsInput{
+				Domain:            &f.domain,
+				ReverseOrder:      input.ReverseOrder,
+				MaximumPageSize:   input.MaximumPageSize,
+				NextPageToken:     input.ClosedNextPageToken,
+				StartTimeFilter:   selectiveFilter.StartTimeFilter,
+				CloseTimeFilter:   selectiveFilter.CloseTimeFilter,
+				ExecutionFilter:   selectiveFilter.ExecutionFilter,
+				TagFilter:         selectiveFilter.TagFilter,
+				TypeFilter:        selectiveFilter.TypeFilter,
+				CloseStatusFilter: selectiveFilter.CloseStatusFilter,
+			}
+
+			resp, err := f.c.ListClosedWorkflowExecutions(closedInput)
+
+			if err != nil {
+				return nil, err
+			}
+
+			f.append(input, output, resp.ExecutionInfos)
+			output.ClosedNextPageToken = resp.NextPageToken
 		}
-
-		resp, err := f.c.ListClosedWorkflowExecutions(closedInput)
-
-		if err != nil {
-			return nil, err
-		}
-
-		output.ExecutionInfos = append(output.ExecutionInfos, resp.ExecutionInfos...)
-		output.ClosedNextPageToken = resp.NextPageToken
 	}
 
 	output.ExecutionInfos = f.applyInputLocally(input, output.ExecutionInfos)
@@ -182,6 +204,19 @@ func (f *finder) setMostSelectiveTimeFilter(input *FindInput, output *listAnyWor
 	}
 }
 
+func (f *finder) append(input *FindInput, output *FindOutput, infos []*swf.WorkflowExecutionInfo) {
+	for _, info := range infos {
+		if input.StatusFilter == FilterStatusOpenPriorityWorkflow {
+			if _, ok := f.workflowIdIndex[*info.Execution.WorkflowId]; ok {
+				continue
+			}
+			f.workflowIdIndex[*info.Execution.WorkflowId] = struct{}{}
+		}
+
+		output.ExecutionInfos = append(output.ExecutionInfos, info)
+	}
+}
+
 func (f *finder) applyInputLocally(input *FindInput, infos []*swf.WorkflowExecutionInfo) []*swf.WorkflowExecutionInfo {
 	applied := []*swf.WorkflowExecutionInfo{}
 
@@ -209,7 +244,7 @@ func (f *finder) applyInputLocally(input *FindInput, infos []*swf.WorkflowExecut
 			if *input.TypeFilter.Name != *info.WorkflowType.Name {
 				continue
 			}
-			if input.TypeFilter.Version != nil && input.TypeFilter.Version != nil {
+			if input.TypeFilter.Version != nil {
 				if *input.TypeFilter.Version != *info.WorkflowType.Version {
 					continue
 				}
@@ -259,6 +294,15 @@ func (f *finder) applyInputLocally(input *FindInput, infos []*swf.WorkflowExecut
 	return applied
 }
 
+func stringsContain(haystack []string, needle string) bool {
+	for _, h := range haystack {
+		if h == needle {
+			return true
+		}
+	}
+	return false
+}
+
 type sortExecutionInfos []*swf.WorkflowExecutionInfo
 
 func (e sortExecutionInfos) Len() int      { return len(e) }
@@ -291,4 +335,8 @@ func (f *finder) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowEx
 		return output.ExecutionInfos[0].Execution, nil
 	}
 	return nil, nil
+}
+
+func (f *finder) Reset() {
+	f.workflowIdIndex = make(map[string]struct{})
 }
