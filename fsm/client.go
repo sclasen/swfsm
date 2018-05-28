@@ -220,6 +220,7 @@ func (c *client) FindAllWalk(input *FindInput, fn func(info *swf.WorkflowExecuti
 
 		input.OpenNextPageToken = output.OpenNextPageToken
 		input.ClosedNextPageToken = output.ClosedNextPageToken
+		cont = cont && hasNextPage
 	}
 
 	return nil
