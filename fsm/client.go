@@ -201,8 +201,8 @@ func (c *client) FindAll(input *FindInput) (output *FindOutput, err error) {
 func (c *client) FindAllWalk(input *FindInput, fn func(info *swf.WorkflowExecutionInfo, done bool) (cont bool)) error {
 	f := NewFinder(c.f.Domain, c.c)
 
-	cont := true
-	for cont {
+	var done bool
+	for !done {
 		output, err := f.FindAll(input)
 		if err != nil {
 			return err
@@ -211,19 +211,19 @@ func (c *client) FindAllWalk(input *FindInput, fn func(info *swf.WorkflowExecuti
 		hasNextPage := output.OpenNextPageToken != nil || output.ClosedNextPageToken != nil
 
 		for i, info := range output.ExecutionInfos {
-			if !cont {
-				return nil
+			done = !hasNextPage && i+1 == len(output.ExecutionInfos) // done because paging+iteration
+			done = !fn(info, done) || done                           // done because fn
+			if done {
+				break
 			}
-			done := !hasNextPage && i+1 == len(output.ExecutionInfos)
-			cont = fn(info, done) && !done
 		}
 
 		input.OpenNextPageToken = output.OpenNextPageToken
 		input.ClosedNextPageToken = output.ClosedNextPageToken
+		done = done || !hasNextPage // done because paging (didn't iterate)
 	}
 
 	return nil
-
 }
 
 func (c *client) FindLatestByWorkflowID(workflowID string) (exec *swf.WorkflowExecution, err error) {

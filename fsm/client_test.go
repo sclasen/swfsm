@@ -761,6 +761,29 @@ func TestClient_FindAllWalk(t *testing.T) {
 	mockSwf.AssertExpectations(t)
 }
 
+func TestClient_FindAllWalk_Empty(t *testing.T) {
+	mockSwf := setupFindAllWalkMocksEmpty()
+
+	steps := 0
+	workflows := []string{}
+
+	NewFSMClient(dummyFsm(), mockSwf).FindAllWalk(&FindInput{StatusFilter: FilterStatusAll}, func(info *swf.WorkflowExecutionInfo, done bool) (cont bool) {
+		steps++
+		workflows = append(workflows, *info.Execution.WorkflowId)
+		return true
+	})
+
+	if steps != 0 {
+		t.Fatal("expected 0 steps. got: ", steps)
+	}
+
+	if len(workflows) != 0 {
+		t.Fatal("expected 0 workflows. got: ", workflows)
+	}
+
+	mockSwf.AssertExpectations(t)
+}
+
 func TestClient_FindAllWalk_EarlyTermination(t *testing.T) {
 	mockSwf := setupFindAllWalkMocks()
 	steps := 0
@@ -803,7 +826,7 @@ func setupFindAllWalkMocks() *mocks.SWFAPI {
 		}, nil,
 	)
 
-	// page 2 closed
+	// page 1 closed
 	mockSwf.MockOnTyped_ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
 		Domain: aws.String(dummyFsm().Domain),
 	}).Return(
@@ -833,6 +856,30 @@ func setupFindAllWalkMocks() *mocks.SWFAPI {
 	)
 
 	// no page 2 closed
+
+	return mockSwf
+}
+
+func setupFindAllWalkMocksEmpty() *mocks.SWFAPI {
+	mockSwf := &mocks.SWFAPI{}
+
+	// page 1 open
+	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(&swf.ListOpenWorkflowExecutionsInput{
+		Domain: aws.String(dummyFsm().Domain),
+	}).Return(
+		func(req *swf.ListOpenWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{}
+		}, nil,
+	)
+
+	// page 1 closed
+	mockSwf.MockOnTyped_ListClosedWorkflowExecutions(&swf.ListClosedWorkflowExecutionsInput{
+		Domain: aws.String(dummyFsm().Domain),
+	}).Return(
+		func(req *swf.ListClosedWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{}
+		}, nil,
+	)
 
 	return mockSwf
 }
