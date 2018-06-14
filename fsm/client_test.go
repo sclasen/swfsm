@@ -269,6 +269,7 @@ func TestFindAll_MetadataFiltering(t *testing.T) {
 
 func TestFindAll_TimeFiltering(t *testing.T) {
 	input := &FindInput{
+		StatusFilter: FilterStatusAll,
 		StartTimeFilter: &swf.ExecutionTimeFilter{
 			OldestDate: aws.Time(time.Now().Add(-8 * time.Hour)),
 			LatestDate: aws.Time(time.Now().Add(-6 * time.Hour)),
@@ -281,6 +282,36 @@ func TestFindAll_TimeFiltering(t *testing.T) {
 
 	mockSwf := &mocks.SWFAPI{}
 
+	expectedOpenInput := &swf.ListOpenWorkflowExecutionsInput{
+		Domain:          aws.String(dummyFsm().Domain),
+		StartTimeFilter: input.StartTimeFilter,
+	}
+	mockSwf.MockOnTyped_ListOpenWorkflowExecutions(expectedOpenInput).Return(
+		func(req *swf.ListOpenWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
+			return &swf.WorkflowExecutionInfos{
+				ExecutionInfos: []*swf.WorkflowExecutionInfo{
+					{
+						Execution: &swf.WorkflowExecution{
+							WorkflowId: aws.String("open-A"),
+						},
+						StartTimestamp: aws.Time(time.Now().Add(-7 * time.Hour)),
+					},
+					{
+						Execution: &swf.WorkflowExecution{
+							WorkflowId: aws.String("open-B-start timestamp too early"),
+						},
+						StartTimestamp: aws.Time(time.Now().Add(-9 * time.Hour)),
+					},
+					{
+						Execution: &swf.WorkflowExecution{
+							WorkflowId: aws.String("open-C-start timestamp too late"),
+						},
+						StartTimestamp: aws.Time(time.Now().Add(-5 * time.Hour)),
+					},
+				},
+			}
+		}, nil)
+
 	expectedClosedInput := &swf.ListClosedWorkflowExecutionsInput{
 		Domain:          aws.String(dummyFsm().Domain),
 		CloseTimeFilter: input.CloseTimeFilter,
@@ -290,37 +321,37 @@ func TestFindAll_TimeFiltering(t *testing.T) {
 		func(req *swf.ListClosedWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
 			return &swf.WorkflowExecutionInfos{
 				ExecutionInfos: []*swf.WorkflowExecutionInfo{
-					&swf.WorkflowExecutionInfo{
+					{
 						Execution: &swf.WorkflowExecution{
-							WorkflowId: aws.String("A"),
+							WorkflowId: aws.String("closed-A"),
 						},
 						StartTimestamp: aws.Time(time.Now().Add(-7 * time.Hour)),
 						CloseTimestamp: aws.Time(time.Now().Add(-3 * time.Hour)),
 					},
-					&swf.WorkflowExecutionInfo{
+					{
 						Execution: &swf.WorkflowExecution{
-							WorkflowId: aws.String("B-start timestamp too early"),
+							WorkflowId: aws.String("closed-B-start timestamp too early"),
 						},
 						StartTimestamp: aws.Time(time.Now().Add(-9 * time.Hour)),
 						CloseTimestamp: aws.Time(time.Now().Add(-3 * time.Hour)),
 					},
-					&swf.WorkflowExecutionInfo{
+					{
 						Execution: &swf.WorkflowExecution{
-							WorkflowId: aws.String("C-start timestamp too late"),
+							WorkflowId: aws.String("closed-C-start timestamp too late"),
 						},
 						StartTimestamp: aws.Time(time.Now().Add(-5 * time.Hour)),
 						CloseTimestamp: aws.Time(time.Now().Add(-3 * time.Hour)),
 					},
-					&swf.WorkflowExecutionInfo{
+					{
 						Execution: &swf.WorkflowExecution{
-							WorkflowId: aws.String("D-close timestamp too early"),
+							WorkflowId: aws.String("closed-D-close timestamp too early"),
 						},
 						StartTimestamp: aws.Time(time.Now().Add(-7 * time.Hour)),
 						CloseTimestamp: aws.Time(time.Now().Add(-5 * time.Hour)),
 					},
-					&swf.WorkflowExecutionInfo{
+					{
 						Execution: &swf.WorkflowExecution{
-							WorkflowId: aws.String("E-close timestamp too late"),
+							WorkflowId: aws.String("closed-E-close timestamp too late"),
 						},
 						StartTimestamp: aws.Time(time.Now().Add(-7 * time.Hour)),
 						CloseTimestamp: aws.Time(time.Now().Add(-1 * time.Hour)),
@@ -334,11 +365,15 @@ func TestFindAll_TimeFiltering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(output.ExecutionInfos) != 1 {
+	if len(output.ExecutionInfos) != 2 {
 		t.Fatal(output.ExecutionInfos)
 	}
 
-	if *output.ExecutionInfos[0].Execution.WorkflowId != "A" {
+	if *output.ExecutionInfos[0].Execution.WorkflowId != "closed-A" {
+		t.Fatal(output.ExecutionInfos)
+	}
+
+	if *output.ExecutionInfos[1].Execution.WorkflowId != "open-A" {
 		t.Fatal(output.ExecutionInfos)
 	}
 
