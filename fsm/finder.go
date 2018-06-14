@@ -102,7 +102,7 @@ func (f *finder) FindAll(input *FindInput) (output *FindOutput, err error) {
 				ReverseOrder:    input.ReverseOrder,
 				MaximumPageSize: input.MaximumPageSize,
 				NextPageToken:   input.OpenNextPageToken,
-				StartTimeFilter: selectiveFilter.StartTimeFilter,
+				StartTimeFilter: input.StartTimeFilter,
 				ExecutionFilter: selectiveFilter.ExecutionFilter,
 				TagFilter:       selectiveFilter.TagFilter,
 				TypeFilter:      selectiveFilter.TypeFilter,
@@ -192,14 +192,15 @@ func (f *finder) setMostSelectiveMetadataFilter(input *FindInput, output *listAn
 	}
 }
 
+// result only used for for closed list. open list uses input.StartTimeFilter directly
 func (f *finder) setMostSelectiveTimeFilter(input *FindInput, output *listAnyWorkflowExecutionsInput) {
-	if input.StartTimeFilter != nil {
-		output.StartTimeFilter = input.StartTimeFilter
+	if input.CloseTimeFilter != nil {
+		output.CloseTimeFilter = input.CloseTimeFilter
 		return
 	}
 
-	if input.CloseTimeFilter != nil {
-		output.CloseTimeFilter = input.CloseTimeFilter
+	if input.StartTimeFilter != nil {
+		output.StartTimeFilter = input.StartTimeFilter
 		return
 	}
 }
