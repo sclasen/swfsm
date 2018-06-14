@@ -283,8 +283,8 @@ func TestFindAll_TimeFiltering(t *testing.T) {
 
 	expectedClosedInput := &swf.ListClosedWorkflowExecutionsInput{
 		Domain:          aws.String(dummyFsm().Domain),
-		StartTimeFilter: input.StartTimeFilter,
-		/* does not include CloseTimeFilter in server request, but filtered later locally */
+		CloseTimeFilter: input.CloseTimeFilter,
+		/* does not include StartTimeFilter in server request, but filtered later locally */
 	}
 	mockSwf.MockOnTyped_ListClosedWorkflowExecutions(expectedClosedInput).Return(
 		func(req *swf.ListClosedWorkflowExecutionsInput) *swf.WorkflowExecutionInfos {
@@ -342,7 +342,7 @@ func TestFindAll_TimeFiltering(t *testing.T) {
 		t.Fatal(output.ExecutionInfos)
 	}
 
-	mockSwf.AssertExpectations(t) // list closed not called
+	mockSwf.AssertExpectations(t) // list open not called
 }
 
 func TestFindAll_CloseStatusFilterDefaultsStatusFilteredToClosed(t *testing.T) {

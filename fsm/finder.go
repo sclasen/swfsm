@@ -193,13 +193,13 @@ func (f *finder) setMostSelectiveMetadataFilter(input *FindInput, output *listAn
 }
 
 func (f *finder) setMostSelectiveTimeFilter(input *FindInput, output *listAnyWorkflowExecutionsInput) {
-	if input.StartTimeFilter != nil {
-		output.StartTimeFilter = input.StartTimeFilter
+	if input.CloseTimeFilter != nil {
+		output.CloseTimeFilter = input.CloseTimeFilter
 		return
 	}
 
-	if input.CloseTimeFilter != nil {
-		output.CloseTimeFilter = input.CloseTimeFilter
+	if input.StartTimeFilter != nil {
+		output.StartTimeFilter = input.StartTimeFilter
 		return
 	}
 }
