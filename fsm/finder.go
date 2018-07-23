@@ -295,15 +295,6 @@ func (f *finder) applyInputLocally(input *FindInput, infos []*swf.WorkflowExecut
 	return applied
 }
 
-func stringsContain(haystack []string, needle string) bool {
-	for _, h := range haystack {
-		if h == needle {
-			return true
-		}
-	}
-	return false
-}
-
 type sortExecutionInfos []*swf.WorkflowExecutionInfo
 
 func (e sortExecutionInfos) Len() int      { return len(e) }
