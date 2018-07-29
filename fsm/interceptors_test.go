@@ -800,6 +800,31 @@ func TestRemoveLowerPriorityDecisionsExpectsLowerPriorityRemoved(t *testing.T) {
 		outcome.Decisions, "Expected lower priority decisions to have been removed")
 }
 
+func TestCloseWorkflowRemoveIncompatibleDecisionInterceptor(t *testing.T) {
+	// arrange
+	outcome := &Outcome{
+		State:     "state",
+		Data:      "data",
+		Decisions: []*swf.Decision{timerDecision(), scheduleActivityDecision(), completeDecision()},
+	}
+	interceptor := CloseWorkflowRemoveIncompatibleDecisionInterceptor()
+
+	// act
+	interceptor.AfterDecision(nil, interceptorTestContext(), outcome)
+
+	// assert
+	assert.Len(t, outcome.Decisions, 1, "Expected outcome to only have 1 decision because incompatables were removed")
+}
+
+func scheduleActivityDecision() *swf.Decision {
+	return &swf.Decision{
+		DecisionType: S(swf.DecisionTypeScheduleActivityTask),
+		ScheduleActivityTaskDecisionAttributes: &swf.ScheduleActivityTaskDecisionAttributes{
+			ActivityId: S("foobar"),
+		},
+	}
+}
+
 func completeDecision() *swf.Decision {
 	return &swf.Decision{
 		CompleteWorkflowExecutionDecisionAttributes: &swf.CompleteWorkflowExecutionDecisionAttributes{},

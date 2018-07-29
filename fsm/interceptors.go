@@ -429,3 +429,54 @@ func (s *StartCancelPair) decisionsContainStartCancel(in []*swf.Decision, cancel
 	}
 	return -1
 }
+
+func CloseDecisionTypes() []string {
+	return []string{
+		swf.DecisionTypeCompleteWorkflowExecution,
+		swf.DecisionTypeCancelWorkflowExecution,
+		swf.DecisionTypeFailWorkflowExecution,
+
+		// swf.DecisionTypeContinueAsNewWorkflowExecution is technically a close type,
+		// but swfsm currently doesn't really treat it as one and there's
+		// a lot of special logic, so excluding it from here for now
+	}
+}
+
+func CloseDecisionIncompatableDecisionTypes() []string {
+	return []string{
+		// TODO: flush out this list with other incompatible types
+		// TODO: see https://console.aws.amazon.com/support/home?#/case/?caseId=5223303261&displayId=5223303261&language=en
+		swf.DecisionTypeScheduleActivityTask,
+		swf.DecisionTypeStartTimer,
+	}
+}
+
+// CloseWorkflowRemoveIncompatibleDecisionInterceptor checks for
+// incompatible decisions with a Complete workflow decision, and if
+// found removes it from the outcome.
+func CloseWorkflowRemoveIncompatibleDecisionInterceptor() DecisionInterceptor {
+	return &FuncInterceptor{
+		AfterDecisionFn: func(decision *swf.PollForDecisionTaskOutput, ctx *FSMContext, outcome *Outcome) {
+			closingDecisionFound := false
+			// Search for close decisions
+			for _, d := range outcome.Decisions {
+				if stringsContain(CloseDecisionTypes(), *d.DecisionType) {
+					closingDecisionFound = true
+				}
+			}
+
+			// If we have a complete decision, search for banned decisions and drop them.
+			if closingDecisionFound {
+				var decisions []*swf.Decision
+				for _, d := range outcome.Decisions {
+					if stringsContain(CloseDecisionIncompatableDecisionTypes(), *d.DecisionType) {
+						logf(ctx, "fn=CloseWorkflowRemoveIncompatibleDecisionInterceptor at=remove decision-type=%s", *d.DecisionType)
+						continue
+					}
+					decisions = append(decisions, d)
+				}
+				outcome.Decisions = decisions
+			}
+		},
+	}
+}

@@ -891,3 +891,12 @@ func (f *FSM) isErrorMarker(e *swf.HistoryEvent) bool {
 func (f *FSM) EmptyDecisions() []*swf.Decision {
 	return make([]*swf.Decision, 0)
 }
+
+func stringsContain(haystack []string, needle string) bool {
+	for _, h := range haystack {
+		if h == needle {
+			return true
+		}
+	}
+	return false
+}
