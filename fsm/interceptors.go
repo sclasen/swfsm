@@ -469,9 +469,11 @@ func CloseWorkflowRemoveIncompatibleDecisionInterceptor() DecisionInterceptor {
 			if closingDecisionFound {
 				var decisions []*swf.Decision
 				for _, d := range outcome.Decisions {
-					if !stringsContain(CloseDecisionIncompatableDecisionTypes(), *d.DecisionType) {
-						decisions = append(decisions, d)
+					if stringsContain(CloseDecisionIncompatableDecisionTypes(), *d.DecisionType) {
+						logf(ctx, "fn=CloseWorkflowRemoveIncompatibleDecisionInterceptor at=remove decision-type=%s", *d.DecisionType)
+						continue
 					}
+					decisions = append(decisions, d)
 				}
 				outcome.Decisions = decisions
 			}
