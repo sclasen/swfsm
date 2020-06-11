@@ -2,6 +2,7 @@ package fsm
 
 import (
 	"os"
+	"reflect"
 	"testing"
 
 	"strings"
@@ -841,6 +842,93 @@ func TestClient_FindAllWalk_EarlyTermination(t *testing.T) {
 	}
 
 	mockSwf.AssertExpectations(t)
+}
+
+func Test_Client_GetSerializedStateForRun(t *testing.T) {
+	state := &SerializedState{
+		StateVersion: 1,
+		StateName:    "testing",
+		StateData:    "{}",
+		WorkflowId:   "test-workflow-id",
+	}
+
+	stateMarker, err := JSONStateSerializer{}.Serialize(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateMarkerEvent := &swf.HistoryEvent{
+		EventType: aws.String(swf.EventTypeMarkerRecorded),
+		MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
+			Details:    aws.String(stateMarker),
+			MarkerName: aws.String(StateMarker),
+		},
+	}
+
+	makeOtherEvent := func() *swf.HistoryEvent {
+		return &swf.HistoryEvent{
+			EventType: aws.String(swf.EventTypeWorkflowExecutionSignaled),
+		}
+	}
+
+	simpleHistoryWithMarker := &swf.GetWorkflowExecutionHistoryOutput{
+		Events: []*swf.HistoryEvent{
+			makeOtherEvent(),
+			stateMarkerEvent,
+			makeOtherEvent(),
+		},
+		NextPageToken: nil,
+	}
+
+	simpleHistoryWithoutMarker := &swf.GetWorkflowExecutionHistoryOutput{
+		Events: []*swf.HistoryEvent{
+			makeOtherEvent(),
+			makeOtherEvent(),
+		},
+		NextPageToken: nil,
+	}
+
+	tests := []struct {
+		name        string
+		mockHistory *swf.GetWorkflowExecutionHistoryOutput
+		wantState   *SerializedState
+		wantHistory *swf.GetWorkflowExecutionHistoryOutput
+		wantErr     bool
+	}{
+		{
+			name:        "find state on first page",
+			mockHistory: simpleHistoryWithMarker,
+			wantState:   state,
+			wantHistory: simpleHistoryWithMarker,
+			wantErr:     false,
+		},
+		{
+			name:        "do not find state on first page",
+			mockHistory: simpleHistoryWithoutMarker,
+			wantState:   nil,
+			wantHistory: simpleHistoryWithoutMarker,
+			wantErr:     true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockSwf := &mocks.SWFAPI{}
+			mockSwf.MockOnAny_GetWorkflowExecutionHistory().Return(tt.mockHistory, nil)
+
+			c := NewFSMClient(dummyFsm(), mockSwf)
+			gotState, gotHistory, gotError := c.GetSerializedStateForRun("test-workflow-id", "test-run-id")
+			if (gotError != nil) != tt.wantErr {
+				t.Errorf("GetSerializedStateForRun() gotError = %v, wantErr %v", gotError, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotState, tt.wantState) {
+				t.Errorf("GetSerializedStateForRun() gotState = %v, wantState %v", gotState, tt.wantState)
+			}
+			if !reflect.DeepEqual(gotHistory, tt.wantHistory) {
+				t.Errorf("GetSerializedStateForRun() gotHistory = %v, wantState %v", gotHistory, tt.wantHistory)
+			}
+		})
+	}
 }
 
 func setupFindAllWalkMocks() *mocks.SWFAPI {
