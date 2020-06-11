@@ -12,7 +12,7 @@ func TestPanicHandler(t *testing.T) {
 	panicFunc()
 	// Line needs to match our panic call below!
 	if !strings.HasSuffix(file, "panic_test.go") || !strings.HasSuffix(name, "panicFunc") || line != 25 {
-		t.Error("Panic handler did not collect expected information")
+		t.Errorf("Panic handler did not collect expected information: file=%s name=%s line=%d]", file, name, line)
 	}
 }
 
