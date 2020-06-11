@@ -459,7 +459,7 @@ func TestContinuedWorkflows(t *testing.T) {
 	resp := testDecisionTask(4, []*swf.HistoryEvent{&swf.HistoryEvent{
 		EventType: S(swf.EventTypeWorkflowExecutionStarted),
 		WorkflowExecutionStartedEventAttributes: &swf.WorkflowExecutionStartedEventAttributes{
-			Input: S(serializedState),
+			Input:                   S(serializedState),
 			ContinuedExecutionRunId: S("someRunId"),
 		},
 	}})

@@ -33,8 +33,8 @@ func TestSegmentHistory(t *testing.T) {
 			EventId:   aws.Int64(8),
 			EventType: aws.String(swf.EventTypeActivityTaskScheduled),
 			ActivityTaskScheduledEventAttributes: &swf.ActivityTaskScheduledEventAttributes{
-				ActivityId: aws.String(activityId),
-				Input:      aws.String(fsm.Serialize(activityData)),
+				ActivityId:                   aws.String(activityId),
+				Input:                        aws.String(fsm.Serialize(activityData)),
 				DecisionTaskCompletedEventId: aws.Int64(4),
 			},
 		},

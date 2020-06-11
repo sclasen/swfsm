@@ -1,9 +1,10 @@
 package mocks
 
-import "github.com/stretchr/testify/mock"
-
-import "github.com/aws/aws-sdk-go/aws/request"
-import "github.com/aws/aws-sdk-go/service/kinesis"
+import (
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/service/kinesis"
+	"github.com/stretchr/testify/mock"
+)
 
 // AUTO-GENERATED MOCK. DO NOT EDIT.
 // USE make mocks TO REGENERATE.
