@@ -56,29 +56,39 @@ type client struct {
 }
 
 func (c *client) GetSerializedStateForRun(id, run string) (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error) {
-	getState := func() (*SerializedState, *swf.GetWorkflowExecutionHistoryOutput, error) {
+	getState := func() (state *SerializedState, history *swf.GetWorkflowExecutionHistoryOutput, err error) {
+		history = &swf.GetWorkflowExecutionHistoryOutput{}
 
-		history, err := c.c.GetWorkflowExecutionHistory(&swf.GetWorkflowExecutionHistoryInput{
+		eachPage := func(historyPage *swf.GetWorkflowExecutionHistoryOutput, lastPage bool) (shouldContinue bool) {
+			history.Events = append(history.Events, historyPage.Events...)
+			history.NextPageToken = historyPage.NextPageToken
+
+			state, err = c.f.findSerializedState(historyPage.Events)
+			// err is returned below from getState func after all pages
+
+			shouldContinue = !lastPage && state == nil
+			return
+		}
+
+		pagingErr := c.c.GetWorkflowExecutionHistoryPages(&swf.GetWorkflowExecutionHistoryInput{
 			Domain: S(c.f.Domain),
 			Execution: &swf.WorkflowExecution{
 				WorkflowId: S(id),
 				RunId:      S(run),
 			},
 			ReverseOrder: aws.Bool(true),
-		})
+		}, eachPage)
 
-		if err != nil {
-			if ae, ok := err.(awserr.Error); ok {
+		if pagingErr != nil {
+			if ae, ok := pagingErr.(awserr.Error); ok {
 				Log.Printf("component=client fn=GetState at=get-history error-type=%s message=%s", ae.Code(), ae.Message())
 			} else {
-				Log.Printf("component=client fn=GetState at=get-history error=%q", err)
+				Log.Printf("component=client fn=GetState at=get-history error=%q", pagingErr)
 			}
-			return nil, nil, err
+			return nil, nil, pagingErr
 		}
 
-		ss, err := c.f.findSerializedState(history.Events)
-		return ss, history, err
-
+		return state, history, err
 	}
 
 	var err error

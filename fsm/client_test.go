@@ -857,12 +857,14 @@ func Test_Client_GetSerializedStateForRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stateMarkerEvent := &swf.HistoryEvent{
-		EventType: aws.String(swf.EventTypeMarkerRecorded),
-		MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
-			Details:    aws.String(stateMarker),
-			MarkerName: aws.String(StateMarker),
-		},
+	makeStateMarkerEvent := func() *swf.HistoryEvent {
+		return &swf.HistoryEvent{
+			EventType: aws.String(swf.EventTypeMarkerRecorded),
+			MarkerRecordedEventAttributes: &swf.MarkerRecordedEventAttributes{
+				Details:    aws.String(stateMarker),
+				MarkerName: aws.String(StateMarker),
+			},
+		}
 	}
 
 	makeOtherEvent := func() *swf.HistoryEvent {
@@ -871,49 +873,91 @@ func Test_Client_GetSerializedStateForRun(t *testing.T) {
 		}
 	}
 
-	simpleHistoryWithMarker := &swf.GetWorkflowExecutionHistoryOutput{
-		Events: []*swf.HistoryEvent{
-			makeOtherEvent(),
-			stateMarkerEvent,
-			makeOtherEvent(),
-		},
-		NextPageToken: nil,
+	makeHistoryPageWithMarker := func() *swf.GetWorkflowExecutionHistoryOutput {
+		return &swf.GetWorkflowExecutionHistoryOutput{
+			Events: []*swf.HistoryEvent{
+				makeOtherEvent(),
+				makeStateMarkerEvent(),
+				makeOtherEvent(),
+			},
+			NextPageToken: nil,
+		}
 	}
 
-	simpleHistoryWithoutMarker := &swf.GetWorkflowExecutionHistoryOutput{
-		Events: []*swf.HistoryEvent{
-			makeOtherEvent(),
-			makeOtherEvent(),
-		},
-		NextPageToken: nil,
+	makeHistoryPageWithoutMarker := func() *swf.GetWorkflowExecutionHistoryOutput {
+		return &swf.GetWorkflowExecutionHistoryOutput{
+			Events: []*swf.HistoryEvent{
+				makeOtherEvent(),
+				makeOtherEvent(),
+			},
+			NextPageToken: nil,
+		}
+	}
+
+	mergeHistoryPages := func(pages ...*swf.GetWorkflowExecutionHistoryOutput) *swf.GetWorkflowExecutionHistoryOutput {
+		out := &swf.GetWorkflowExecutionHistoryOutput{}
+		for _, page := range pages {
+			out.Events = append(out.Events, page.Events...)
+		}
+		return out
 	}
 
 	tests := []struct {
-		name        string
-		mockHistory *swf.GetWorkflowExecutionHistoryOutput
-		wantState   *SerializedState
-		wantHistory *swf.GetWorkflowExecutionHistoryOutput
-		wantErr     bool
+		name             string
+		mockHistoryPages []*swf.GetWorkflowExecutionHistoryOutput
+		wantState        *SerializedState
+		wantErr          bool
 	}{
 		{
-			name:        "find state on first page",
-			mockHistory: simpleHistoryWithMarker,
-			wantState:   state,
-			wantHistory: simpleHistoryWithMarker,
-			wantErr:     false,
+			name: "find state on first page",
+			mockHistoryPages: []*swf.GetWorkflowExecutionHistoryOutput{
+				makeHistoryPageWithMarker(),
+			},
+			wantState: state,
+			wantErr:   false,
 		},
 		{
-			name:        "do not find state on first page",
-			mockHistory: simpleHistoryWithoutMarker,
-			wantState:   nil,
-			wantHistory: simpleHistoryWithoutMarker,
-			wantErr:     true,
+			name: "find state on second page",
+			mockHistoryPages: []*swf.GetWorkflowExecutionHistoryOutput{
+				makeHistoryPageWithoutMarker(),
+				makeHistoryPageWithMarker(),
+			},
+			wantState: state,
+			wantErr:   false,
+		},
+		{
+			name: "do not find state on first page",
+			mockHistoryPages: []*swf.GetWorkflowExecutionHistoryOutput{
+				makeHistoryPageWithoutMarker(),
+			},
+			wantState: nil,
+			wantErr:   true,
+		},
+		{
+			name: "do not find state on second page",
+			mockHistoryPages: []*swf.GetWorkflowExecutionHistoryOutput{
+				makeHistoryPageWithoutMarker(),
+				makeHistoryPageWithoutMarker(),
+			},
+			wantState: nil,
+			wantErr:   true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			wantHistory := mergeHistoryPages(tt.mockHistoryPages...)
+
 			mockSwf := &mocks.SWFAPI{}
-			mockSwf.MockOnAny_GetWorkflowExecutionHistory().Return(tt.mockHistory, nil)
+			mockSwf.MockOnAny_GetWorkflowExecutionHistoryPages().Return(
+				func(input *swf.GetWorkflowExecutionHistoryInput, pager func(*swf.GetWorkflowExecutionHistoryOutput, bool) bool) error {
+					for i, historyPage := range tt.mockHistoryPages {
+						if !pager(historyPage, i == len(tt.mockHistoryPages)-1) {
+							return nil
+						}
+					}
+					panic("no more pages")
+				},
+			)
 
 			c := NewFSMClient(dummyFsm(), mockSwf)
 			gotState, gotHistory, gotError := c.GetSerializedStateForRun("test-workflow-id", "test-run-id")
@@ -924,8 +968,8 @@ func Test_Client_GetSerializedStateForRun(t *testing.T) {
 			if !reflect.DeepEqual(gotState, tt.wantState) {
 				t.Errorf("GetSerializedStateForRun() gotState = %v, wantState %v", gotState, tt.wantState)
 			}
-			if !reflect.DeepEqual(gotHistory, tt.wantHistory) {
-				t.Errorf("GetSerializedStateForRun() gotHistory = %v, wantState %v", gotHistory, tt.wantHistory)
+			if !reflect.DeepEqual(gotHistory, wantHistory) {
+				t.Errorf("GetSerializedStateForRun() gotHistory = %v, wantState %v", gotHistory, wantHistory)
 			}
 		})
 	}
