@@ -396,7 +396,7 @@ func TestTickRateLimit(t *testing.T) {
 		t.Fatal("Not Completed")
 	}
 	if hc.ticks == 0 || hc.ticks > 5 {
-		t.Fatalf("must run no more than 5x in 500ms with a tickInterval of 100ms. Ticks: %d")
+		t.Fatalf("must run no more than 5x in 500ms with a tickInterval of 100ms. Ticks: %d", hc.ticks)
 	}
 }
 
