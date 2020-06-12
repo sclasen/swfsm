@@ -7,6 +7,8 @@ import (
 
 // LocatePanic takes result of recover(), and will return the file name, line
 // and function name that triggered the panic
+//
+// line is best effort and may not be accurate.
 func LocatePanic(r interface{}) (file string, line int, funcName string) {
 	defer func() {
 		// Be safe in here

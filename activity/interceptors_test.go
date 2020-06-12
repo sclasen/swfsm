@@ -76,6 +76,13 @@ func TestInterceptors(t *testing.T) {
 		t.Fatal("no after fail")
 	}
 
+	if calledComplete {
+		t.Fatal("complete should not be called")
+	}
+
+	if calledCanceled {
+		t.Fatal("cancel should not be called")
+	}
 }
 
 func TestFailedInterceptor(t *testing.T) {
@@ -126,9 +133,14 @@ func TestFailedInterceptor(t *testing.T) {
 		t.Fatal("no after fail")
 	}
 	if failMessage != "fail" {
-		t.Fatal("wong error message")
+		t.Fatal("wrong error message")
 	}
-
+	if calledComplete {
+		t.Fatal("complete should not be called")
+	}
+	if calledCanceled {
+		t.Fatal("cancel should not be called")
+	}
 }
 
 func TestCanceledInterceptor(t *testing.T) {
@@ -181,7 +193,12 @@ func TestCanceledInterceptor(t *testing.T) {
 	if details != "details" {
 		t.Fatalf("wong task canceled details. Got: %q", details)
 	}
-
+	if calledFail {
+		t.Fatal("fail should not be called")
+	}
+	if calledComplete {
+		t.Fatal("complete should not be called")
+	}
 }
 
 func TestComposedInterceptor(t *testing.T) {

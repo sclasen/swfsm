@@ -477,7 +477,7 @@ func TestTimerTracking(t *testing.T) {
 	info = c.TimerInfo(timerFired)
 
 	if info != nil {
-		t.Fatal("non nil info %v", info)
+		t.Fatalf("non nil info %v", info)
 	}
 
 	c.Track(timerStart2)
@@ -491,7 +491,7 @@ func TestTimerTracking(t *testing.T) {
 	info = c.TimerInfo(timerCanceled)
 
 	if info != nil {
-		t.Fatal("non nil info2 %v", info)
+		t.Fatalf("non nil info2 %v", info)
 	}
 }
 

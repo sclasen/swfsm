@@ -350,10 +350,10 @@ func TestTypedActivityWorker(t *testing.T) {
 	go NewWorkerFSM(client, done).Start()
 
 	_, err := client.StartWorkflowExecution(&swf.StartWorkflowExecutionInput{
-		Domain:       S(domain),
-		WorkflowId:   S("worker-test"),
-		WorkflowType: &swf.WorkflowType{Name: S(workflow), Version: S(version)},
-		Input:        S("{}"),
+		Domain:                       S(domain),
+		WorkflowId:                   S("worker-test"),
+		WorkflowType:                 &swf.WorkflowType{Name: S(workflow), Version: S(version)},
+		Input:                        S("{}"),
 		ExecutionStartToCloseTimeout: S("90"),
 		TaskStartToCloseTimeout:      S("10"),
 		ChildPolicy:                  S("ABANDON"),

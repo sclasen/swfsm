@@ -828,14 +828,14 @@ func scheduleActivityDecision() *swf.Decision {
 func completeDecision() *swf.Decision {
 	return &swf.Decision{
 		CompleteWorkflowExecutionDecisionAttributes: &swf.CompleteWorkflowExecutionDecisionAttributes{},
-		DecisionType:                                S(swf.DecisionTypeCompleteWorkflowExecution),
+		DecisionType: S(swf.DecisionTypeCompleteWorkflowExecution),
 	}
 }
 
 func cancelDecision() *swf.Decision {
 	return &swf.Decision{
 		CancelWorkflowExecutionDecisionAttributes: &swf.CancelWorkflowExecutionDecisionAttributes{},
-		DecisionType:                              S(swf.DecisionTypeCancelWorkflowExecution),
+		DecisionType: S(swf.DecisionTypeCancelWorkflowExecution),
 	}
 }
 
